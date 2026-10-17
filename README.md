@@ -102,3 +102,4 @@ node docs/tools/screenshots.js                   # переснять скрин
   и синхронное управление.
 - **Сценарий** — файл в `backend/scenarios/` с `run(ctx)`; что умеет `ctx` —
   в [руководстве](docs/guide.md#что-умеет-ctx).
+# ferma
