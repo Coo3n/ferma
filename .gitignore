@@ -20,3 +20,19 @@ tags.json
 /*.patch
 /*.zip
 /my-state.txt
+
+# картинки, видео и прочий мусор от работы фермы: скриншоты, записи экрана,
+# кропы целей записанных сценариев. Картинки документации — исключение.
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.mp4
+*.webm
+!docs/images/**
+*.log
+*.rej
+*.orig
+.DS_Store
+.pytest_cache/
