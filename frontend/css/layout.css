@@ -1,0 +1,698 @@
+/* Каркас: шапка, верхнеуровневые виды, рабочее место устройства.
+
+   Навигация одноуровневая: Ферма / Сценарии / Задачи, плюс «Устройство»,
+   которое появляется в шапке только когда карточка раскрыта. Вложенные
+   вкладки остались лишь внутри рабочего места устройства — там они описывают
+   инструменты одного и того же экрана, а не разделы приложения. */
+
+/* ------------------------------------------------------------------ шапка */
+
+/* body > header, а не просто header: правило на голый тег ловило любой
+   <header> на странице. Из-за этого шапка карточки внутри подвала схемы
+   получала display:flex с высотой 50px, и заголовок с пояснением в ней
+   вставали в строку вместо друг друга. Шапка приложения ровно одна и
+   лежит прямо в body — сузили селектор до неё. */
+body > header {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    padding: 0 var(--s3);
+    height: 54px;
+    background: color-mix(in srgb, var(--panel) 85%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+    flex: 0 0 auto;
+    z-index: 20;
+}
+
+body > header h1 {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    margin: 0;
+    font: 600 var(--fs-3) var(--sans);
+    white-space: nowrap;
+}
+
+/* Знак: робот в подсвеченном квадрате. Девять пикселей заливки читались как
+   индикатор состояния, а не как логотип, — и в шапке не за что было зацепиться
+   глазу. Рисунок вшит в разметку: ферма обязана подниматься без интернета. */
+body > header h1 .mark {
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r2);
+    color: var(--accent);
+    background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--accent) 5%, transparent));
+    box-shadow: inset 0 0 0 1px var(--accent-line);
+    flex: 0 0 auto;
+}
+
+body > header h1 .mark svg {
+    width: 17px;
+    height: 17px
+}
+
+body > header h1 .wm {
+    color: var(--text);
+}
+
+.nav {
+    display: flex;
+    gap: var(--s1);
+    align-items: center
+}
+
+.navbtn {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text2);
+    font-weight: 600;
+    font-size: var(--fs-3);
+    padding: 7px 14px;
+}
+
+.navbtn:hover:not(:disabled) {
+    background: var(--panel2);
+    color: var(--text);
+    border-color: transparent
+}
+
+.navbtn {
+    position: relative;
+}
+
+/* Активный раздел — заливка и черта снизу, без рамки: тройное
+   выделение (рамка+заливка+черта) спорило с кнопками на панели ниже. */
+.navbtn.on {
+    color: var(--text);
+    background: var(--panel2);
+    border-color: transparent;
+}
+
+/* Подчёркивание активного раздела разъезжается из центра. Заливка и цвет
+   переключаются мгновенно и не показывают направление; растущая черта
+   даёт переходу точку отсчёта — глаз цепляется за неё и понимает, что
+   сменился раздел, а не просто перекрасилась кнопка.
+
+   scaleX по псевдоэлементу, а не ширина: анимация ширины считается
+   раскладкой на каждом кадре, transform — нет. */
+.navbtn::after {
+    content: "";
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 2px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--accent-fill);
+    transform: scaleX(0);
+    transition: transform var(--mid) var(--ease-out);
+}
+
+.navbtn.on::after {
+    transform: scaleX(1);
+}
+
+.navbtn[hidden] {
+    display: none
+}
+
+/* Имя устройства бывает длинным («sdk gphone16k arm64») и в узкой шапке
+   выдавливало соседей за край экрана. Режем многоточием, полное имя всё
+   равно стоит в заголовке рабочего места. */
+#navDeviceName {
+    max-width: 15ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.badge {
+    min-width: 17px;
+    height: 17px;
+    padding: 0 5px;
+    border-radius: var(--pill);
+    background: var(--busy);
+    color: var(--bg);
+    font: 700 var(--fs-1)/17px var(--sans);
+    text-align: center;
+}
+
+.badge[hidden] {
+    display: none
+}
+
+.stat {
+    color: var(--dim);
+    font: var(--fs-2) var(--sans);
+    font-variant-numeric: tabular-nums;
+    background: transparent;
+    border-radius: var(--pill);
+    padding: 3px 4px;
+    white-space: nowrap;
+}
+
+.stat b {
+    color: var(--text);
+    font-weight: 650
+}
+
+/* Счётчик, которому нечего показать, не должен висеть пустой рамкой. */
+.stat:empty {
+    display: none
+}
+
+/* ------------------------------------------------------------------- виды */
+
+main {
+    flex: 1;
+    min-height: 0;
+    display: flex
+}
+
+.view {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+}
+
+/* Раздел не подменяется, а въезжает: контент поднимается и проявляется.
+   Смена без движения читается как перезагрузка страницы — непонятно, ты
+   перешёл или всё моргнуло. */
+/* Без анимации появления (2026-10-17): «Все запуски / Проблемы /
+   Расписание» — три отдельных раздела со своей панелью, и сдвиг на 8px
+   при каждом клике по вкладке выглядел как прыжок всего экрана вместе
+   с самими вкладками. Раздел меняется мгновенно и стоит на месте. */
+.view.on {
+    display: flex;
+}
+
+@keyframes view-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* Полоса действий вверху каждого вида — единственное место для кнопок
+   раздела, поэтому выглядит одинаково везде. */
+.bar {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    padding: var(--s2) var(--s4);
+    background: var(--bg);
+    border-bottom: 1px solid var(--line-soft);
+    flex: 0 0 auto;
+    min-height: 52px;
+    flex-wrap: wrap;
+}
+
+.bar strong {
+    font-size: var(--fs-4);
+    font-weight: 650
+}
+
+.find {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--well);
+    border: 1px solid var(--line);
+    border-radius: var(--r2);
+    padding: 0 10px;
+    min-width: 240px;
+    color: var(--dim);
+    transition: border-color var(--fast) var(--ease);
+}
+
+.find:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim)
+}
+
+.find input {
+    border: none;
+    background: none;
+    padding: 6px 0
+}
+
+.find input:focus {
+    box-shadow: none
+}
+
+.chips {
+    display: flex;
+    gap: var(--s1)
+}
+
+.chip {
+    padding: 4px 12px;
+    border-radius: var(--pill);
+    font-size: var(--fs-2);
+    color: var(--text2);
+    background: transparent;
+}
+
+.chip.on {
+    background: var(--panel3);
+    border-color: transparent;
+    color: var(--text)
+}
+
+/* Раньше у чипов не было иконок (только текст «Схема»/«Список») — без
+   этого правила значок брал бы --icon-md (15px) и не совпадал бы по
+   размеру с соседними кнопками .sm (13px) в той же строке. */
+.chip .ic {
+    width: var(--icon-sm);
+    height: var(--icon-sm)
+}
+
+.scroll {
+    overflow-y: auto;
+    min-height: 0
+}
+
+.scroll.grow {
+    flex: 1
+}
+
+/* Два столбца: список слева, подробности справа. Общая раскладка для
+   «Сценариев» и «Задач» — разделы разные, устройство чтения одно. */
+.split {
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(260px, 360px) 1fr;
+    min-height: 0;
+}
+
+.split > * {
+    min-width: 0;
+    min-height: 0
+}
+
+.split > * + * {
+    border-left: 1px solid var(--line-soft)
+}
+
+.pad-box {
+    padding: var(--s3)
+}
+
+.logwrap {
+    display: flex;
+    flex-direction: column;
+    min-height: 0
+}
+
+/* ---------------------------------------------------- рабочее место устр-ва */
+
+/* Рабочее место: конструктор сюжета занимает всё, зеркало экрана стоит
+   сбоку узкой колонкой. Ширину зеркала держит --mirror-w: её двигает
+   мышью разделитель (.wsplit, workspace.js) и запоминает localStorage —
+   сколько места отдать графу, зависит от сюжета, а не от нашей догадки.
+   Прежняя раскладка (экран слева, вкладки справа, потолок 420px) отдавала
+   графу треть окна: развилка на пять веток в неё не помещалась. */
+.work {
+    --mirror-w: 380px;
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(360px, 1fr) 7px var(--mirror-w);
+    min-height: 0;
+}
+
+.col {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0
+}
+
+.col.mirror {
+    border-left: 1px solid var(--line-soft);
+    background: var(--panel)
+}
+
+/* Свёрнутое зеркало: холсту достаётся вся ширина. Не display:none на
+   .stage — узел #screen обязан остаться в документе, иначе MJPEG-поток
+   рвётся и при разворачивании кадр приходится поднимать заново. */
+.work.mirror-off {
+    grid-template-columns: 1fr 0 0;
+}
+
+.work.mirror-off > .mirror,
+.work.mirror-off > .wsplit {
+    visibility: hidden;
+    overflow: hidden;
+}
+
+/* Разделитель: 7px полосы мало для мыши, поэтому тянущая зона расширена
+   псевдоэлементом наружу — сама полоса остаётся тонкой линией. */
+.wsplit {
+    position: relative;
+    background: var(--line-soft);
+    cursor: col-resize;
+    touch-action: none;
+    transition: background var(--fast) var(--ease);
+}
+
+.wsplit::after {
+    content: "";
+    position: absolute;
+    inset: 0 -4px;
+}
+
+.wsplit:hover,
+.wsplit.dragging,
+.wsplit:focus-visible {
+    background: var(--accent-fill);
+}
+
+.box {
+    padding: var(--s4);
+    border-bottom: 1px solid var(--line-soft);
+    flex: 0 0 auto
+}
+
+/* Заголовок блока — настоящий заголовок, а не мелкая подпись: раньше он
+   был моноширинным капсом 10px и читался как служебная метка. */
+.box h3 {
+    margin: 0 0 var(--s2);
+    font: 600 var(--fs-4) var(--sans);
+    color: var(--text);
+}
+
+/* Имя выбранного сценария — главный заголовок панели. */
+#scParams > h3 {
+    font-size: var(--fs-5);
+}
+
+.row {
+    display: flex;
+    gap: var(--s2);
+    align-items: center;
+    margin-bottom: var(--s2)
+}
+
+.row:last-child {
+    margin-bottom: 0
+}
+
+.row label {
+    flex: 0 0 120px;
+    color: var(--text2);
+    font-size: var(--fs-3)
+}
+
+.kb {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--dim);
+    font-size: var(--fs-2);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.kb:hover {
+    color: var(--text)
+}
+
+/* Чекбокс рисуем сами. Нативный приходит светло-серым залитым квадратом
+   от системы: среди тёмных кнопок-пилюль он читается как чужой элемент,
+   попавший на страницу по ошибке, и не подчиняется теме. Размер 15px
+   вместо системных 13 — чтобы совпадать по высоте со строчной буквой
+   подписи рядом. */
+.kb input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    flex: 0 0 auto;
+    border: 1px solid var(--line);
+    border-radius: var(--r1);
+    background: var(--panel2);
+    display: grid;
+    place-content: center;
+    cursor: pointer;
+    transition: background var(--fast) var(--ease),
+    border-color var(--fast) var(--ease);
+}
+
+.kb:hover input[type="checkbox"]:not(:checked) {
+    border-color: var(--line-hover);
+}
+
+.kb input[type="checkbox"]:checked {
+    background: var(--accent-fill);
+    border-color: var(--accent);
+}
+
+/* Галочка — ::before со scale(0): при переключении она вырастает, а не
+   возникает рывком, и видно, что это ответ на клик. */
+.kb input[type="checkbox"]::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    transform: scale(0);
+    transition: transform var(--fast) var(--ease);
+    background: var(--accent-ink);
+    clip-path: polygon(14% 45%, 0 60%, 39% 100%, 100% 22%, 85% 8%, 38% 71%);
+}
+
+.kb input[type="checkbox"]:checked::before {
+    transform: scale(1);
+}
+
+/* Радиокнопка — там же, где галка: выбор ветки отвода и селектора цели
+   (.rs-alts). Круглая, не квадратная: форма отличает «одно из» от
+   «включено/выключено», и подменять её галочкой нельзя. */
+.kb input[type="radio"],
+.rs-alts input[type="radio"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    flex: 0 0 auto;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--panel2);
+    display: grid;
+    place-content: center;
+    cursor: pointer;
+    transition: border-color var(--fast) var(--ease);
+}
+
+.kb input[type="radio"]:checked,
+.rs-alts input[type="radio"]:checked {
+    border-color: var(--accent);
+}
+
+.kb input[type="radio"]::before,
+.rs-alts input[type="radio"]::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent-fill);
+    transform: scale(0);
+    transition: transform var(--fast) var(--ease);
+}
+
+.kb input[type="radio"]:checked::before,
+.rs-alts input[type="radio"]:checked::before {
+    transform: scale(1);
+}
+
+/* Фокус с клавиатуры обязан быть виден: без этого таб-обход упирается в
+   квадрат, который никак не отзывается. */
+.kb input[type="checkbox"]:focus-visible,
+.kb input[type="radio"]:focus-visible,
+.rs-alts input[type="radio"]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.inline {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s2);
+    color: var(--dim);
+    font-size: var(--fs-2);
+    white-space: nowrap;
+}
+
+.inline select, .inline input {
+    width: auto
+}
+
+.inline input[type=number] {
+    width: 64px
+}
+
+pre.log {
+    margin: 0;
+    padding: var(--s3);
+    font: var(--fs-1)/1.65 var(--mono);
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text2);
+    background: var(--well);
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+}
+
+/* --------------------------------------------------------------- адаптив */
+
+/* На рабочем месте устройства сводка по задачам уезжает по той же причине,
+   что и на узком окне ниже: 300px строки «очередь · работает · ok · сбой»
+   против значка на кнопке «Задачи», который несёт тот же смысл. Здесь это
+   особенно заметно — шапка и так полна (логотип, четыре раздела, состояние
+   сети, adb), а под ней ещё три панели самого рабочего места. */
+body:has(#view-device.on) #stJobs {
+    display: none;
+}
+
+/* Ноутбук: правая колонка рабочего места ужимается первой — экран
+   устройства важнее списка шагов. Подробная статистика задач уезжает: она
+   занимает 300px, а тот же смысл несёт значок на кнопке «Задачи». */
+@media (max-width: 1180px) {
+    .work {
+        --mirror-w: 320px;
+    }
+
+    .split {
+        grid-template-columns: minmax(220px, 300px) 1fr
+    }
+
+    #stJobs {
+        display: none
+    }
+}
+
+/* Планшет и узкое окно: колонки складываются в одну, боковая панель
+   получает свою высоту. Горизонтальной прокрутки не появляется нигде. */
+@media (max-width: 900px) {
+    .work, .split {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto;
+        overflow-y: auto
+    }
+
+    .col.mirror, .split > * + * {
+        border-left: none;
+        border-top: 1px solid var(--line)
+    }
+
+    /* Колонки и так стоят строками — тянуть нечего. */
+    .wsplit {
+        display: none;
+    }
+
+    /* На узком окне свёрнутое зеркало убирает свою строку целиком, а не
+       меняет число колонок (оно уже 1). */
+    .work.mirror-off {
+        grid-template-rows: 1fr;
+    }
+
+    .work.mirror-off > .mirror {
+        display: none;
+    }
+
+    /* Строка auto ужимала колонку до min-content: кадр схлопывался
+       в полоску (0×0), а панели кнопок с flex-shrink:0 вылезали поверх
+       соседней колонки. Задаём гарантированную высоту — остаток берёт холст. */
+    .work > .col.build {
+        min-height: 60vh
+    }
+
+    .stage {
+        min-height: 38vh
+    }
+
+    .col.mirror {
+        min-height: 62vh
+    }
+
+    .split > * {
+        max-height: 60vh
+    }
+
+    body > header {
+        flex-wrap: wrap;
+        height: auto;
+        padding: var(--s2) var(--s3);
+        gap: var(--s2)
+    }
+
+    .nav {
+        order: 3;
+        width: 100%
+    }
+
+    /* min-width:0 обязателен: у флекс-элемента он по умолчанию auto, и
+       кнопка отказывается ужиматься уже кнопки с её содержимым — из-за
+       этого нижняя навигация вылезала за край на узком экране. */
+    .navbtn {
+        flex: 1;
+        justify-content: center;
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    #navDeviceName {
+        max-width: 10ch
+    }
+}
+
+@media (max-width: 640px) {
+    body > header h1 span:not(.mark) {
+        display: none
+    }
+
+    .bar {
+        gap: var(--s1)
+    }
+
+    .find {
+        min-width: 130px;
+        flex: 1
+    }
+
+    .stat {
+        font-size: var(--fs-1);
+        padding: 3px 8px
+    }
+}
+
+/* Открытое устройство — контекст, не раздел.
+   Стоит вне .nav и выглядит иначе: рамка вместо плоской кнопки, имя
+   устройства вместо слова «Устройство», явный крестик. Раньше это была
+   четвёртая кнопка среди разделов, и с фермы читалась как «ещё один раздел»,
+   хотя на деле означала «у вас открыт телефон». */
+.ctx {
+    display: inline-flex; align-items: stretch;
+    border: 1px solid var(--accent-line); border-radius: var(--r2);
+    background: var(--accent-dim); overflow: hidden;
+}
+.ctx-go, .ctx-x {
+    display: inline-flex; align-items: center; gap: var(--s2);
+    background: none; border: 0; cursor: pointer;
+    color: var(--text); font: inherit; font-size: var(--fs-2);
+    padding: var(--s2) var(--s3);
+}
+.ctx-x { color: var(--dim); border-left: 1px solid var(--accent-line); padding: var(--s2); }
+.ctx-go:hover { background: var(--accent-dim); }
+.ctx-x:hover { color: var(--bad); background: var(--panel2); }
+.ctx-go:focus-visible, .ctx-x:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }

@@ -1,0 +1,6 @@
+# Слои зрения резолвера: OCR и поиск по шаблону. Без них ферма работает,
+# просто эти два слоя выключены.
+opencv-python-headless>=4.9
+numpy>=1.26
+ocrmac>=1.0 ; sys_platform == "darwin"
+pytesseract>=0.3.10 ; sys_platform != "darwin"

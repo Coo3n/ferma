@@ -1,0 +1,207 @@
+{
+ "meta": {
+  "name": "Записанный сценарий",
+  "description": "",
+  "watch_popups": true,
+  "human": true
+ },
+ "params": {},
+ "steps": [
+  {
+   "kind": "launch_app",
+   "args": {
+    "package": "com.wildberries.ru.dev"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "expect",
+   "args": {
+    "name": "screen3"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": [
+    "resourceId=\"MainBannersComponentContent\"",
+    "resourceId=\"horizontalPager\"",
+    "resourceId=\"bannerPage_1\""
+   ],
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "text=\"Из китая\"",
+    "fallbacks": []
+   },
+   "param": null,
+   "note": "«Из китая»",
+   "texts": [
+    "Из китая"
+   ],
+   "crop": "03_click.png",
+   "point": [
+    0.112,
+    0.5788
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "swipe",
+   "args": {
+    "x1": 0.6434915860268453,
+    "y1": 0.8885279826066457,
+    "x2": 0.6434915860268453,
+    "y2": 0.7477046797029508,
+    "duration": 0.575
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "long_tap",
+   "args": {
+    "x": 0.6652856210448651,
+    "y": 0.8801456431480924,
+    "duration": 0.8
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "expect",
+   "args": {
+    "name": "screen5"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": [
+    "resourceId=\"com.wildberries.ru.dev:id/snackbarCompose\"",
+    "resourceId=\"com.wildberries.ru.dev:id/bottomBarShadow\"",
+    "resourceId=\"com.wildberries.ru.dev:id/bottomBarCompose\""
+   ],
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "text=\"Смартфоны\"",
+    "fallbacks": []
+   },
+   "param": null,
+   "note": "«Смартфоны»",
+   "texts": [
+    "Смартфоны"
+   ],
+   "crop": "07_click.png",
+   "point": [
+    0.125,
+    0.4314
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "expect",
+   "args": {
+    "name": "screen6"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": [
+    "resourceId=\"newFastFiltersRow\"",
+    "resourceId=\"TopBarRoot\"",
+    "resourceId=\"back\""
+   ],
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "className=\"android.view.View\", instance=14",
+    "fallbacks": [
+     "resourceId=\"catalogGridCardShimmer\""
+    ]
+   },
+   "param": null,
+   "note": "«catalogGridCardShimmer»",
+   "texts": [],
+   "crop": "09_click.png",
+   "point": [
+    0.2486,
+    0.4395
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  }
+ ],
+ "screen_width": 1080,
+ "line_map": {
+  "9": 0,
+  "10": 1,
+  "11": 2,
+  "12": 3,
+  "13": 4,
+  "14": 5,
+  "15": 6,
+  "16": 7,
+  "17": 8
+ },
+ "code_sha256": "7f9f51250b7031286d3ddbe97a58de23cf90c99106e058e924a6e1004656254a"
+}

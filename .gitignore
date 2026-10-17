@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.pyc
+artifacts/
+data/
+devices.json
+network.json
+.superpowers/
+.idea/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# локальные данные фермы: пароли аккаунтов, группы
+accounts.json
+groups.json
+schedules.json
+tags.json
+
+# служебные файлы для обмена правками — не в git
+/*.patch
+/my-state.txt

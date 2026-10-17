@@ -1,0 +1,989 @@
+.sc {
+    padding: var(--s3) var(--s4);
+    border-bottom: 1px solid var(--line-soft);
+    cursor: pointer;
+    border-left: 2px solid transparent;
+}
+
+.sc:hover {
+    background: var(--panel2)
+}
+
+.sc.on {
+    background: var(--accent-dim);
+    border-left-color: var(--accent)
+}
+
+.sc .nm {
+    font-weight: 600
+}
+
+.sc .ds {
+    color: var(--text2);
+    font-size: var(--fs-2);
+    margin-top: 2px
+}
+
+.sc .er {
+    color: var(--bad);
+    font: var(--fs-1) var(--mono);
+    margin-top: 3px
+}
+
+.sc .meta {
+    color: var(--dim);
+    font-size: var(--fs-2);
+    margin-top: 2px
+}
+
+.sc .health {
+    display: flex;
+    gap: 8px;
+    font-size: var(--fs-2);
+    margin-top: 2px
+}
+
+.sc .hp {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px
+}
+
+.sc .hp.ok { color: var(--ok) }
+.sc .hp.warn { color: var(--warn) }
+.sc .hp.bad { color: var(--bad) }
+
+/* Группы списка сценариев: «Готовые шаблоны» сверху, затем свои. */
+#scList .sc-group {
+    padding: var(--s4) var(--s4) var(--s1);
+    color: var(--dim);
+    font-size: var(--fs-2);
+    font-weight: 600;
+}
+
+.sc:not(.on):not(:hover):not(:focus-within) .nm button {
+    background: transparent;
+    color: var(--dim);
+}
+
+.job {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: var(--s2) var(--s4);
+    border-bottom: 1px solid var(--line-soft);
+    cursor: pointer;
+    font-size: var(--fs-3);
+}
+
+.job:hover {
+    background: var(--panel2)
+}
+
+.job.on {
+    background: var(--accent-dim)
+}
+
+.job .nm {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis
+}
+
+.job > span:last-child {
+    font-family: var(--sans);
+    font-size: var(--fs-2)
+}
+
+.xdel {
+    border: none;
+    background: none;
+    color: var(--dim);
+    padding: 0 3px;
+    font-size: var(--fs-2);
+    opacity: 0;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+.job:hover .xdel {
+    opacity: .7
+}
+
+.xdel:hover {
+    opacity: 1 !important;
+    color: var(--bad);
+    background: none;
+    border: none
+}
+
+/* В отличие от .xdel видна всегда: у живой задачи отмена — главное действие. */
+.xstop {
+    border: none;
+    background: none;
+    color: var(--bad);
+    padding: 0 3px;
+    font-size: var(--fs-1);
+    opacity: .6;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+.xstop:hover {
+    opacity: 1;
+    background: none;
+    border: none
+}
+
+.badge {
+    font: 700 var(--fs-1) var(--sans);
+    padding: 2px 8px;
+    border-radius: var(--pill);
+}
+
+.b-queued {
+    background: var(--panel3);
+    color: var(--text2)
+}
+
+.b-running {
+    background: color-mix(in srgb, var(--busy) 14%, transparent);
+    color: var(--busy);
+    animation: pulse 1.6s infinite
+}
+
+/* CANCELLING — задача ещё идёт, но уже доживает: пульс как у работающей,
+   цвет как у отменённой, чтобы исход читался заранее. */
+.b-cancelling {
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    color: var(--warn);
+    animation: pulse 1.6s infinite
+}
+
+.b-passed {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--ok)
+}
+
+.b-failed {
+    background: color-mix(in srgb, var(--bad) 13%, transparent);
+    color: var(--bad)
+}
+
+.b-cancelled {
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    color: var(--warn)
+}
+
+.arts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--line);
+    background: var(--panel);
+}
+
+.arts a {
+    color: var(--accent);
+    font: var(--fs-1) var(--sans);
+    text-decoration: none;
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    padding: 3px 8px;
+    border-radius: var(--pill);
+}
+
+.arts a:hover {
+    background: var(--accent-dim)
+}
+
+/* -------------------------------------------------------- отклонения */
+
+/* Строка отклонения — не элемент списка, а карточка с делом: заголовок,
+   объяснение и действия. Поэтому у неё три этажа, а не один, как у .job. */
+.dvn {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line-soft);
+    border-left: 2px solid var(--bad);
+    font-size: var(--fs-2);
+}
+
+/* Прочитанное отклонение не исчезает, но перестаёт кричать: если то же
+   повторится, запишется новая строка. */
+.dvn.seen {
+    border-left-color: var(--panel3);
+    opacity: .6;
+}
+
+.dvn-head {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.dvn-title {
+    font-weight: 600;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dvn-hits {
+    font: 700 var(--fs-1) var(--sans);
+    color: var(--warn);
+    flex: 0 0 auto;
+}
+
+.dvn-age {
+    font: var(--fs-1) var(--sans);
+    color: var(--dim);
+    flex: 0 0 auto;
+}
+
+.dvn .xdel {
+    opacity: .5;
+}
+
+.dvn-detail {
+    color: var(--dim);
+    margin-top: 4px;
+    line-height: 1.45;
+}
+
+.dvn-meta {
+    color: var(--dim);
+    font-size: var(--fs-1);
+    margin-top: 3px;
+}
+
+.dvn-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+/* Свёрнутые повторы одной и той же причины: та же карточка, только без
+   размноженного текста подряд. */
+.dvn-group-toggle {
+    display: block;
+    width: 100%;
+    text-align: left;
+    color: var(--dim);
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--line-soft);
+    padding: 6px 12px;
+    font-size: var(--fs-1);
+    cursor: pointer;
+}
+
+.dvn-group-toggle:hover {
+    color: var(--warn);
+}
+
+.dvn-group-more {
+    display: none;
+}
+
+.dvn-group.open .dvn-group-more {
+    display: block;
+}
+
+/* Главная кнопка падения. На узком экране палец крупнее .sm (27px). */
+.dvn-repair {
+    margin-top: 8px;
+}
+
+@media (max-width: 720px) {
+    .dvn-repair button,
+    .held-main,
+    .held-acts button {
+        min-height: 44px;
+    }
+}
+
+.dvn-acts a {
+    color: var(--accent);
+    font-size: var(--fs-1);
+    text-decoration: none;
+}
+
+.dvn-acts a:hover {
+    text-decoration: underline;
+}
+
+/* Миниатюра скрина: снимки телефона портретные, поэтому она слева
+   фиксированной коробкой 9/16, а не на всю ширину. Размер задан заранее —
+   когда картинка догрузится, ничего не сдвинется. */
+.dvn.has-shot {
+    display: flex;
+    gap: var(--s3);
+    align-items: flex-start;
+}
+
+.dvn-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.dvn-shot {
+    position: relative;
+    flex: 0 0 auto;
+    width: 60px;
+    height: 107px;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--r1);
+    background: var(--panel2);
+    cursor: pointer;
+}
+
+.dvn-shot:hover {
+    border-color: var(--accent);
+}
+
+.dvn-shot:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.dvn-shot img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Пока снимок грузится — заготовка с бегущим бликом; ok и gone ставит
+   сама картинка (onload / onerror). */
+.dvn-shot:not(.ok):not(.gone)::after,
+.dvn-big:not(.ok):not(.gone)::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, var(--panel3), transparent);
+    background-size: 200% 100%;
+    animation: dvn-shimmer 1.2s var(--ease) infinite;
+}
+
+@keyframes dvn-shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dvn-shot:not(.ok):not(.gone)::after,
+    .dvn-big:not(.ok):not(.gone)::after {
+        animation: none;
+    }
+}
+
+.dvn-gone {
+    display: none;
+    padding: var(--s2);
+    color: var(--dim);
+    font-size: var(--fs-1);
+    text-align: center;
+}
+
+.dvn-shot .dvn-gone {
+    position: absolute;
+    inset: 0;
+    align-items: center;
+    justify-content: center;
+}
+
+.gone > .dvn-gone {
+    display: flex;
+}
+
+.gone > img {
+    display: none;
+}
+
+/* Большой снимок: обёртка облегает саму картинку, поэтому проценты
+   маркера равны долям кадра. */
+.dvn-big {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    min-width: 160px;
+    min-height: 120px;
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: var(--r1);
+    overflow: hidden;
+    vertical-align: top;
+}
+
+.dvn-big img {
+    display: block;
+    max-width: 100%;
+    max-height: min(70vh, 720px);
+    height: auto;
+}
+
+.dvn-big.gone {
+    min-height: 200px;
+}
+
+.dvn-mark {
+    display: none;
+    position: absolute;
+    pointer-events: none;
+}
+
+/* Маркер показываем, только когда кадр загрузился: на заготовке он
+   указывал бы в пустую коробку. */
+.ok > .dvn-mark {
+    display: block;
+}
+
+/* Возле правого края подпись уходит влево, иначе её срежет overflow. */
+.dvn-mark.flip b {
+    left: auto;
+    right: 28px;
+}
+
+/* У верхнего края подпись уходит под кольцо: top:-10px срезал бы её. */
+.dvn-mark.below b {
+    top: 28px;
+}
+
+.dvn-mark i {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px var(--accent-line);
+}
+
+.dvn-mark b {
+    position: absolute;
+    left: 28px;
+    top: -10px;
+    padding: 2px var(--s2);
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: var(--r1);
+    color: var(--text);
+    font: 600 var(--fs-1) var(--sans);
+    white-space: nowrap;
+}
+
+.dvn-code {
+    font-family: var(--mono);
+    background: var(--panel3);
+    padding: 1px var(--s2);
+    border-radius: var(--r1);
+    word-break: break-all;
+}
+
+/* Виды отклонений. Цвет говорит о срочности: падение красное — прогон
+   встал; слепой обход и устаревший селектор жёлтые — доехало, но чинить
+   надо. */
+.b-fail {
+    background: color-mix(in srgb, var(--bad) 13%, transparent);
+    color: var(--bad)
+}
+
+.b-escape {
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    color: var(--warn)
+}
+
+.b-layer {
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    color: var(--warn)
+}
+
+/* ------------------------------------------------- остановка на человеке */
+
+/* Живой экран задачи: что на устройстве прямо сейчас, без похода на «Ферма».
+   Кадр обновляется сам — раз в несколько секунд, тот же ритм, что у плиток
+   на «Ферме»; для гладкой ручной работы это не замена, а превью. */
+.job-live {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 12px 0;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--r2);
+    background: var(--panel2);
+}
+
+.job-live-img {
+    flex: 0 0 auto;
+    width: 54px;
+    height: 96px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: var(--well);
+    opacity: 0;
+    transition: opacity .2s;
+}
+
+.job-live-img.ready {
+    opacity: 1;
+}
+
+.job-live-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: var(--fs-2);
+    color: var(--dim);
+}
+
+.job-live-info a {
+    color: var(--accent);
+}
+
+/* Задача стоит на промахнувшемся шаге и держит устройство. Полоса кричит
+   намеренно: каждая минута тут — простой телефона. */
+.held-bar {
+    border: 1px solid var(--warn);
+    border-radius: var(--r2);
+    background: color-mix(in srgb, var(--warn) 7%, transparent);
+    padding: 9px 12px;
+    margin: 10px 12px 0;
+    font-size: var(--fs-2);
+}
+
+.held-body {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.held-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.held-shot {
+    position: relative;
+    flex: 0 0 auto;
+    display: block;
+    width: 48px;
+    height: 86px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--r1);
+    background: var(--panel2);
+}
+
+.held-shot img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.held-shot:not(.ok):not(.gone) {
+    visibility: hidden;
+}
+
+.held-why {
+    display: flex;
+    gap: 7px;
+    align-items: flex-start;
+    color: var(--warn);
+    line-height: 1.45;
+}
+
+.held-why .ic {
+    flex: 0 0 auto;
+    margin-top: 1px;
+}
+
+.held-choice {
+    margin-top: 8px;
+}
+
+/* Главный шаг — один и крупнее остальных: с первого взгляда ясно, что жать. */
+.held-main {
+    font-size: var(--fs-3);
+    padding: 6px 12px;
+}
+
+.held-hint {
+    margin: 5px 0 0;
+    color: var(--dim);
+    line-height: 1.45;
+}
+
+/* Запасные ответы — мелко и без рамок: они есть, но не спорят с главным. */
+.held-acts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 4px;
+    margin-top: 6px;
+}
+
+.held-or {
+    color: var(--dim);
+    margin-right: 2px;
+}
+
+/* «Уронить» — необратимо для прогона: отдельно справа и красным. */
+.held-acts .held-drop {
+    margin-left: auto;
+    color: var(--bad);
+}
+
+button.held-shot {
+    padding: 0;
+    cursor: pointer;
+}
+
+button.held-shot:hover {
+    border-color: var(--accent);
+}
+
+/* HELD — разновидность RUNNING, а не итог: тот же пульс, что у работающей
+   задачи, но жёлтый, потому что ждут не телефон, а человека. */
+.b-held {
+    background: color-mix(in srgb, var(--warn) 14%, transparent);
+    color: var(--warn);
+    animation: pulse 1.6s infinite
+}
+
+.b-hold {
+    background: color-mix(in srgb, var(--warn) 14%, transparent);
+    color: var(--warn)
+}
+
+.b-branch {
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+    color: var(--warn)
+}
+
+.degraded {
+    color: var(--warn);
+    font-size: var(--fs-2);
+    cursor: help;
+}
+
+/* ----------------------------------------- «Проблемы»: карточка в три уровня
+
+   Слева снимок, по центру что случилось, справа факты столбиком — глаз
+   идёт по заголовкам сверху вниз, а цифры не мешают читать. Тип — цветной
+   точкой и словом, без бейджа капсом. Непрочитанное — полоса слева. */
+#dvnList {
+    padding: var(--s4);
+    display: grid;
+    gap: var(--s3);
+    align-content: start;
+}
+
+#dvnList .dvn {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) minmax(190px, 250px);
+    gap: var(--s4);
+    align-items: start;
+    padding: var(--s3) var(--s4);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--r3);
+    background: var(--panel);
+    box-shadow: none;
+}
+
+#dvnList .dvn:not(.has-shot) {
+    grid-template-columns: minmax(0, 1fr) minmax(190px, 250px);
+}
+
+#dvnList .dvn:not(.seen) {
+    box-shadow: inset 3px 0 0 var(--dk, var(--bad));
+}
+
+#dvnList .dvn.seen {
+    background: transparent;
+}
+
+#dvnList .dvn-shot {
+    width: 64px;
+    border-radius: var(--r1);
+    overflow: hidden;
+}
+
+#dvnList .dvn-main {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.dvn-kind {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--fs-2);
+    color: var(--dk, var(--text2));
+    font-weight: 600;
+}
+
+.dvn-kind i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--dk, var(--dim));
+}
+
+.dvn-new {
+    margin-left: 4px;
+    padding: 0 6px;
+    border-radius: var(--pill);
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+#dvnList .dvn-title {
+    margin: 0;
+    font-size: var(--fs-4);
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.35;
+}
+
+#dvnList .dvn-detail {
+    margin: 0;
+    color: var(--text2);
+    font-size: var(--fs-2);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+#dvnList .dvn-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s3);
+    align-items: center;
+    font-size: var(--fs-2);
+    margin-top: 2px;
+}
+
+/* Ссылки-действия: кегль строки (не сноски) и высота под палец/мышь —
+   прежние 11px «к задаче» были самым мелким, что надо нажимать. */
+#dvnList .dvn-acts a {
+    font-size: inherit;
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+}
+
+#dvnList .dvn-acts a.dim {
+    color: var(--dim);
+}
+
+.dvn-facts {
+    margin: 0;
+    display: grid;
+    gap: 6px;
+    font-size: var(--fs-2);
+}
+
+.dvn-facts div {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s2);
+    min-width: 0;
+}
+
+.dvn-facts dt {
+    flex: 0 0 auto;
+}
+
+.dvn-facts dt {
+    color: var(--dim);
+}
+
+.dvn-facts dd {
+    margin: 0;
+    min-width: 0;
+    color: var(--text);
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#dvnList .dvn .xdel {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    opacity: 0;
+}
+
+#dvnList .dvn:hover .xdel,
+#dvnList .dvn .xdel:focus-visible {
+    opacity: 1;
+}
+
+#dvnList .dvn-facts {
+    padding-right: 20px;
+    min-width: 0;
+}
+
+/* Цвет типа — одна переменная: точка, слово и полоса непрочитанного. */
+.dvn--fail, .dk-fail { --dk: var(--bad); }
+.dvn--hold, .dk-hold { --dk: var(--warn); }
+.dvn--escape, .dk-escape { --dk: var(--busy); }
+.dvn--branch, .dk-branch { --dk: var(--accent); }
+.dvn--layer, .dk-layer { --dk: var(--warn); }
+.dvn--lost, .dk-lost { --dk: var(--warn); }
+
+.hs-f[class*="dk-"] i { background: var(--dk); }
+
+#view-deviations .bar .hs-legend {
+    margin-left: var(--s2);
+    padding: 2px;
+    border: 0;
+    border-radius: var(--r2);
+    background: var(--panel2);
+}
+
+/* В панели фильтр по типу — той же высоты и формы, что вкладки рядом. */
+#view-deviations .bar .hs-f {
+    height: 28px;
+    padding: 0 10px;
+    border-radius: var(--r1);
+    font-size: var(--fs-2);
+}
+
+@media (max-width: 900px) {
+    #dvnList .dvn,
+    #dvnList .dvn:not(.has-shot) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* ------------------------------------------------ «Запуски»: группы */
+
+.rgroup {
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.rg-head {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px var(--s3);
+    padding: var(--s3) var(--s3) var(--s3) var(--s4);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    text-align: left;
+    white-space: normal;
+}
+
+.rg-head:hover {
+    background: var(--panel2);
+}
+
+.rg-title {
+    font-size: var(--fs-3);
+    color: var(--text2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rg-title b {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.rg-counts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--s3);
+    font-size: var(--fs-2);
+}
+
+.rg-counts .ok { color: var(--ok); }
+.rg-counts .bad { color: var(--bad); }
+.rg-counts .warn { color: var(--warn); margin: 0; display: inline; }   /* глобальный .warn давал сдвиг вниз */
+.rg-counts .busy { color: var(--busy); }
+
+.rg-head .bb-track {
+    grid-column: 1 / -1;
+    width: 100%;
+    height: 4px;
+}
+
+/* Полоса слева — итог запуска одним цветом: сбой виден в списке сразу. */
+.rgroup.rg-failed { box-shadow: inset 3px 0 0 var(--bad); }
+.rgroup.rg-held { box-shadow: inset 3px 0 0 var(--warn); }
+.rgroup.rg-running { box-shadow: inset 3px 0 0 var(--busy); }
+
+.rg-body {
+    padding-bottom: var(--s2);
+    background: var(--well);
+}
+
+.rg-body .job {
+    padding-left: var(--s5);
+}
+
+.rg-only {
+    margin: var(--s2) var(--s4) 0;
+}
+
+/* Правая панель шаблона: что делает, настройки по умолчанию, в расписание. */
+.sc-tpl-info {
+    display: grid;
+    gap: var(--s3);
+    max-width: 560px;
+    margin-top: var(--s4);
+    padding-top: var(--s4);
+    border-top: 1px solid var(--line-soft);
+    font-size: var(--fs-3);
+}
+
+.sc-tpl-info p {
+    margin: 0;
+    color: var(--text2);
+    line-height: 1.55;
+}
+
+.sc-tpl-info h4 {
+    margin: 0;
+    font-size: var(--fs-2);
+    color: var(--dim);
+    font-weight: 600;
+}
+
+.sc-tpl-facts {
+    margin: 0;
+    display: grid;
+    gap: 6px;
+}
+
+.sc-tpl-facts div {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s4);
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.sc-tpl-facts dt { color: var(--text2); }
+.sc-tpl-facts dd { margin: 0; color: var(--text); font-variant-numeric: tabular-nums; }
+
+.sc-tpl-info > button { justify-self: start; }

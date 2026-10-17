@@ -1,0 +1,1044 @@
+/* Плитка фермы: все устройства разом, с живым превью экрана.
+
+   Карточка — это и статус, и кнопка входа, и чекбокс выбора. Три роли в
+   одном прямоугольнике требуют дисциплины: вход по клику на всю карточку,
+   выбор — только по своему чекбоксу с остановкой всплытия, мелкие действия
+   живут в углу и появляются на наведении.
+
+   Превью показывается в корпусе телефона. Это не украшение: кадр 9:16,
+   брошенный на чёрный фон, читался как обрезок картинки, а рамка сразу
+   говорит «это экран устройства» и отделяет один телефон от другого. */
+
+/* ------------------------------------------------------------------ обзор */
+
+/* Полоса обзора закрывает главную дыру фермы: на широком экране две плитки
+   висели в пустоте, и страница выглядела недогруженной. Числа отвечают на
+   вопрос «что сейчас с фермой», а клик по карточке ставит тот же фильтр,
+   что и чипы в панели, — карточка обязана быть кнопкой. */
+
+/* Карточке задан потолок ширины: на 1920 четыре штуки по 1fr растягивались
+   почти на пол-экрана каждая, и между подписью и числом зияла пустота —
+   полоса читалась как сломанная вёрстка, а не как сводка. */
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 280px));
+    justify-content: start;
+    gap: var(--s3);
+    padding: var(--s4) var(--s4) 0;
+}
+
+.kpi {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    padding: 12px var(--s4) 12px 15px;
+    border-radius: var(--r3);
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, .028), transparent 60%),
+            var(--panel);
+    border: 1px solid var(--line);
+    text-align: left;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Цветная нить слева — единственное место, где состояние подписано цветом
+   крупно. Сам цвет карточка получает через --tone от своего модификатора. */
+.kpi::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--tone, var(--line));
+    opacity: .9;
+}
+
+.kpi:hover:not(:disabled) {
+    border-color: var(--line-hover);
+    background: var(--panel2);
+    box-shadow: var(--e2);
+}
+
+.kpi.on {
+    border-color: color-mix(in srgb, var(--tone, var(--accent)) 55%, var(--line));
+    background: var(--panel2);
+}
+
+.kpi .ico {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    color: var(--tone, var(--text2));
+    background: color-mix(in srgb, var(--tone, var(--dim)) 13%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone, var(--dim)) 28%, transparent);
+}
+
+.kpi .ico .ic {
+    width: var(--icon-lg);
+    height: var(--icon-lg)
+}
+
+/* Подпись слева, число справа: карточка тянется во всю колонку, и число,
+   прижатое к левому краю, оставляло посреди неё пустое поле. */
+.kpi .txt {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+
+.kpi .num {
+    font: 650 var(--fs-5)/1 var(--sans);
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    letter-spacing: -.02em;
+    flex: 0 0 auto;
+    margin-left: var(--s2);
+}
+
+.kpi.zero .num {
+    color: var(--dim)
+}
+
+.kpi .lab {
+    font: 600 var(--fs-1) var(--sans);
+    color: var(--dim);
+    white-space: nowrap;
+}
+
+.kpi .sub {
+    font-size: var(--fs-1);
+    color: var(--dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kpi--all {
+    --tone: var(--accent-hi)
+}
+
+.kpi--online {
+    --tone: var(--ok)
+}
+
+.kpi--busy {
+    --tone: var(--busy)
+}
+
+.kpi--warn {
+    --tone: var(--warn)
+}
+
+/* Нулевая тревога не должна кричать: гасим цвет, пока считать нечего. */
+.kpi.zero .ico {
+    color: var(--dim);
+    background: color-mix(in srgb, var(--off) 10%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--off) 20%, transparent);
+}
+
+.kpi.zero::before {
+    opacity: .25
+}
+
+/* ----------------------------------------------------------- заголовок */
+
+.sect {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s2);
+    padding: var(--s5) var(--s5) 0;
+}
+
+.sect h2 {
+    margin: 0;
+    font: 600 var(--fs-3) var(--sans);
+    color: var(--text2);
+}
+
+.sect-n {
+    font: 500 var(--fs-3) var(--sans);
+    color: var(--dim)
+}
+
+
+/* ------------------------------------------------------------------ сетка */
+
+.tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--s4);
+    padding: var(--s3) var(--s5) var(--s5);
+    align-content: start;
+}
+
+.tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--r3);
+    overflow: hidden;
+    cursor: pointer;
+    text-align: left;
+    padding: 0;
+    /* Цвет, тень и подъём — да, размер — нет: сетка не должна дышать при
+       наведении. translateY на 2px не меняет раскладку (transform не
+       вызывает рефлоу) и даёт карточке вес: она приподнимается к курсору
+       вместе с тенью, а не просто меняет цвет рамки. */
+    transition: border-color var(--fast) var(--ease),
+    box-shadow var(--mid) var(--ease),
+    transform var(--mid) var(--ease-out),
+    background var(--fast) var(--ease);
+}
+
+/* Появление каскадом. Задержку ставит fleet.js при создании плитки —
+   плитки живут долго и обновляются поштучно, поэтому анимация проходит
+   один раз, а не заново на каждый опрос фермы (раз в 2.5 с). */
+@media (prefers-reduced-motion: no-preference) {
+    .tile.fresh {
+        animation: tile-in var(--slow) var(--ease-out) both;
+    }
+}
+
+@keyframes tile-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(.97);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* Без подъёма: сорок плиток, прыгающих под курсором, — шум. Наведение
+   говорит рамкой, а не движением. */
+.tile:hover {
+    border-color: var(--line-hover);
+    background: var(--panel2);
+}
+
+.tile.sel {
+    border-color: var(--accent-line);
+    box-shadow: 0 0 0 1px var(--accent-line), var(--e2);
+}
+
+.tile.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), var(--e2);
+}
+
+.tile.off {
+    opacity: .62
+}
+
+.tile.off:hover {
+    opacity: .85
+}
+
+/* ------------------------------------------------------------- превью */
+
+.tile .shot {
+    position: relative;
+    /* Пропорция задана заранее — картинка приходит асинхронно, и без неё
+       плитка прыгала бы на каждом обновлении (CLS). */
+    aspect-ratio: 10 / 15;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--s3) var(--s3) 0;
+    overflow: hidden;
+    background:
+            radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 62%),
+            var(--well);
+}
+
+/* Корпус телефона. Толщина рамки постоянная, размер задаёт сетка: экран
+   внутри держит свои 9:16 сам, поэтому широкие колонки не растягивают
+   аппарат в планшет. */
+/* Пропорция корпуса берётся у самого устройства (--ar ставит tileUpdate).
+   Иначе кадр 1080×2340 внутри рамки 9/19 ложился с чёрными полями по бокам,
+   и телефон читался как телефон в телефоне. */
+.tile .phone {
+    position: relative;
+    height: 100%;
+    max-width: 100%;
+    display: flex;
+    border-radius: 13px 13px 0 0;
+    padding: 5px 5px 0;
+    background: linear-gradient(165deg, var(--panel3), var(--well) 55%);
+    box-shadow:
+            inset 0 0 0 1px rgba(255, 255, 255, .07),
+            0 10px 22px rgba(0, 0, 0, .45);
+}
+
+/* Пропорцию держит стекло, а не корпус: рамка добавляет свои 5px с каждой
+   стороны, и на корпусе тот же ratio оставлял кадр с полями по бокам. */
+.tile .glass {
+    position: relative;
+    height: 100%;
+    aspect-ratio: var(--ar, 9 / 19);
+    max-width: 100%;
+    border-radius: 9px 9px 0 0;
+    overflow: hidden;
+    background: var(--glass);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Чёлка: две детали, которые превращают прямоугольник в телефон. */
+.tile .notch {
+    position: absolute;
+    top: 7px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 34%;
+    height: 5px;
+    border-radius: var(--pill);
+    background: var(--glass);
+    z-index: 3;
+    pointer-events: none;
+}
+
+/* Блик по стеклу — одна неподвижная диагональ, без анимации: приборной
+   панели не нужен блеск, ей нужен объём. */
+.tile .glass::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(112deg, rgba(255, 255, 255, .07) 0 18%, transparent 42%);
+}
+
+/* Боковые кнопки — тонкие штрихи на рамке, читаются только вблизи. */
+.tile .phone::before,
+.tile .phone::after {
+    content: "";
+    position: absolute;
+    width: 2px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, .14);
+}
+
+.tile .phone::before {
+    right: -1px;
+    top: 22%;
+    height: 9%
+}
+
+.tile .phone::after {
+    right: -1px;
+    top: 34%;
+    height: 14%
+}
+
+/* contain, а не cover: смысл плитки — увидеть, что сейчас на телефоне.
+   Обрезка съедала бы низ экрана вместе с половиной интерфейса приложения. */
+.tile .shot img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    opacity: 0;
+    transition: opacity var(--mid) var(--ease);
+}
+
+.tile .shot img.ready {
+    opacity: 1
+}
+
+/* Приехавший кадр убирает заглушку из-под себя. Соседний селектор, а не
+   класс на родителе: превью само знает, когда оно готово, и лишний обход
+   из JS тут не нужен. */
+.tile .shot img.ready ~ .noshot {
+    display: none
+}
+
+/* Заглушка вместо картинки: у офлайна её взять неоткуда. Вместо иконки в
+   13 пикселей — погашенный экран с блёклым знаком: видно, что это телефон,
+   а не сломанная картинка. */
+.tile .shot .noshot {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s2);
+    color: var(--off);
+    font-size: var(--fs-1);
+    font-family: var(--sans);
+    background: repeating-linear-gradient(
+            -45deg, rgba(255, 255, 255, .014) 0 6px, transparent 6px 12px);
+}
+
+.tile .shot .noshot .ic {
+    width: 30px;
+    height: 30px;
+    opacity: .5;
+    stroke-width: 1.4;
+}
+
+/* Подсказка «открыть» всплывает по наведению поверх нижней части экрана —
+   карточка кликабельна целиком, но об этом нужно сказать один раз. */
+.tile .open {
+    position: absolute;
+    left: 50%;
+    bottom: var(--s3);
+    transform: translate(-50%, 6px);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: var(--pill);
+    font: 600 var(--fs-1) var(--sans);
+    color: var(--accent);
+    background: color-mix(in srgb, var(--glass) 82%, transparent);
+    backdrop-filter: blur(8px);
+    box-shadow: inset 0 0 0 1px var(--accent-line);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--fast) var(--ease), transform var(--fast) var(--ease);
+    z-index: 4;
+}
+
+.tile:hover .open,
+.tile:focus-visible .open {
+    opacity: 1;
+    transform: translate(-50%, 0)
+}
+
+.tile.off .open {
+    display: none
+}
+
+.tile .open .ic {
+    width: 12px;
+    height: 12px
+}
+
+/* Метка занятости поверх превью — видна, даже когда на экране темно. */
+.tile .flag {
+    position: absolute;
+    top: var(--s2);
+    left: var(--s2);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: var(--pill);
+    font: 600 var(--fs-2) var(--sans);
+    z-index: 4;
+}
+
+.tile .flag.busy {
+    /* непрозрачная подложка: сквозь полупрозрачную просвечивала рамка
+       нарисованного телефона и перечёркивала слово */
+    background: color-mix(in srgb, var(--busy) 18%, var(--panel));
+    color: var(--busy)
+}
+
+.tile .flag.err {
+    /* непрозрачная подложка: сквозь полупрозрачную просвечивала рамка
+       нарисованного телефона и перечёркивала слово */
+    background: color-mix(in srgb, var(--bad) 18%, var(--panel));
+    color: var(--bad)
+}
+
+.tile .flag .ic {
+    width: 11px;
+    height: 11px
+}
+
+/* --------------------------------------------------------- выбор и меню */
+
+/* Чекбокс держим бледным: непрозрачный квадрат поверх экрана выглядел как
+   пятно на превью. Галочка внутри видна всегда, но вполсилы — так понятно,
+   что это выбор, а не мусор в кадре. */
+.tile .pick {
+    position: absolute;
+    top: var(--s2);
+    right: var(--s2);
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r1);
+    background: color-mix(in srgb, var(--glass) 55%, transparent);
+    backdrop-filter: blur(8px);
+    color: color-mix(in srgb, var(--text) 38%, transparent);
+    border-color: rgba(255, 255, 255, .1);
+    z-index: 5;
+}
+
+.tile:hover .pick,
+.tile:focus-within .pick {
+    background: color-mix(in srgb, var(--glass) 80%, transparent);
+    border-color: rgba(255, 255, 255, .22);
+    color: color-mix(in srgb, var(--text) 70%, transparent);
+}
+
+/* Квадратные кнопки поверх превью задают размер сами — общий min-height
+   кнопок вытянул бы их в прямоугольники. */
+.tile .pick, .tile .acts button {
+    min-height: 0
+}
+
+.tile .pick .ic {
+    width: 14px;
+    height: 14px
+}
+
+.tile .pick[aria-pressed="true"] {
+    background: var(--accent-fill);
+    border-color: var(--accent-fill);
+    color: var(--accent-ink);
+}
+
+.tile .pick:hover {
+    border-color: var(--accent-line)
+}
+
+/* Меню карточки прячем до наведения, но клавиатурный фокус его показывает —
+   иначе с клавиатуры до него не добраться. */
+.tile .acts {
+    position: absolute;
+    top: 40px;
+    right: var(--s2);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s1);
+    opacity: 0;
+    transition: opacity var(--fast) var(--ease);
+    z-index: 5;
+}
+
+.tile:hover .acts,
+.tile:focus-within .acts {
+    opacity: 1;
+}
+
+.tile .acts button {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--glass) 78%, transparent);
+    backdrop-filter: blur(8px);
+    border-color: rgba(255, 255, 255, .16);
+}
+
+.tile .acts button .ic {
+    width: 13px;
+    height: 13px
+}
+
+/* ------------------------------------------------------------- подпись */
+
+/* Подпись: имя крупно, под ним одна тихая строка цифр. Без градиента и
+   разделителя — лишние слои на сорока плитках сливались в рябь. */
+.tile .cap {
+    padding: var(--s3) var(--s3) var(--s3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2);
+}
+
+.tile .cap .top {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    min-width: 0
+}
+
+.tile .nm {
+    font-weight: 600;
+    font-size: var(--fs-4);
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+}
+
+/* Версия Android — ярлык, а не часть строки метаданных: её ищут глазами,
+   когда подбирают телефон под сценарий. */
+.tile .os {
+    flex: 0 0 auto;
+    font: 500 var(--fs-2) var(--sans);
+    color: var(--dim);
+}
+
+.tile .metrics {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    color: var(--text2);
+    font: var(--fs-2) var(--sans);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.tile .metrics .m {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px
+}
+
+.tile .metrics .ic {
+    width: var(--icon-sm);
+    height: var(--icon-sm);
+    opacity: .6
+}
+
+.tile .metrics .m.low {
+    color: var(--bad)
+}
+
+.tile .metrics .m.mid {
+    color: var(--warn)
+}
+
+.tile .metrics .m.hot {
+    color: var(--warn)
+}
+
+.tile .metrics .m.chg {
+    color: var(--ok)
+}
+
+.tile .metrics .m.link {
+    margin-left: auto;
+    font-size: var(--fs-1);
+    color: var(--dim);
+}
+
+/* Теги: до двух чипов, остальное — «+N» (полный список в подсказке).
+   На плотности S весь ряд метрик скрыт (bulk.css). */
+.tile .metrics .m.tags {
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Теги — своей строкой под метриками: в одном ряду с зарядом они
+   ужимались до «п..» и не читались. */
+.tile .metrics:has(.tags) {
+    flex-wrap: wrap;
+    row-gap: 6px;
+}
+
+.tile .metrics .tags {
+    order: 10;
+    flex: 0 0 100%;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.tile .metrics .tagchip {
+    flex: 0 1 auto;
+    min-width: 0;
+    padding: 0 var(--s2);
+    border-radius: var(--pill);
+    background: var(--panel3);
+    color: var(--text2);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tile .metrics .tagmore {
+    color: var(--dim);
+}
+
+/* Серийник вместо метрик у офлайна: показать нечего, но опознать телефон
+   всё равно нужно. */
+.tile .metrics .sn {
+    overflow: hidden;
+    text-overflow: ellipsis
+}
+
+/* Состояние передаём точкой И текстом: одного цвета мало. */
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background: var(--off);
+}
+
+.dot.on {
+    background: var(--ok)
+}
+
+.dot.busy {
+    background: var(--busy)
+}
+
+.dot.err {
+    background: var(--bad)
+}
+
+.dot.off {
+    background: var(--off)
+}
+
+/* Полоса заряда: цвет дублирует число рядом, самостоятельного смысла не несёт. */
+/* Полоса дублирует процент в строке метрик — показываем её, только когда
+   заряд садится и это повод посмотреть. */
+.batt:not(:has(i.mid, i.low)) {
+    display: none;
+}
+
+.batt {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--panel3);
+    overflow: hidden
+}
+
+/* Нормальный заряд — нейтральный: сорок зелёных полосок были шумом.
+   Цвет появляется, только когда заряд садится. */
+.batt i {
+    display: block;
+    height: 100%;
+    background: var(--dim);
+    border-radius: 2px;
+    transition: width var(--mid) var(--ease);
+}
+
+.batt i.mid {
+    background: var(--warn)
+}
+
+.batt i.low {
+    background: var(--bad)
+}
+
+.tile .alert {
+    color: var(--warn);
+    font-size: var(--fs-2);
+    line-height: 1.4;
+    display: flex;
+    gap: 5px
+}
+
+.tile .alert .ic {
+    width: 12px;
+    height: 12px;
+    margin-top: 1px
+}
+
+/* ------------------------------------------------------------- скрытые */
+
+.hiddenzone {
+    padding: 0 var(--s4) var(--s5)
+}
+
+.hiddenbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: var(--s2) var(--s3);
+    color: var(--dim);
+    font-size: var(--fs-2);
+    cursor: pointer;
+    border: 1px dashed var(--line);
+    border-radius: var(--r2);
+    background: transparent;
+    width: 100%;
+}
+
+.hiddenbar:hover {
+    color: var(--text);
+    border-color: var(--line-hover);
+    background: var(--panel)
+}
+
+/* ------------------------------------------------------- панель запуска */
+
+/* Появляется снизу, только когда что-то выбрано: пустая полоса действий
+   внизу экрана — потерянные 56px и лишний шум. */
+.runbar {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    padding: var(--s2) var(--s3);
+    background: color-mix(in srgb, var(--panel2) 92%, transparent);
+    backdrop-filter: blur(14px);
+    border-top: 1px solid var(--accent-line);
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    animation: rise 200ms var(--ease);
+    box-shadow: 0 -8px 28px rgba(0, 0, 0, .35);
+}
+
+.runbar[hidden] {
+    display: none
+}
+
+.runbar .count {
+    font: 650 var(--fs-2) var(--sans);
+    color: var(--accent);
+    white-space: nowrap
+}
+
+.runbar select {
+    min-width: 190px
+}
+
+/* До первого ответа фермы раздел пуст: нули в обзоре и заглушка «ферма
+   пуста» на долю секунды выглядели как реальное состояние. */
+#view-fleet.loading #fleetScroll {
+    visibility: hidden;
+}
+
+/* ------------------------------------------------------------ пустая ферма */
+
+/* Сетка плиток — грид, и заглушка обязана занять всю строку, иначе встанет
+   в одну колонку шириной с плитку. Остальной вид .emptybig — общий, лежит
+   в base.css: тем же приёмом рисуются пустые «Сценарии», «Задачи»,
+   «Отклонения» и конструктор. */
+#fleetEmpty {
+    grid-column: 1/-1;
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
+/* Заглушка центрируется по всей свободной высоте под обзором, а не по
+   верхнему краю: прокручиваемый блок и сетка внутри него растягиваются,
+   только пока в сетке нет плиток. */
+#fleetScroll:has(#fleetEmpty) {
+    display: flex;
+    flex-direction: column;
+}
+
+.tiles:has(> #fleetEmpty) {
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-content: stretch;
+    /* Отступы и колонки не зависят от размера L/M/S: с заглушкой внутри
+       переключение размера сдвигало её на пару пикселей. */
+    padding: var(--s3) var(--s4) var(--s4);
+    gap: 0;
+}
+
+/* --------------------------------------------------------------- скелет */
+
+/* Плитка-заглушка на первую загрузку: пустой экран читается как поломка. */
+.tile.skel {
+    pointer-events: none;
+    border-style: dashed
+}
+
+.tile.skel .glass {
+    background: linear-gradient(100deg, var(--well) 30%, var(--panel) 50%, var(--well) 70%);
+    background-size: 220% 100%;
+    animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes shimmer {
+    from {
+        background-position: 120% 0
+    }
+    to {
+        background-position: -120% 0
+    }
+}
+
+@media (max-width: 640px) {
+    .tiles {
+        grid-template-columns: repeat(auto-fill, minmax(144px, 1fr));
+        gap: var(--s3);
+        padding: var(--s2)
+    }
+
+    .kpis {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: var(--s2);
+        padding: var(--s3) var(--s3) 0;
+    }
+
+    .kpi {
+        padding: 10px var(--s3)
+    }
+
+    .sect {
+        padding: var(--s4) var(--s3) 0
+    }
+}
+
+
+/* ------------------------------------------- состояние плитки (исключения)
+
+   Норма — серая рамка без цвета. Цвет только там, где нужно действие или
+   идёт работа: полоса сверху и рамка. Слово рядом (точка + подпись) уже
+   есть в подписи плитки — цвет не единственный признак. */
+.tile[data-st="err"] {
+    border-color: var(--bad-line);
+    box-shadow: inset 0 3px 0 var(--bad);
+}
+
+.tile[data-st="busy"] {
+    box-shadow: inset 0 3px 0 var(--busy);
+}
+
+.tile.sel {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.tile.sel[data-st="err"] {
+    box-shadow: 0 0 0 1px var(--accent), inset 0 3px 0 var(--bad);
+}
+
+/* Переход с полосы фермы — короткая вспышка рамки, чтобы глаз нашёл плитку. */
+@media (prefers-reduced-motion: no-preference) {
+    .tile.flash {
+        animation: tile-flash 900ms var(--ease-out);
+    }
+}
+
+@keyframes tile-flash {
+    0%, 40% { box-shadow: 0 0 0 3px var(--accent); }
+    100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* -------------------------------------------------------- полоса фермы */
+
+#fleetStats.kpis {
+    display: grid;
+    gap: var(--s3);
+    grid-template-columns: none;
+    padding: var(--s4) var(--s5) 0;
+}
+
+.hs-trouble {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s2);
+}
+
+/* Строка «кто сломался»: имя и причина, красная рамка — единственное
+   громкое на экране, когда что-то не так. */
+.hs-t {
+    height: 32px;
+    padding: 0 var(--s3);
+    border-radius: var(--pill);
+    border: 1px solid transparent;
+    background: var(--bad-dim);
+    color: var(--text2);
+    font-size: var(--fs-3);
+    gap: 6px;
+}
+
+.hs-t b {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.hs-t.more {
+    background: var(--panel2);
+}
+
+/* Фильтры фермы — одна «дорожка», как вкладки «Запусков»: невыбранные
+   пункты лежат на общей подложке, а не висят голым текстом в воздухе. */
+.hs-legend {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-self: start;
+    gap: 2px;
+    padding: 3px;
+    background: var(--panel);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--pill);
+}
+
+.hs-f {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: var(--pill);
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text2);
+    font-size: var(--fs-3);
+    min-height: 0;
+}
+
+.hs-f:hover:not(:disabled):not(.on) {
+    background: var(--panel2);
+    color: var(--text);
+}
+
+.hs-f b {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.hs-f i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--dim);
+}
+
+.hs-f--online i { background: var(--ok); }
+.hs-f--busy i { background: var(--busy); }
+.hs-f--warn i { background: var(--bad); }
+
+/* «Требуют внимания» с ненулём — единственная громкая кнопка в легенде. */
+.hs-f--warn:not(.zero) {
+    color: var(--bad);
+}
+
+.hs-f--warn:not(.zero) b {
+    color: var(--bad);
+}
+
+.hs-f.zero {
+    color: var(--dim);
+}
+
+.hs-f.zero b {
+    color: var(--dim);
+}
+
+.hs-f.on {
+    background: var(--panel3);
+    color: var(--text);
+    box-shadow: var(--e1);
+}
+
+
+/* Вкладки, фильтры и кнопки — не текст: протяжка мышью (рамка выделения
+   на ферме) не должна закрашивать их как выделенный текст. */
+.nav, .navbtn, .hs-legend, .hs-trouble, .chips, .seg, .tiles, .runbar, .bar button {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* Над плиткой несут файл (fleetDrop): куда он уйдёт. */
+.tile.drop {
+    outline: 2px dashed var(--accent-line);
+    outline-offset: 2px;
+}

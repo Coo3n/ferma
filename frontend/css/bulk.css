@@ -1,0 +1,841 @@
+/* Массовые действия, синхронный режим и аккаунты — в токенах base.css. */
+
+.bulk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: var(--s2);
+    margin-bottom: var(--s4);
+}
+
+.bulk-grid button {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: var(--s2);
+    align-items: center;
+    text-align: left;
+    height: auto;
+    white-space: normal;
+    overflow: visible;
+    padding: var(--s3);
+    border-radius: var(--r2);
+}
+
+.bulk-grid button .ic {
+    grid-row: span 2;
+    width: var(--icon-lg);
+    height: var(--icon-lg);
+    color: var(--accent);
+}
+
+.bulk-grid button b {
+    font-weight: 650;
+    font-size: var(--fs-3);
+}
+
+.bulk-grid button span {
+    white-space: normal;
+    line-height: 1.3;
+    color: var(--dim);
+    font-size: var(--fs-1);
+}
+
+.bulk-grid button.armed span {
+    color: #fff;
+}
+
+.bulk-row {
+    display: grid;
+    gap: var(--s1);
+    margin-top: var(--s3);
+    font-size: var(--fs-2);
+    color: var(--text2);
+}
+
+.bulk-row > span {
+    display: flex;
+    gap: var(--s2);
+}
+
+/* Формат строки импорта: поля — плашками, разделитель «:» — акцентом,
+   иначе «логин:пароль:прокси» сливается в одно слово. */
+.fmt-ex {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s2);
+    margin: var(--s1) 0 var(--s2);
+    color: var(--dim);
+}
+
+.fmt {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.fmt b {
+    padding: 2px var(--s2);
+    border-radius: var(--r1);
+    background: var(--panel3);
+    color: var(--text);
+    font-weight: 500;
+}
+
+.fmt b.opt {
+    background: var(--busy-dim);
+    color: var(--busy);
+}
+
+.fmt i {
+    font-style: normal;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+.bulk-row input, .bulk-row textarea {
+    flex: 1;
+    width: 100%;
+}
+
+.syncbar {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    padding: var(--s2) var(--s3);
+    background: var(--accent-dim);
+    border-bottom: 1px solid var(--accent-line);
+    color: var(--accent-hi);
+    font-size: var(--fs-2);
+}
+
+.syncbar[hidden] {
+    display: none;
+}
+
+.syncbar span {
+    flex: 1;
+}
+
+/* ---------------------------------------------------------------- аккаунты */
+
+#accList {
+    padding: var(--s4);
+}
+
+.acc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-3);
+}
+
+.acc-table th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--dim);
+    font-size: var(--fs-2);
+    /* слева — как у текста в поле (отступ ячейки + поля + рамка), чтобы
+       заголовок стоял ровно над значением */
+    padding: var(--s2) calc(var(--s1) + 7px);
+    border-bottom: 1px solid var(--line-soft);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+}
+
+.acc-table td {
+    padding: 2px var(--s1);
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.acc-table tr:hover td {
+    background: var(--panel);
+}
+
+/* Поле выглядит текстом, пока его не трогают: таблица читается как
+   таблица, а не как форма из сорока полей. */
+.acc-table input, .acc-table select {
+    width: 100%;
+    min-width: 80px;
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--r1);
+    padding: 5px 6px;
+    color: var(--text);
+}
+
+.acc-table input:hover, .acc-table select:hover {
+    border-color: var(--line);
+}
+
+/* Шеврон у каждого выпадающего в каждой строке — частокол стрелок.
+   Показываем его, только когда поле под курсором или в фокусе. */
+.acc-table select:not(:hover):not(:focus) {
+    background-image: none;
+}
+
+.acc-table input:focus, .acc-table select:focus {
+    border-color: var(--accent-line);
+    background-color: var(--panel2);
+    outline: none;
+}
+
+.acc-st--active { color: var(--ok) !important; }
+.acc-st--login { color: var(--warn) !important; }
+.acc-st--banned { color: var(--bad) !important; }
+
+
+#accPlatform, #groupFilter, #tagFilter {
+    width: auto;
+    flex: 0 0 auto;
+    max-width: 200px;
+}
+
+/* Рамка выделения на ферме. */
+.marquee {
+    position: fixed;
+    z-index: 50;
+    pointer-events: none;
+    border: 1px solid var(--accent);
+    background: var(--accent-dim);
+    border-radius: var(--r1);
+}
+
+body.marqueeing {
+    user-select: none;
+    cursor: crosshair;
+}
+
+.runbar select {
+    width: auto;
+}
+
+/* ------------------------------------------------- размер плиток (40+) */
+
+/* Переключатель — мягкая «дорожка» с подсвеченным выбранным сегментом,
+   без рамок и без зелёной заливки: выбор значения — не главное действие. */
+.seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--panel2);
+    border-radius: var(--r2);
+    overflow: hidden;
+}
+
+.seg button {
+    border: 0;
+    border-radius: var(--r1);
+    min-width: 30px;
+    min-height: 0;
+    height: 28px;
+    padding: 0 10px;
+    font: var(--fs-2) var(--sans);
+    background: transparent;
+    color: var(--text2);
+}
+
+.seg button:hover:not(:disabled):not(.on) {
+    background: transparent;
+    color: var(--text);
+}
+
+.seg button.on {
+    background: var(--panel3);
+    color: var(--text);
+    box-shadow: var(--e1);
+}
+
+/* Вкладки «Все запуски / Проблемы» — навигация, а не выбор значения:
+   выбранная подсвечена мягко, сплошная заливка тут кричала бы. */
+.seg.runs-seg button.on {
+    background: var(--panel3);
+    color: var(--text);
+}
+
+.tiles[data-density="m"] .tile .nm {
+    font-size: var(--fs-3);
+}
+
+.tiles[data-density="m"] {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: var(--s3);
+}
+
+/* Мелко: только экран, имя и точка состояния — метрики читаются в
+   подробностях. 40 телефонов влезают в два-три ряда на 1920. */
+.tiles[data-density="s"] {
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: var(--s2);
+    padding: var(--s2) var(--s3);
+}
+
+.tiles[data-density="s"] .tile .metrics,
+.tiles[data-density="s"] .tile .batt,
+.tiles[data-density="s"] .tile .os,
+.tiles[data-density="s"] .tile .open,
+.tiles[data-density="s"] .tile .acts {
+    display: none;
+}
+
+.tiles[data-density="s"] .tile .cap {
+    padding: 4px 6px;
+}
+
+.tiles[data-density="s"] .tile .nm {
+    font-size: var(--fs-2);
+}
+
+.tiles[data-density="s"] .tile .alert span {
+    display: none;
+}
+
+.phrases {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s1);
+    margin-top: var(--s2);
+}
+
+.phrases:empty {
+    display: none;
+}
+
+.phrase {
+    display: inline-flex;
+}
+
+.phrase button:first-child {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-radius: var(--r1) 0 0 var(--r1);
+}
+
+.phrase .x {
+    border-radius: 0 var(--r1) var(--r1) 0;
+    border-left: 0;
+    color: var(--dim);
+}
+
+.inline-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.inline-check small {
+    color: var(--dim);
+}
+
+.inline-check input {
+    accent-color: var(--accent);
+    width: auto;
+}
+
+.grun {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.grun td {
+    padding: var(--s2) 0;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.grun small {
+    color: var(--dim);
+    margin-left: var(--s1);
+}
+
+.grun select {
+    width: 100%;
+}
+
+/* .bulk-row input растягивает поля на всю ширину — чекбоксу это не нужно. */
+.bulk-row.inline-check {
+    display: flex;
+}
+
+.bulk-row.inline-check input {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+/* ------------------------------------------- шаги сценария на «Сценариях» */
+
+#scSteps {
+    margin-top: var(--s3);
+}
+
+.sc-steps-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sc-steps {
+    margin: var(--s2) 0 0;
+    padding-left: 28px;
+    font-size: var(--fs-2);
+    color: var(--text2);
+    line-height: 1.9;
+    columns: 2 320px;
+    column-gap: var(--s5);
+}
+
+.sc-steps li::marker {
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------- выбор телефона для записи */
+
+.phone-pick {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--s2);
+    max-height: 50vh;
+    overflow: auto;
+}
+
+.phone-pick button {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: var(--s2);
+    align-items: center;
+    text-align: left;
+    height: auto;
+    padding: var(--s2) var(--s3);
+}
+
+.phone-pick .dot {
+    grid-row: span 2;
+}
+
+.phone-pick span:last-child {
+    color: var(--dim);
+    font-size: var(--fs-1);
+}
+
+.runs-seg .seg-n:not(:empty) {
+    margin-left: 4px;
+    padding: 0 6px;
+    border-radius: 9px;
+    background: var(--bad);
+    color: #fff;
+    font-size: var(--fs-1);
+}
+
+/* Взведённое опасное действие (armConfirm): второе нажатие выполнит. */
+button.armed {
+    background: var(--bad);
+    border-color: var(--bad);
+    color: #fff;
+}
+
+/* ------------------------------------------------------ окно запуска */
+
+.rd-who {
+    display: flex;
+    gap: var(--s2);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.rd-who select {
+    width: auto;
+}
+
+.rd-repeat input {
+    width: 90px;
+}
+
+.rd-check {
+    margin-top: var(--s4);
+    padding: var(--s3);
+    border: 1px solid var(--line);
+    border-radius: var(--r2);
+    background: var(--panel);
+    display: grid;
+    gap: var(--s2);
+    font-size: var(--fs-2);
+}
+
+.rd-check:empty {
+    display: none;
+}
+
+.rd-counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: baseline;
+}
+
+.rd-sep {
+    color: var(--dim);
+}
+
+.rd-c--ok { color: var(--ok); }
+.rd-c--warn { color: var(--warn); }
+.rd-c--busy { color: var(--busy); }
+.rd-c--bad { color: var(--bad); }
+.rd-c--off { color: var(--dim); }
+
+.rd-need, .rd-empty, .rd-list small {
+    color: var(--dim);
+}
+
+.rd-err {
+    color: var(--bad);
+}
+
+.rd-list ul {
+    margin: var(--s2) 0 0;
+    padding: 0;
+    list-style: none;
+    max-height: 180px;
+    overflow: auto;
+    display: grid;
+    gap: 3px;
+}
+
+.rd-list summary {
+    cursor: pointer;
+    color: var(--text2);
+}
+
+.rd-gc {
+    font-size: var(--fs-2);
+    white-space: nowrap;
+    padding-left: var(--s2) !important;
+}
+
+/* ------------------------------------------- карточка на «Сценариях» */
+
+.sc-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s4);
+    font-size: var(--fs-2);
+    color: var(--text2);
+    margin: var(--s1) 0 var(--s3);
+}
+
+.sc-meta .ok { color: var(--ok); }
+.sc-meta .bad { color: var(--bad); }
+
+.sc-acts {
+    display: flex;
+    gap: var(--s2);
+}
+
+/* ---------------------------------------- полоса запуска на «Запусках» */
+
+.batchbar {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    padding: var(--s2) var(--s4);
+    border-bottom: 1px solid var(--line);
+    background: var(--panel2);
+    font-size: var(--fs-2);
+    flex-wrap: wrap;
+}
+
+.batchbar[hidden] {
+    display: none;
+}
+
+.bb-n.ok { color: var(--ok); }
+.bb-n.bad { color: var(--bad); }
+.bb-n.busy { color: var(--busy); }
+
+.bb-track {
+    display: flex;
+    width: 160px;
+    height: 6px;
+    border-radius: var(--r1);
+    overflow: hidden;
+    background: var(--line);
+}
+
+.bb-track i {
+    display: block;
+    height: 100%;
+    transition: width var(--mid) var(--ease);
+}
+
+.bb-track .ok { background: var(--ok); }
+.bb-track .bad { background: var(--bad); }
+
+/* Значок аккаунта на плитке: слово, а не только цвет. */
+.tile .accflag {
+    font-size: var(--fs-1);
+    font-weight: 650;
+    padding: 1px 5px;
+    border-radius: var(--r1);
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.tile .accflag.bad {
+    background: color-mix(in srgb, var(--bad) 18%, transparent);
+    color: var(--bad);
+}
+
+.tile .accflag.warn {
+    background: color-mix(in srgb, var(--warn) 18%, transparent);
+    color: var(--warn);
+}
+
+/* На средних и мелких плитках слово не влезает рядом с именем — остаётся
+   кружок с «!» (не только цвет), полный текст в подсказке. */
+.tiles[data-density="m"] .tile .accflag,
+.tiles[data-density="s"] .tile .accflag {
+    font-size: 0;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tiles[data-density="m"] .tile .accflag::before,
+.tiles[data-density="s"] .tile .accflag::before {
+    content: "!";
+    font-size: var(--fs-1);
+    font-weight: 800;
+}
+
+/* Бан и «нужен вход» различаются знаком, а не только цветом. */
+.tiles[data-density="m"] .tile .accflag.bad::before,
+.tiles[data-density="s"] .tile .accflag.bad::before {
+    content: "×";
+    font-size: var(--fs-2);
+}
+
+/* Фокус с клавиатуры — одинаковый у всего, что добавлено поверх базы. */
+.bulk-grid button:focus-visible,
+.seg button:focus-visible,
+.live-switch:focus-visible,
+.phone-pick button:focus-visible,
+.gr-try:focus-visible,
+.acc-table input:focus-visible,
+.acc-table select:focus-visible,
+.acc-table button:focus-visible,
+.rd button:focus-visible,
+.rd select:focus-visible,
+.rd input:focus-visible,
+.batchbar button:focus-visible,
+.phrase button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Пустой журнал: одна заглушка слева, правая «выберите задачу» не нужна. */
+#view-jobs.no-jobs .logwrap {
+    display: none;
+}
+
+#view-jobs.no-jobs .split {
+    grid-template-columns: 1fr;
+}
+
+/* Ячейка таблицы остаётся ячейкой: display:flex на <td> выбивал её из
+   сетки — фон и нижняя линия рвались на этой колонке. */
+.acc-pw {
+    white-space: nowrap;
+}
+
+.acc-pw input {
+    width: calc(100% - 34px);
+    vertical-align: middle;
+}
+
+.acc-pw button {
+    vertical-align: middle;
+}
+
+/* Телефон — тот же кегль и вес, что у соседних полей: мелкая жирная
+   кнопка читалась как отдельный элемент управления посреди строки. */
+.acc-phone {
+    width: 100%;
+    justify-content: flex-start;
+    background: transparent;
+    border-color: transparent;
+    font-size: var(--fs-3);
+    font-weight: 400;
+    padding: 5px 6px;
+    min-height: 0;
+}
+
+.acc-phone:hover {
+    border-color: var(--line);
+}
+
+/* Корзина в каждой строке — серая, красной становится на своей строке. */
+.acc-table tr:not(:hover):not(:focus-within) button.danger:not([data-armed]) {
+    color: var(--dim);
+}
+
+.acc-phone .dim,
+.acc-phone small {
+    color: var(--dim);
+}
+
+/* Строка «Приложение»: список и три кнопки — кнопки переносятся под
+   список, а не обрезаются. */
+.bulk-row > span {
+    flex-wrap: wrap;
+}
+
+#bulkApp {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
+.bulk-row small.dim {
+    color: var(--dim);
+}
+
+/* ------------------------------------- окно «Действия»: плитки + панель */
+
+.bulk-sect {
+    font-size: var(--fs-1);
+    font-weight: 600;
+    color: var(--dim);
+    margin: var(--s3) 0 var(--s2);
+}
+
+.bulk-sect:first-child {
+    margin-top: 0;
+}
+
+.bulk-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    margin-bottom: 0;
+}
+
+.bulk-grid button.on {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+}
+
+.bulk-panel {
+    margin-top: var(--s3);
+    padding: var(--s3);
+    border: 1px solid var(--accent-line);
+    border-radius: var(--r2);
+    background: var(--panel);
+    display: grid;
+    gap: var(--s2);
+    animation: rise var(--mid) var(--ease);
+}
+
+.bulk-panel[hidden] {
+    display: none;
+}
+
+.bp-row {
+    display: flex;
+    gap: var(--s2);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.bp-row input,
+.bp-row select {
+    flex: 1 1 240px;
+    min-width: 0;
+    height: 32px;
+}
+
+.bulk-panel small.dim {
+    color: var(--dim);
+    font-size: var(--fs-1);
+}
+
+.bulk-jitter {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    font-size: var(--fs-2);
+    color: var(--text2);
+}
+
+.bulk-jitter select {
+    width: auto;
+}
+
+/* Плитка с уточнением — стрелка вместо «…»: раскроется панель ниже. */
+.bulk-grid button[data-tile]:not([data-tile=""]) b::after {
+    content: " ▾";
+    color: var(--dim);
+    font-weight: 400;
+}
+
+.bulk-grid button.on b::after {
+    content: " ▴";
+}
+
+/* Галерея «Скриншоты» */
+.shots {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--s3);
+}
+
+.shots figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s1);
+    min-width: 0;
+}
+
+.shots a {
+    display: block;
+    aspect-ratio: 9 / 19;
+    background: var(--well);
+    border: 1px solid var(--line);
+    border-radius: var(--r2);
+    overflow: hidden;
+}
+
+.shots a:hover {
+    border-color: var(--line-hover);
+}
+
+.shots img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.shots figcaption {
+    font-size: var(--fs-2);
+    color: var(--text2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.shots figure.fail a {
+    display: grid;
+    place-items: center;
+}
+
+.shots figure.fail img {
+    display: none;
+}
+
+.shots figure.fail a::after {
+    content: "не удалось";
+    font-size: var(--fs-2);
+    color: var(--bad);
+}

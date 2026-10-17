@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Токены</title>
+<!-- Картинка для docs/design-system.md (images/design-tokens.png): screenshots.js
+     открывает этот файл с адреса фермы, чтобы design/tokens.css подтянулся настоящий. -->
+<link rel="stylesheet" href="design/tokens.css">
+<style>
+    body { margin: 0; padding: 28px; background: var(--bg); color: var(--text); font: var(--fs-3)/var(--lh) var(--sans); width: 1100px; }
+    h2 { font-size: var(--fs-2); color: var(--text2); font-weight: 600; margin: 20px 0 10px; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .sw { width: 120px; border-radius: var(--r2); overflow: hidden; background: var(--panel); border: 1px solid var(--line-soft); }
+    .sw i { display: block; height: 52px; }
+    .sw span { display: block; padding: 6px 8px; font-size: var(--fs-1); color: var(--dim); font-family: var(--mono); }
+    .type div { margin: 4px 0; }
+    .btns { display: flex; gap: 10px; align-items: center; }
+    .b { padding: 8px 14px; border-radius: var(--r2); background: var(--panel2); color: var(--text); font-weight: 500; }
+    .b.p { background: var(--accent-fill); color: var(--accent-ink); }
+    .b.d { background: none; color: var(--bad); }
+    .b.a { background: var(--accent-dim); color: var(--accent); }
+    .pill { padding: 3px 10px; border-radius: var(--pill); font-size: var(--fs-2); }
+</style>
+</head>
+<body>
+<h2>Поверхности и текст</h2>
+<div class="row" id="surf"></div>
+<h2>Акцент и состояния</h2>
+<div class="row" id="state"></div>
+<h2>Типографика — Golos Text</h2>
+<div class="type">
+    <div style="font-size:var(--fs-5);font-weight:700">--fs-5 · 20 · Заголовок раздела</div>
+    <div style="font-size:var(--fs-4);font-weight:600">--fs-4 · 16 · Phone 12</div>
+    <div style="font-size:var(--fs-3)">--fs-3 · 14 · Основной текст и кнопки</div>
+    <div style="font-size:var(--fs-2);color:var(--text2)">--fs-2 · 13 · Подписи и метаданные</div>
+    <div style="font-size:var(--fs-1);color:var(--dim)">--fs-1 · 12 · Бейджи и сноски</div>
+</div>
+<h2>Кнопки и метки</h2>
+<div class="btns">
+    <span class="b p">Записать сценарий</span><span class="b">Скриншот</span><span class="b a">Показать, как быть</span><span class="b d">Завершить</span>
+    <span class="pill" style="background:var(--busy-dim);color:var(--busy)">занято</span>
+    <span class="pill" style="background:var(--bad-dim);color:var(--bad)">бан VK</span>
+    <span class="pill" style="background:var(--warn-dim);color:var(--warn)">ждёт</span>
+</div>
+<script>
+    const sw = (box, names) => document.getElementById(box).innerHTML = names.map(n =>
+        `<div class="sw"><i style="background:var(--${n})"></i><span>--${n}</span></div>`).join('');
+    sw('surf', ['bg', 'panel', 'panel2', 'panel3', 'well', 'line', 'text', 'text2', 'dim']);
+    sw('state', ['accent', 'accent-dim', 'ok', 'warn', 'bad', 'busy', 'off']);
+</script>
+</body>
+</html>

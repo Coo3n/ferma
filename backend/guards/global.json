@@ -1,0 +1,37 @@
+[
+  {
+    "name": "permission-allow-id",
+    "when": {"any": [{"resourceId": "com.android.permissioncontroller:id/permission_allow_button"}]},
+    "action": {"click": {"resourceId": "com.android.permissioncontroller:id/permission_allow_button"}},
+    "max_fires": 5
+  },
+  {
+    "name": "permission-allow-ru",
+    "when": {"any": [{"text": "Разрешить"}, {"text": "РАЗРЕШИТЬ"}]},
+    "action": {"click": {"textMatches": "(?i)Разрешить"}},
+    "max_fires": 5
+  },
+  {
+    "name": "permission-allow-en",
+    "when": {"any": [{"text": "Allow"}, {"text": "ALLOW"}]},
+    "action": {"click": {"textMatches": "(?i)Allow"}},
+    "max_fires": 5
+  },
+  {
+    "name": "permission-while-using",
+    "when": {"any": [{"text": "While using the app"}, {"text": "При использовании приложения"}]},
+    "action": {"click": {"textMatches": "(?i).*(using the app|использовании приложения).*"}},
+    "max_fires": 5
+  },
+  {
+    "name": "anr-wait",
+    "when": {"any": [{"textContains": "не отвечает"}, {"textContains": "isn't responding"}]},
+    "action": {"click": {"textMatches": "(?i).*(Подождать|Wait).*"}}
+  },
+  {
+    "name": "rate-us-back",
+    "when": {"any": [{"textContains": "Оцените приложение"}, {"textContains": "Rate this app"}]},
+    "action": {"key": "back"},
+    "max_fires": 2
+  }
+]

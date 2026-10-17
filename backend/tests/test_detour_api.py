@@ -1,0 +1,198 @@
+"""Создание отвода: записанные шаги → блок + страж. Устройство не нужно."""
+import json
+
+import pytest
+from fastapi import HTTPException
+
+from farm import config, guards, scenarios
+from farm.api import detours as api
+
+
+@pytest.fixture
+def песочница(tmp_path, monkeypatch):
+    scen, grd = tmp_path / "scenarios", tmp_path / "guards"
+    scen.mkdir(), grd.mkdir()
+    monkeypatch.setattr(config, "SCENARIOS_DIR", scen)
+    monkeypatch.setattr(config, "GUARDS_DIR", grd)
+    scenarios._cache.clear()
+    guards._cache.clear()
+    return scen, grd
+
+
+ТЕЛО = {
+    "key": "close_tariff",
+    "name": "Закрыть тариф",
+    "package": "com.app",
+    "when": {"textContains": "Выберите тариф"},
+    "steps": [{"kind": "click", "args": {},
+               "selector": {"call": "click", "args": 'text="Позже"'}}],
+}
+
+
+def test_отвод_создаёт_блок_и_стража(песочница):
+    scen, grd = песочница
+    api.create_detour(dict(ТЕЛО))
+
+    assert 'ctx.click(text="Позже")' in (scen / "close_tariff.py").read_text("utf-8")
+    правила = json.loads((grd / "com.app.json").read_text("utf-8"))
+    assert правила[0]["action"] == {"run": "close_tariff"}
+    assert правила[0]["when"]["any"] == [{"textContains": "Выберите тариф"}]
+
+
+def test_страж_годен_для_движка(песочница):
+    """Записанное правило обязано грузиться движком, а не только лежать в файле."""
+    api.create_detour(dict(ТЕЛО))
+    имена = [g.name for g in guards.load("com.app")]
+    assert "close_tariff" in имена
+
+
+def test_второй_отвод_дописывается_а_не_затирает(песочница):
+    _, grd = песочница
+    api.create_detour(dict(ТЕЛО))
+    api.create_detour(dict(ТЕЛО, key="skip_ad", name="Закрыть рекламу",
+                           when={"textContains": "Реклама"}))
+    правила = json.loads((grd / "com.app.json").read_text("utf-8"))
+    assert len(правила) == 2
+
+
+def test_повторное_имя_отвергается(песочница):
+    api.create_detour(dict(ТЕЛО))
+    with pytest.raises(HTTPException) as e:
+        api.create_detour(dict(ТЕЛО))
+    assert e.value.status_code == 409
+
+
+def test_без_условия_нельзя(песочница):
+    with pytest.raises(HTTPException) as e:
+        api.create_detour(dict(ТЕЛО, when={}))
+    assert e.value.status_code == 400
+
+
+def test_без_шагов_нельзя(песочница):
+    with pytest.raises(HTTPException) as e:
+        api.create_detour(dict(ТЕЛО, steps=[]))
+    assert e.value.status_code == 400
+
+
+def test_без_пакета_пишется_в_глобальные(песочница):
+    _, grd = песочница
+    api.create_detour(dict(ТЕЛО, package=""))
+    assert (grd / "global.json").exists()
+
+
+def test_кривой_пакет_отвергается(песочница):
+    """Пакет идёт в имя файла — путь наружу недопустим."""
+    with pytest.raises(HTTPException) as e:
+        api.create_detour(dict(ТЕЛО, package="../побег"))
+    assert e.value.status_code == 400
+
+
+# ------------------------------------------------------------ карта отводов
+
+@pytest.fixture
+def с_артефактами(песочница, tmp_path, monkeypatch):
+    arts = tmp_path / "artifacts"
+    arts.mkdir()
+    monkeypatch.setattr(config, "ARTIFACTS_DIR", arts)
+    return песочница + (arts,)
+
+
+def падение(arts, job, rid, text, package="com.app"):
+    d = arts / job
+    d.mkdir()
+    (d / "obstacle.json").write_text(json.dumps({
+        "package": package, "texts": [text],
+        "candidates": [{"selector": {"resourceId": rid}, "label": f"по id: {rid}"}],
+    }, ensure_ascii=False), "utf-8")
+
+
+def test_карта_показывает_непокрытые_преграды(с_артефактами):
+    *_, arts = с_артефактами
+    падение(arts, "job1", "com.app:id/tariff", "Выберите тариф")
+    падение(arts, "job2", "com.app:id/tariff", "Выберите тариф")
+    падение(arts, "job3", "com.app:id/ad", "Реклама")
+
+    карта = api.detour_map(package="com.app")
+    дыры = {o["texts"][0]: o["hits"] for o in карта["obstacles"]}
+    assert дыры == {"Выберите тариф": 2, "Реклама": 1}
+    assert карта["obstacles"][0]["texts"] == ["Выберите тариф"], "частое — первым"
+
+
+def test_после_обучения_преграда_уходит_с_карты(с_артефактами):
+    *_, arts = с_артефактами
+    падение(arts, "job1", "com.app:id/tariff", "Выберите тариф")
+    падение(arts, "job2", "com.app:id/ad", "Реклама")
+
+    api.create_detour(dict(ТЕЛО, when={"resourceId": "com.app:id/tariff"}))
+
+    карта = api.detour_map(package="com.app")
+    assert [o["texts"][0] for o in карта["obstacles"]] == ["Реклама"]
+    assert any(r["action"].get("run") == "close_tariff" for r in карта["rules"])
+
+
+def test_карта_не_мешает_чужие_приложения(с_артефактами):
+    *_, arts = с_артефактами
+    падение(arts, "job1", "com.other:id/x", "Чужое", package="com.other")
+    assert api.detour_map(package="com.app")["obstacles"] == []
+
+
+def test_преграда_помнит_задачу_для_обучения(с_артефактами):
+    """Кнопка «научить» на схеме ведёт в задачу — без её id она мертва."""
+    *_, arts = с_артефактами
+    падение(arts, "job42", "com.app:id/tariff", "Выберите тариф")
+    карта = api.detour_map(package="com.app")
+    assert карта["obstacles"][0]["job"] == "job42"
+
+
+def test_scan_obstacles_читает_слепки_из_артефактов(tmp_path, monkeypatch):
+    from farm import config
+    from farm.api.detours import scan_obstacles
+
+    monkeypatch.setattr(config, "ARTIFACTS_DIR", tmp_path)
+    job_dir = tmp_path / "job1"
+    job_dir.mkdir()
+    (job_dir / "obstacle.json").write_text(
+        json.dumps({"package": "com.app", "texts": ["Тариф"],
+                    "candidates": [{"selector": {"text": "Тариф"}}]}),
+        "utf-8")
+
+    слепки = scan_obstacles("com.app")
+    assert len(слепки) == 1
+    assert слепки[0]["job"] == "job1"
+    assert слепки[0]["file"] == "obstacle.json"
+
+
+def test_scan_obstacles_фильтрует_по_пакету(tmp_path, monkeypatch):
+    from farm import config
+    from farm.api.detours import scan_obstacles
+
+    monkeypatch.setattr(config, "ARTIFACTS_DIR", tmp_path)
+    job_dir = tmp_path / "job1"
+    job_dir.mkdir()
+    (job_dir / "obstacle.json").write_text(
+        json.dumps({"package": "com.other", "texts": [], "candidates": []}),
+        "utf-8")
+
+    assert scan_obstacles("com.app") == []
+
+
+def test_scan_obstacles_без_пакета_не_фильтрует(tmp_path, monkeypatch):
+    from farm import config
+    from farm.api.detours import scan_obstacles
+
+    monkeypatch.setattr(config, "ARTIFACTS_DIR", tmp_path)
+    job_dir = tmp_path / "job1"
+    job_dir.mkdir()
+    (job_dir / "obstacle.json").write_text(
+        json.dumps({"package": "com.other", "texts": [], "candidates": []}),
+        "utf-8")
+
+    assert len(scan_obstacles("")) == 1
+
+
+def test_scan_obstacles_без_папки_артефактов_не_падает(tmp_path, monkeypatch):
+    from farm import config
+    from farm.api.detours import scan_obstacles
+
+    monkeypatch.setattr(config, "ARTIFACTS_DIR", tmp_path / "нет-такой-папки")
+    assert scan_obstacles("com.app") == []

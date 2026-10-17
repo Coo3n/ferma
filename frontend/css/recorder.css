@@ -1,0 +1,836 @@
+/* Конструктор сценариев: панель шагов и оверлей рамок. */
+
+.mode { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+/* Слой рамок не перехватывает мышь: клик обязан дойти до экрана и тапнуть
+   устройство. Этим режим записи и отличается от инспектора. */
+#recLayer {
+    position: absolute;
+    display: none;
+    pointer-events: none;
+    z-index: 5;
+}
+
+#recLayer .rb {
+    position: absolute;
+    border: 1px solid color-mix(in srgb, var(--busy) 35%, transparent);
+}
+
+/* Кликабельный узел без подписи: рамка пунктирная — селектор у него будет
+   хрупким (className+instance или координаты), пусть это видно заранее. */
+#recLayer .rb.anon {
+    border-style: dashed;
+    border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+}
+
+#recLayer .rb.hov {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--busy) 12%, transparent);
+}
+
+/* строки шагов */
+.rs { border-bottom: 1px solid var(--line-soft); padding: 8px 10px;
+      transition: background var(--fast) var(--ease); }
+.rs-head { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.rs-n {
+    color: var(--dim);
+    font: var(--fs-1) var(--mono, ui-monospace, monospace);
+    min-width: 18px;
+    text-align: right;
+    flex: 0 0 auto;
+}
+/* Подпись занимает всю свободную ширину и режется сама — иначе при длинном
+   имени кнопки строки уезжали бы за край панели. */
+.rs-label { font-size: var(--fs-3); flex: 1; min-width: 0; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; }
+.rs-head > .ic { color: var(--accent); flex: 0 0 auto; }
+
+/* Кнопки строки проявляются на наведении и фокусе. Восемнадцать шагов ×
+   три кнопки — пятьдесят четыре значка, которые постоянно спорят с
+   подписями за внимание; нужны они в момент правки, а не при чтении.
+   :focus-within обязателен: с клавиатуры кнопка должна быть видна, иначе
+   таб-обход упирается в невидимый элемент.
+
+   Лежат абсолютом поверх правого края, а не в потоке: скрытые через
+   opacity они всё равно держали бы ~90px ширины, и подпись резалась бы
+   многоточием там, где места ей хватает. Подложка под ними — фон панели,
+   иначе кнопки легли бы поверх текста и он читался бы сквозь них. */
+.rs-head { position: relative; }
+
+.rs-acts {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 var(--s2);
+    background: var(--panel2);   /* сплошная: градиент читался как «фейд» */
+    opacity: 0;
+    transition: opacity var(--fast) var(--ease);
+}
+
+.rs:hover .rs-acts,
+.rs:focus-within .rs-acts,
+.rs.open .rs-acts { opacity: 1; }
+/* overflow-wrap обязателен: resourceId вида com.android.systemui:id/… это одно
+   «слово» без пробелов, и без переноса оно уезжает за правый край панели. */
+/* Код виден только у раскрытого шага (recRow). Развёрнутый ctx.expect_screen
+   с тремя dict(resourceId=…) занимает четыре строки — вчетверо больше самой
+   подписи, и в свёрнутом списке сюжет читался как стена Python, в которой
+   не видно ни порядка шагов, ни их смысла. */
+.rs-code {
+    color: var(--dim);
+    font-family: var(--mono, ui-monospace, monospace);
+    font-size: var(--fs-1);
+    margin-top: 6px;
+    padding: 6px 8px;
+    background: var(--panel2);
+    border-radius: var(--r1);
+    overflow-wrap: anywhere;
+    /* Развилка занимает несколько строк, и отступы в ней значимы: без
+       pre-wrap предпросмотр кода склеился бы в одну строку. */
+    white-space: pre-wrap;
+}
+
+/* Ветка развилки: имя, блок и признаки экрана, по которым она узнаётся. */
+.rs-arm {
+    border-left: 2px solid var(--line);
+    padding-left: 8px;
+    margin-top: 8px;
+}
+
+.rs-arm .row {
+    gap: 6px;
+}
+
+.rs-ok { color: var(--ok); font-size: var(--fs-1); margin-top: 2px; }
+.rs-warn { color: var(--warn); font-size: var(--fs-1); margin-top: 2px; }
+.rs-alts { font-size: var(--fs-1); margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.rs-alts label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.rs-param { font-size: var(--fs-1); margin-top: 6px; display: flex; align-items: center; gap: 8px; }
+/* Признаки якоря — селекторы: моноширинный, чтобы читались как код. */
+.rs-feat { font-family: var(--mono, ui-monospace, monospace); opacity: .75; }
+
+/* inline-block обязателен: контейнер ужимается ровно по картинке, и рамка
+   .rs-box, заданная в процентах, продолжает совпадать с элементом. Блок на всю
+   ширину растянул бы систему координат, и рамка уехала бы. */
+.rs-thumb { position: relative; display: inline-block; margin: 8px 0; }
+.rs-thumb img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 160px;
+    max-height: 200px;  /* у вертикального экрана телефона высота решает, а не ширина */
+    border-radius: var(--r1);
+}
+.rs-box { position: absolute; border: 2px solid var(--accent); }
+
+/* библиотека готовых скриптов в модалке */
+.lib {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.lib .li {
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r2);
+    cursor: pointer;
+    transition: border-color .12s ease, background .12s ease;
+}
+
+.lib .li:hover {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.lib .li b {
+    display: block;
+    font-size: var(--fs-3);
+    margin-bottom: 2px;
+}
+
+.lib .li span {
+    color: var(--dim);
+    font-size: var(--fs-1);
+    line-height: 1.35;
+}
+
+/* значок записанного сценария в списке */
+.rec-mark { color: var(--accent); }
+.sc .nm { display: flex; align-items: center; gap: 6px; }
+
+/* Вправо кнопки уводит растянутое название, а не margin-left:auto на самих
+   кнопках: auto стоял на каждой .sm, и свободное место делилось перед
+   обеими — карандаш повисал посреди строки, а корзина уезжала к краю.
+   Заодно длинное имя сценария теперь режется многоточием, а не распирает
+   строку и не выталкивает кнопки за край карточки. */
+.sc .nm > span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Схема сценария: хребет сверху, отводы под ним.
+
+   Хребет — интерактивный холст, а не свободный граф: карточку можно
+   перетащить, но нельзя соединить с произвольной другой — связи
+   определяет порядок в REC.steps и arms развилки, холст только даёт им
+   раскладку. Тот же вопрос про отводы (guards), что был здесь раньше,
+   остаётся в силе и не пересмотрен: страж срабатывает где угодно на
+   прогоне, а не в конкретной точке хребта, и рисовать его врезанным в
+   карточку было бы враньём — отводы остаются отдельным блоком под
+   холстом. Развилка — другое дело: она стоит в конкретной точке
+   последовательности, и её веер веток на холсте — честное отображение
+   того, что происходит (подробности —
+   docs/superpowers/specs/2026-09-25-scenario-graph-editor-design.md).
+   Панель живёт рядом с экраном устройства, а не в полноширинной модалке. */
+.sch { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+/* Окно холста: прокрутка и панорама живут здесь, а не на всей панели —
+   иначе «уехать вправо к пятой ветке» утаскивало бы вместе с холстом и
+   блок отводов под ним. Точки — сетка холста: по ней видно, что полотно
+   двигается, когда тащишь пустое место. */
+.sch-view {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    background-image: radial-gradient(var(--line-soft) 1px, transparent 1px);
+    background-size: 24px 24px;
+}
+
+.sch-view.panning { cursor: grabbing; }
+
+/* Пустой конструктор: заглушка центрируется по окну холста, а не липнет к
+   его верхнему краю. Своей высоты у .sch-spine нет — она равна полотну,
+   которого без шагов не существует, поэтому min-height:100% у .emptywrap
+   не к чему привязать. Высота есть у .sch-view (flex:1), она и центрирует.
+   Только когда шагов нет: с полотном сетка ломала бы прокрутку и панораму. */
+/* center stretch, а не center: по горизонтали элемент обязан тянуться на
+   всю ширину — иначе грид ужимает его до min-content, и текст встаёт
+   узкой колонкой в одно-два слова. Горизонтальным центрированием
+   занимается сама .emptywrap. */
+.sch-view:has(.emptywrap) {
+    display: grid;
+    place-items: center stretch;
+}
+
+/* Масштаб применяется к полотну, а размер держит .sch-spine: полосы
+   прокрутки должны считать уменьшенный сюжет, а не исходный. */
+.sch-spine { position: relative; }
+.sch-spine .gr-canvas { transform-origin: 0 0; }
+
+/* Отводы и преграды — справка о пути, а не часть сюжета: сложены в
+   раскрывающийся подвал, чтобы не отъедать высоту у холста. */
+.sch-foot {
+    flex: 0 0 auto;
+    border-top: 1px solid var(--line);
+    background: var(--panel);
+    max-height: 38vh;
+    overflow-y: auto;
+}
+
+.sch-foot > summary {
+    padding: var(--s2) var(--s3);
+    color: var(--dim);
+    font-size: var(--fs-1);
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+}
+
+.sch-foot > summary::-webkit-details-marker { display: none; }
+
+.sch-foot > summary::before {
+    content: "▸";
+    display: inline-block;
+    margin-right: var(--s2);
+    transition: transform var(--fast) var(--ease);
+}
+
+.sch-foot[open] > summary::before { transform: rotate(90deg); }
+.sch-foot > summary:hover { color: var(--text); }
+/* Подвал схемы: два раздела — отводы и непокрытые преграды. Раньше здесь
+   всё было 11px цветом --dim: заголовок не отличался от содержимого, два
+   раздела сливались в один поток, и читать это было нечем. Теперь у
+   каждого раздела своя карточка с заголовком, пояснением и счётчиком. */
+.sch-side-wrap {
+    display: grid;
+    gap: var(--s3);
+    padding: 0 var(--s3) var(--s3);
+}
+
+/* Два раздела рядом, когда ширины хватает: они равноправны и читаются
+   парой («что умеем» / «что не умеем»), а не списком друг под другом. */
+/* Без align-items:start — карточки тянутся до высоты соседа. С ним одна
+   была по своему тексту, другая по своему, и пара смотрелась как брак
+   вёрстки: у равноправных блоков рядом должен быть общий низ. */
+/* auto-fit, а не @media по окну: колонка конструктора уже окна, и при
+   1280 две колонки по 1fr вылезали за правый край. */
+.sch-side-wrap { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+
+.sch-side {
+    border: 1px solid var(--line);
+    border-radius: var(--r2);
+    background: var(--panel2);
+    padding: var(--s3);
+}
+
+.sch-side-head { margin-bottom: var(--s2); }
+
+/* Заголовок читаемого размера и веса: это заголовок, а не подпись. */
+.sch-side h4 {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    font-size: var(--fs-2);
+    font-weight: 650;
+    color: var(--text);
+    margin: 0;
+}
+
+/* Пояснение отдельной строкой, а не через тире в заголовке: в заголовке
+   оно удлиняло строку вдвое и мешало выхватить сам заголовок глазом. */
+.sch-side-head p {
+    margin: 3px 0 0;
+    font-size: var(--fs-1);
+    line-height: 1.5;
+    color: var(--dim);
+    max-width: 52ch;
+}
+
+/* Счётчик виден и у свёрнутого подвала — сколько всего, понятно без
+   разворачивания. Нулевой — зелёный: ноль преград это хорошо. */
+.sch-count {
+    font: 650 var(--fs-1) var(--sans);
+    padding: 1px 7px;
+    border-radius: var(--pill);
+    background: var(--panel3);
+    color: var(--text2);
+}
+
+.sch-count.ok { background: var(--accent-dim); color: var(--accent); }
+
+.sch-side-link {
+    margin-left: auto;
+    background: none;
+    border: 0;
+    color: var(--accent-hi);
+    font-size: var(--fs-1);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+}
+
+.sch-side-link:hover { text-decoration: underline; }
+
+/* Строки списка: свой фон и разделители, чтобы «Экран без читаемого
+   текста» и «Рабочий стол» читались как две записи, а не как сплошной
+   текст в два этажа. */
+.sch-rule, .sch-gap {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    font-size: var(--fs-2);
+    padding: var(--s2) 0;
+    border-top: 1px solid var(--line-soft);
+}
+
+.sch-rule > .ic { color: var(--ok); flex: 0 0 auto; }
+
+/* Не красный: преграда — не поломка, а «ещё не научили». Красным в этом
+   интерфейсе помечено упавшее, и путать эти два смысла нельзя. */
+.sch-gap > .ic { color: var(--warn); flex: 0 0 auto; }
+
+.sch-hits {
+    color: var(--dim);
+    font-size: var(--fs-1);
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+/* Подпись преграды в две строки: что это за экран и откуда он. Пакет
+   держим отдельной строкой, а не в скобках, — он длинный
+   (com.google.android.apps.nexuslauncher) и в одну строку выдавливал бы
+   кнопку «научить» за край. */
+.sch-gap-txt {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.3;
+}
+
+.sch-gap-txt b {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sch-gap-sub {
+    color: var(--dim);
+    font-size: var(--fs-1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Пусто в этих двух блоках — не «ничего нет», а «всё в порядке»: отводов
+   не нужно, незнакомых экранов не встречалось. Поэтому галка, а не серая
+   строчка: тон должен совпадать со смыслом. */
+/* Верхняя черта — как у строк списка: пусто или не пусто, граница между
+   шапкой раздела и его содержимым должна быть на одном месте. */
+.sch-empty {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s2);
+    color: var(--dim);
+    font-size: var(--fs-2);
+    line-height: 1.55;
+    padding: var(--s2) 0 0;
+    border-top: 1px solid var(--line-soft);
+    margin-top: var(--s2);
+}
+
+.sch-empty .ic {
+    color: var(--ok);
+    flex: 0 0 auto;
+    margin-top: 1px;
+}
+
+/* ------------------------------------------------------- холст: карточки */
+
+.gr-canvas { position: relative; }
+.gr-edges { position: absolute; left: 0; top: 0; pointer-events: none; }
+
+.gr-node {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 44px;
+    padding: 0 10px 0 6px;
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: var(--r1);
+    font-size: var(--fs-2);
+    transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+
+/* Наведение на карточку — рамка и заливка на ступень светлее. Тень под
+   карточкой и серая плашка внутри (глобальный button:hover на .gr-body)
+   давали «коробку в коробке». */
+.gr-node:hover { border-color: var(--line-hover); background: var(--panel3); }
+
+.gr-node.dragging { opacity: .7; cursor: grabbing; z-index: 5; }
+
+/* Ручка видна всегда, хоть и приглушённо: карточку можно тащить, и это
+   не должно быть открытием, которое человек делает случайно наведя мышь.
+   На hover — просто ярче, не появляется из ничего. */
+.gr-grip {
+    color: var(--dim);
+    cursor: grab;
+    opacity: .35;
+    user-select: none;
+    display: flex;
+    flex: 0 0 auto;
+    touch-action: none;
+}
+.gr-node:hover .gr-grip { opacity: .8; }
+
+.gr-body {
+    background: none;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 1;
+}
+.gr-body,
+.gr-body:hover:not(:disabled) { background: none; border: 0; min-height: 0; padding: 0; }
+.gr-body:hover .gr-label { color: var(--text); }
+
+/* Иконка узла — тот же спрайт, что у кнопок «Якорь экрана»/«Развилка»:
+   один и тот же значок означает одно и то же везде в конструкторе. */
+.gr-icon { width: var(--icon-sm); height: var(--icon-sm); color: var(--accent); flex: 0 0 auto; }
+
+.gr-node.anchor .gr-body .gr-icon { color: var(--accent-hi); }
+.gr-node.block .gr-body .gr-icon { color: var(--text2); }
+.gr-node.branch .gr-body .gr-icon { color: var(--busy); }
+
+.gr-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+/* Номер шага на карточке — моноширинный и приглушённый: он для сверки со
+   «Списком» и журналом, а не часть подписи, и не должен с ней спорить. */
+.gr-n {
+    color: var(--dim);
+    font: var(--fs-1) var(--mono, ui-monospace, monospace);
+    min-width: 16px;
+    text-align: right;
+    flex: 0 0 auto;
+}
+
+/* Карточка ветки — своя лента слева цветом дорожки (инлайн, из GR_LANES),
+   плюс собственная высота: две строки (имя ветки и блок/«ничего не
+   делать»), а не одна, как у карточки хребта. */
+.gr-arm {
+    height: 54px;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+    border-left-width: 3px;
+    padding: 4px 10px;
+}
+.gr-arm-name { font-size: var(--fs-1); font-weight: 600; }
+.gr-arm-empty { color: var(--dim); font-size: var(--fs-1); }
+.gr-arm-block {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: 1px solid var(--accent-line);
+    color: var(--accent);
+    font: var(--fs-1) var(--mono, ui-monospace, monospace);
+    padding: 1px 7px;
+    border-radius: var(--pill);
+    cursor: pointer;
+}
+.gr-arm-block .gr-icon { width: 11px; height: 11px; color: inherit; }
+.gr-arm-block:hover { background: var(--accent-dim); }
+.gr-arm-lost { color: var(--bad); font-size: var(--fs-1); overflow-wrap: anywhere; white-space: normal; }
+
+.gr-arm.ghost { opacity: .6; }
+/* Пропавший блок — отдельный сигнал (тонкая красная обводка), не
+   перекрашивает всю карточку: цвет карточки — это цвет её дорожки. */
+.gr-arm.missing { box-shadow: inset 0 0 0 1px var(--bad); }
+
+/* ------------------------------------------- перетаскивание шагов */
+
+/* Ручка проявляется на строке, а не висит всегда: в списке из двадцати шагов
+   двадцать точек по краю читаются как мусор. */
+.rs-grip {
+    color: var(--dim);
+    cursor: grab;
+    opacity: 0;
+    user-select: none;
+    display: flex;
+    flex: 0 0 auto;
+    transition: opacity var(--fast) var(--ease);
+}
+
+.rs:hover .rs-grip {
+    opacity: .6;
+}
+
+.rs-grip:active {
+    cursor: grabbing;
+    opacity: 1;
+}
+
+.rs.dragging {
+    opacity: .45;
+}
+
+/* Куда встанет шаг — выше или ниже цели. Без этой линии первое
+   перетаскивание всегда получается не туда. */
+.rs.over-up {
+    box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.rs.over-down {
+    box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* ------------------------------------------------------ панель записи
+
+   Раньше это были три блока с заголовками «Запись», «Добавить в сюжет»,
+   «Вид» — 170px высоты в узкой колонке, то есть треть того места, где
+   должен был помещаться сюжет. Теперь два плотных ряда: первый — что
+   пишем, второй — как смотрим. Заголовки не нужны: кнопки названы
+   словами, а группы разделены чертой. */
+.recbar {
+    padding: var(--s2) var(--s3);
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    flex: 0 0 auto;
+    /* Ширина колонки зависит от разделителя, который пользователь таскает
+       мышью, а не от окна, — поэтому крошка ниже ужимается по
+       container query, а не по @media. */
+    container-type: inline-size;
+}
+
+.recbar-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    flex-wrap: wrap;
+}
+
+.recbar-row.sub {
+    margin-top: var(--s2);
+    padding-top: var(--s2);
+    border-top: 1px solid var(--line-soft);
+}
+
+/* Идёт запись. Единственная в интерфейсе бесконечная анимация — и
+   единственная, которой это положено: она не украшение, а индикатор
+   состояния, за которым человек следит краем глаза, пока кликает по
+   экрану телефона. Пульсирует только точка, не вся кнопка: мигающая
+   кнопка в панели, где рядом ещё шесть, читается как ошибка.
+
+   Кольцо вокруг точки — отдельный слой: расходится и гаснет, как сигнал
+   в эфир. Дороже простого мигания на один псевдоэлемент, но именно оно
+   читается как «идёт запись», а не «что-то моргает». */
+#btnRecStart.on {
+    color: var(--bad);
+    border-color: var(--bad-line);
+    background: color-mix(in srgb, var(--bad) 10%, transparent);
+}
+
+#btnRecStart.on .dotrec {
+    animation: rec-beat 1.4s var(--ease) infinite;
+    transform-origin: center;
+}
+
+@keyframes rec-beat {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: .45; transform: scale(.82); }
+}
+
+/* Крошка «← Ферма / имя устройства» в начале первого ряда. Стоит здесь, а
+   не отдельной панелью над рабочим местом: та несла ещё четыре элемента,
+   которые разъехались по своим местам (шапка зеркала, диалог
+   «Управление»), и держать ради двух слов целую строку над экраном стало
+   не за что. */
+.crumb {
+    color: var(--dim);
+    flex: 0 0 auto;
+}
+
+.crumb:hover:not(:disabled) {
+    color: var(--text);
+}
+
+/* Имя режется многоточием: у телефона может быть длинная подпись, и без
+   этого она вытолкнула бы кнопки записи за край панели. */
+.crumb-name {
+    font-size: var(--fs-3);
+    font-weight: 650;
+    max-width: 22ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+/* Узкая колонка: у крошки остаётся одна стрелка. Слово «Ферма» — не
+   единственный путь назад (есть раздел «Ферма» в шапке), а «Сохранить
+   сценарий» из-за него уезжал на вторую строку. Имя устройства остаётся:
+   оно отвечает на вопрос «с каким телефоном я работаю», и подменить его
+   нечем. Сокращать подписи кнопок не стали — короткие аббревиатуры тут
+   не читаются (см. решение ниже про перенос строки). */
+@container (max-width: 900px) {
+    .crumb span {
+        display: none;
+    }
+
+    .crumb-name {
+        max-width: 14ch;
+    }
+}
+
+/* Черта между группами кнопок — вместо заголовков над ними. */
+.recbar-sep {
+    width: 1px;
+    align-self: stretch;
+    min-height: 18px;
+    background: var(--line);
+}
+
+.recbar .warn {
+    margin-top: var(--s2);
+}
+
+/* Блок масштаба читается как один орган управления, а не как четыре
+   отдельные кнопки: общая рамка, кнопки без своих границ. */
+.zoom {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--r1);
+    overflow: hidden;
+}
+
+.zoom button {
+    border-radius: 0;
+    border-color: transparent;
+}
+
+.zoom #btnZoomLevel {
+    min-width: 54px;
+    justify-content: center;
+    font: var(--fs-1) var(--sans);
+    color: var(--dim);
+}
+
+#btnMirror[aria-pressed="false"] {
+    color: var(--accent);
+}
+
+/* Схема и список занимают всё, что осталось от панели. */
+#recScheme,
+#recSteps {
+    flex: 1;
+    min-height: 0;
+}
+
+/* ▶ на карточке схемы: проверить один шаг, не уходя в список. Видна при
+   наведении/фокусе — на 30 карточках постоянные кнопки шумели бы.
+   Форма — общая с кнопками строки (см. .rs-acts button.sm ниже). */
+.gr-try {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    transition: opacity var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+
+.gr-node:hover .gr-try,
+.gr-node:focus-within .gr-try {
+    opacity: 1;
+}
+
+/* Масштаб — у холста, как в Figma и картах: управляет холстом и живёт на
+   нём. В панели инструментов он ронял второй ряд в перенос. */
+#recScheme {
+    position: relative;
+}
+
+.zoom-float {
+    position: absolute;
+    right: var(--s3);
+    bottom: 44px;
+    z-index: 5;
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: var(--r2);
+    box-shadow: var(--e2);
+}
+
+.zoom-float[hidden] {
+    display: none;
+}
+
+/* ------------------------------------------- узкая колонка конструктора
+
+   На 1280 рядом с экраном телефона колонке остаётся ~600px, и оба ряда
+   панели уходили в перенос. Второстепенные кнопки сжимаются до иконки
+   (подпись остаётся в DOM — её читает экранная читалка, и в title), чип
+   «запись остановлена» прячется: то же видно по кнопке «Запись». */
+.col.build {
+    container: build / inline-size;
+}
+
+@container build (max-width: 900px) {
+    #recState {
+        display: none !important;
+    }
+
+    #btnRecPause,
+    #btnRecModeOff,
+    #btnRecAnchor,
+    #btnRecBranch,
+    #btnRecDiff,
+    #btnMirror,
+    .recbar-row button[onclick="recLibOpen()"],
+    .recbar-row button[onclick="devToolsOpen()"] {
+        font-size: 0;
+        gap: 0;
+        width: 30px;
+        padding: 0;
+        justify-content: center;
+    }
+
+    #btnRecPause span,
+    #btnRecModeOff span,
+    #btnMirror span {
+        font-size: 0;
+    }
+
+    .recbar-row {
+        gap: 6px;
+    }
+}
+
+
+/* Кнопки строки шага и ▶ на карточке схемы — одна форма: квадрат
+   высотой с .sm (30px), иконка по центру. Раньше width 26 спорил с
+   min-height 30 у button.sm (выходило 26×30), а ▶ на карточке — 26×32:
+   ряд выглядел собранным из разных наборов. Наведение — только смена
+   заливки/рамки токенами, без свечения и теней. */
+.rs-acts button.sm,
+.gr-try {
+    width: 30px;
+    height: 30px;
+    min-height: 30px;
+    padding: 0;
+    justify-content: center;
+    border: 1px solid var(--line);
+    border-radius: var(--r1);
+    background: var(--panel);
+    color: var(--text2);
+}
+
+.rs-acts button.sm:hover:not(:disabled),
+.gr-try:hover:not(:disabled) {
+    border-color: var(--line-hover);
+    background: var(--panel3);
+    color: var(--text);
+}
+
+.rs-acts button.sm.danger {
+    color: var(--bad);
+}
+
+.rs-acts button.sm.danger:hover:not(:disabled) {
+    border-color: var(--bad-line);
+    background: var(--bad-dim);
+    color: var(--bad);
+}
+
+/* Вспышка нажатия (radial accent из base.css) на мелких квадратах
+   читалась как странное зелёное свечение — здесь она не нужна. */
+.rs-acts button::before,
+.gr-try::before,
+.gr-body::before {
+    content: none;
+}
+
+.rs:not(.sel):hover,
+.rs.open:not(.sel) {
+    background: var(--panel2);
+}

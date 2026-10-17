@@ -1,0 +1,364 @@
+{
+ "meta": {
+  "name": "Лайк ВК",
+  "description": "",
+  "watch_popups": true,
+  "human": true
+ },
+ "params": {},
+ "steps": [
+  {
+   "kind": "launch_app",
+   "args": {
+    "package": "com.vkontakte.android"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "expect",
+   "args": {
+    "name": "Главная"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": [
+    "resourceId=\"com.vkontakte.android:id/app_bar_layout\"",
+    "resourceId=\"com.vkontakte.android:id/header_container\"",
+    "resourceId=\"com.vkontakte.android:id/user_photo\""
+   ],
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "swipe",
+   "args": {
+    "x1": 0.709549795361528,
+    "y1": 0.8861161914347788,
+    "x2": 0.6396998635743519,
+    "y2": 0.4383385091261707,
+    "duration": 0.44
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"com.vkontakte.android:id/tab_clips\"",
+    "fallbacks": [
+     "description=\"Клипы\""
+    ]
+   },
+   "param": null,
+   "note": "«Клипы»",
+   "texts": [
+    "Клипы"
+   ],
+   "crop": "04_click.png",
+   "point": [
+    0.584,
+    0.9558
+   ],
+   "any": null,
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "expect",
+   "args": {
+    "name": "screen5"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": [
+    "resourceId=\"com.vkontakte.android:id/clips_wrapper_top_bar\"",
+    "resourceId=\"com.vkontakte.android:id/clips_header_view\"",
+    "resourceId=\"com.vkontakte.android:id/clips_header_content\""
+   ],
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"com.vkontakte.android:id/fullscreen_clip_overlay_like_text\"",
+    "fallbacks": [
+     "text=\"3\""
+    ]
+   },
+   "param": null,
+   "note": "«3»",
+   "texts": [
+    "3"
+   ],
+   "crop": "06_click.png",
+   "point": [
+    0.9213,
+    0.5542
+   ],
+   "any": null,
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "swipe",
+   "args": {
+    "x1": 0.47555252387448843,
+    "y1": 0.7651376597233304,
+    "x2": 0.6152523874488404,
+    "y2": 0.15081810259116965,
+    "duration": 0.441
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"com.vkontakte.android:id/fullscreen_clip_overlay_comment_container\"",
+    "fallbacks": [
+     "description=\"23 комментария\""
+    ]
+   },
+   "param": null,
+   "note": "«23 комментария»",
+   "texts": [
+    "23 комментария"
+   ],
+   "crop": "08_click.png",
+   "point": [
+    0.9213,
+    0.625
+   ],
+   "any": null,
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "long_tap",
+   "args": {
+    "x": 0.41268758526603,
+    "y": 0.6143072825246413,
+    "duration": 0.8
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "expect",
+   "args": {
+    "name": "screen6"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": [
+    "resourceId=\"com.android.systemui:id/status_bar_launch_animation_container\"",
+    "resourceId=\"com.android.systemui:id/status_bar_container\"",
+    "resourceId=\"com.android.systemui:id/status_bar\""
+   ],
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "tap",
+   "args": {
+    "x": 0.5942974079126876,
+    "y": 0.6095938332371822
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "expect",
+   "args": {
+    "name": "screen7"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": [
+    "resourceId=\"com.android.systemui:id/status_bar_launch_animation_container\"",
+    "resourceId=\"com.android.systemui:id/status_bar_container\"",
+    "resourceId=\"com.android.systemui:id/status_bar\""
+   ],
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "description=\"Закрыть\"",
+    "fallbacks": []
+   },
+   "param": null,
+   "note": "«Закрыть»",
+   "texts": [
+    "Закрыть"
+   ],
+   "crop": "13_click.png",
+   "point": [
+    0.0689,
+    0.2765
+   ],
+   "any": null,
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "swipe",
+   "args": {
+    "x1": 0.5803274215552524,
+    "y1": 0.7431415630485215,
+    "x2": 0.5803274215552524,
+    "y2": 0.3754925186267169,
+    "duration": 0.236
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "swipe",
+   "args": {
+    "x1": 0.6606548431105048,
+    "y1": 0.7839914568731665,
+    "x2": 0.7130422919508868,
+    "y2": 0.23094674047797323,
+    "duration": 0.37
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "expect",
+   "args": {
+    "name": "screen8"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": [
+    "resourceId=\"com.vkontakte.android:id/clips_wrapper_top_bar\"",
+    "resourceId=\"com.vkontakte.android:id/clips_header_view\"",
+    "resourceId=\"com.vkontakte.android:id/clips_header_content\""
+   ],
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"com.vkontakte.android:id/fullscreen_clip_overlay_like_container\"",
+    "fallbacks": [
+     "description=\"14787 лайков\""
+    ]
+   },
+   "param": null,
+   "note": "«14787 лайков»",
+   "texts": [
+    "14787 лайков"
+   ],
+   "crop": "17_click.png",
+   "point": [
+    0.9213,
+    0.5542
+   ],
+   "any": null,
+   "arms": null,
+   "report": null
+  },
+  {
+   "kind": "stop_app",
+   "args": {
+    "package": "com.vkontakte.android"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null
+  }
+ ],
+ "screen_width": 1220
+}

@@ -1,0 +1,311 @@
+/* Инструменты конструктора: подсветка хода прогона, группы шагов, проверка,
+   превью жестов, дифф. Движение — только через токены base.css (--ease*,
+   --fast/--mid/--slow); prefers-reduced-motion глушит всё глобально. */
+
+/* ---- значки на шаге */
+.rs-badge {
+    font-size: var(--fs-1);
+    line-height: 1;
+    padding: 3px 6px;
+    border-radius: var(--pill);
+    border: 1px solid var(--line);
+    color: var(--text2);
+    flex: 0 0 auto;
+}
+
+.rs-badge.opt { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.rs-badge.retry { color: var(--busy); border-color: color-mix(in srgb, var(--busy) 35%, transparent); }
+
+.rs-flex {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--s3);
+    margin-top: 6px;
+    font-size: var(--fs-1);
+    color: var(--text2);
+}
+
+.rs-flex select { font-size: var(--fs-1); }
+
+/* ---- выбор группы */
+.rs-sel { flex: 0 0 auto; accent-color: var(--accent); margin: 0; }
+.rs.sel { background: var(--accent-dim); box-shadow: inset 0 0 0 1px var(--accent-line); }
+
+.selbar {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s2) var(--s3);
+    padding: var(--s2) var(--s3);
+    background: var(--panel2);
+    border-bottom: 1px solid var(--accent-line);
+    box-shadow: var(--e2);
+    font-size: var(--fs-2);
+    animation: st-drop var(--mid) var(--ease-out);
+}
+
+.selbar-n {
+    padding: 3px 9px;
+    border-radius: var(--pill);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-line);
+    color: var(--accent-hi);
+}
+
+.selbar-grp {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s1);
+    padding-right: var(--s3);
+    border-right: 1px solid var(--line-soft);
+}
+
+.selbar .sp { flex: 1; }
+.selbar select, #recRun select { width: auto; }
+.selbar button .ic { margin-right: 2px; }
+.selbar-pause { display: inline-flex; align-items: center; gap: 4px; color: var(--text2); }
+.selbar-pause input { width: 56px; }
+
+/* ---- ход прогона: шаги плавно «загораются» */
+.rs, .gr-node {
+    transition: background var(--mid) var(--ease-out), box-shadow var(--mid) var(--ease-out),
+        border-color var(--mid) var(--ease-out);
+}
+
+.rs.run-ok, .gr-node.run-ok { box-shadow: inset 3px 0 0 var(--ok); }
+.rs.run-retry, .gr-node.run-retry { box-shadow: inset 3px 0 0 var(--busy); }
+.rs.run-skip, .gr-node.run-skip { box-shadow: inset 3px 0 0 var(--warn); opacity: .8; }
+.rs.run-fail, .gr-node.run-fail {
+    box-shadow: inset 3px 0 0 var(--bad);
+    background: color-mix(in srgb, var(--bad) 8%, transparent);
+}
+
+.rs.run-now, .gr-node.run-now {
+    box-shadow: inset 3px 0 0 var(--accent);
+    background: var(--accent-dim);
+    animation: st-now 1.4s var(--ease) infinite;
+}
+
+.rs.has-issue, .gr-node.has-issue { box-shadow: inset 3px 0 0 var(--bad); }
+.rs.has-warn, .gr-node.has-warn { box-shadow: inset 3px 0 0 var(--warn); }
+
+@keyframes st-now {
+    0%, 100% { background-color: var(--accent-dim); }
+    50% { background-color: color-mix(in srgb, var(--accent) 18%, transparent); }
+}
+
+@keyframes st-drop {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ---- панель проверки: заголовок, один ряд управления, подсказки по требованию */
+#recRun {
+    margin-top: var(--s3);
+    padding: var(--s3) var(--s4);
+    border: 1px solid var(--line);
+    border-radius: var(--r3);
+    background: linear-gradient(180deg, var(--panel2), var(--panel));
+    box-shadow: var(--e1);
+    font-size: var(--fs-2);
+    animation: st-drop var(--mid) var(--ease-out);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.run-head { display: flex; align-items: center; justify-content: space-between; }
+.run-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; letter-spacing: .01em; }
+.run-title .ic { color: var(--accent); }
+.run-ctl { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2) var(--s4); margin-top: var(--s3); }
+.run-ctl > button .ic { margin-right: 4px; }
+.run-opt { display: inline-flex; align-items: center; gap: var(--s2); }
+.run-lbl { color: var(--dim); font-size: var(--fs-1); }
+.run-note { margin-top: var(--s2); color: var(--warn); font-size: var(--fs-1); }
+#runFrom { width: 210px; }
+
+/* Сегмент (.seg) — один на весь сайт, описан в bulk.css. */
+
+.iss-box { margin-top: var(--s3); border: 1px solid var(--line-soft); border-radius: var(--r2); padding: 0 var(--s3) var(--s2); }
+.iss-box summary {
+    cursor: pointer;
+    padding: var(--s2) 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--warn);
+    list-style: none;
+}
+
+.iss-box summary::-webkit-details-marker { display: none; }
+.iss-box.has-err { border-color: color-mix(in srgb, var(--bad) 35%, transparent); }
+.iss-box.has-err summary { color: var(--bad); }
+.iss { margin-top: 4px; }
+
+.runprog { margin-top: var(--s2); }
+.runprog-bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.runprog-bar i {
+    display: block;
+    height: 100%;
+    background: var(--accent-fill);
+    transition: width var(--slow) var(--ease-out);
+}
+
+.runprog.failed .runprog-bar i { background: var(--bad); }
+.runprog.passed .runprog-bar i { background: var(--ok); }
+.runprog-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s3); margin-top: 6px; }
+.run-step { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-ok-txt { color: var(--ok); }
+.run-fail-box { flex: 1; min-width: 0; color: var(--text); }
+.run-fail-box b { color: var(--bad); }
+.run-fail-box p { margin: 4px 0; color: var(--text2); line-height: 1.45; }
+.runprog-acts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); margin-top: 6px; }
+.runprog-acts a, .runprog-row a { color: var(--accent-hi); }
+
+/* ---- превью жеста поверх экрана */
+.rec-gest { position: absolute; display: none; pointer-events: none; z-index: 6; }
+.rec-gest svg { display: block; overflow: visible; }
+.rec-gest .g-line {
+    fill: none;
+    stroke: var(--accent-hi);
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: g-draw 1s var(--ease-out) infinite;
+}
+
+.rec-gest .g-head { fill: var(--accent-hi); }
+.rec-gest .g-dot { fill: var(--accent); stroke: #fff; stroke-width: 2; }
+.rec-gest .g-txt { fill: #fff; font: 600 var(--fs-2) var(--sans); paint-order: stroke; stroke: #000; stroke-width: 3px; }
+.rec-gest .g-ring {
+    fill: none;
+    stroke: var(--accent-hi);
+    stroke-width: 3;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: g-pulse 1.1s var(--ease-out) infinite;
+}
+
+.rec-gest .g-ring.long { animation-duration: 1.9s; fill: color-mix(in srgb, var(--accent) 15%, transparent); }
+.rec-gest .g-box { fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: var(--accent-hi); stroke-width: 2; }
+
+@keyframes g-draw {
+    0% { stroke-dashoffset: 1; opacity: 1; }
+    70% { stroke-dashoffset: 0; opacity: 1; }
+    100% { stroke-dashoffset: 0; opacity: .25; }
+}
+
+@keyframes g-pulse {
+    from { transform: scale(.4); opacity: 1; }
+    to { transform: scale(1.5); opacity: 0; }
+}
+
+/* ---- дифф */
+.dflist { display: flex; flex-direction: column; gap: 4px; max-height: 60vh; overflow: auto; font-size: var(--fs-2); }
+.df { display: flex; gap: 8px; padding: 4px 6px; border-radius: var(--r1); }
+.df-m { font-family: var(--mono); width: 12px; flex: 0 0 auto; }
+.df.add { background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--ok); }
+.df.del { background: color-mix(in srgb, var(--bad) 8%, transparent); color: var(--bad); }
+.df.chg { background: color-mix(in srgb, var(--warn) 8%, transparent); color: var(--warn); }
+.df-d { display: block; color: var(--text2); font-size: var(--fs-1); }
+
+/* ---- журнал задач: шаги и объяснение ошибки */
+.jp { color: var(--accent-hi); font-size: var(--fs-1); }
+.jsteps { margin: 10px 12px 0; }
+.jchips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.jchip {
+    min-width: 22px;
+    padding: 2px 5px;
+    text-align: center;
+    border-radius: var(--r1);
+    font: var(--fs-1) var(--sans);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--ok);
+}
+
+.jchip.retried { background: color-mix(in srgb, var(--busy) 14%, transparent); color: var(--busy); }
+.jchip.skipped { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+.jchip.failed { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
+.jnote { color: var(--dim); font-size: var(--fs-1); margin-left: 6px; }
+.jerr {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px solid color-mix(in srgb, var(--bad) 40%, transparent);
+    border-radius: var(--r2);
+    background: color-mix(in srgb, var(--bad) 6%, transparent);
+    font-size: var(--fs-2);
+}
+
+.jerr.timeout { border-color: color-mix(in srgb, var(--warn) 40%, transparent); background: color-mix(in srgb, var(--warn) 6%, transparent); }
+.jerr b { color: var(--bad); }
+.jerr.timeout b { color: var(--warn); }
+.jerr p { margin: 4px 0 0; color: var(--text2); line-height: 1.45; }
+
+/* ---- фокус и лента шагов прогона */
+.selbar button:focus-visible, #recRun button:focus-visible, #recRun select:focus-visible,
+.selbar select:focus-visible, .jchip:focus-visible, .rs-sel:focus-visible {
+    outline: 2px solid var(--accent-hi);
+    outline-offset: 2px;
+}
+
+.run-chips { margin-top: 8px; }
+button.jchip { border: 0; cursor: pointer; }
+button.jchip:hover { filter: brightness(1.25); }
+.jchip.now { background: var(--accent-fill); color: var(--accent-ink); animation: st-now 1.4s var(--ease) infinite; }
+.rs-sel { width: 15px; height: 15px; cursor: pointer; }
+.iss { padding: 5px 8px; border-radius: var(--r1); background: rgba(255, 255, 255, .03); }
+.iss.error { background: color-mix(in srgb, var(--bad) 8%, transparent); }
+.iss.warning { background: color-mix(in srgb, var(--warn) 7%, transparent); }
+.rs-badge { letter-spacing: .02em; }
+
+
+.iss a { color: var(--accent-hi); font-weight: 600; }
+.iss .ic { flex: 0 0 auto; margin-top: 2px; }
+
+/* Шаг «прошёл вслепую»: формально без ошибки, но экран не проверен. */
+.rs.run-blind, .gr-node.run-blind { box-shadow: inset 3px 0 0 var(--warn); background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--warn) 7%, transparent) 0 6px, transparent 6px 12px); }
+.jchip.blind { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); outline: 1px dashed var(--warn); outline-offset: -1px; }
+.run-fail-box b.warnb { color: var(--warn); }
+
+/* Выравнивание: все органы ряда одной высоты и по центру, номера шагов и
+   галки — в одну вертикаль. */
+.run-ctl { align-items: center; }
+.run-ctl > button, .run-opt select { height: 32px; box-sizing: border-box; }
+.run-ctl > button { display: inline-flex; align-items: center; justify-content: center; }
+.run-ctl > button .ic { margin: 0 6px 0 0; }
+.run-opt { height: 32px; }
+.seg { align-items: stretch; }
+.seg button { display: inline-flex; align-items: center; }
+.run-head { min-height: 24px; }
+.rs-head { align-items: center; }
+.rs-head > .rs-sel { flex: 0 0 15px; }
+.rs-head > .rs-n { flex: 0 0 22px; text-align: center; }
+.rs-head > .ic { flex: 0 0 16px; }
+.rs-badge { display: inline-flex; align-items: center; height: 18px; }
+.iss-box { padding-bottom: 0; }
+.iss-box[open] { padding-bottom: var(--s2); }
+.iss-box summary { padding: 7px 0; }
+
+/* Баннер режима правки — той же ширины и отступов, что панель проверки. */
+#recBanner:not([hidden]) {
+    margin-top: var(--s3);
+    padding: 8px var(--s4);
+    align-items: center;
+    border: 1px solid color-mix(in srgb, var(--warn) 28%, transparent);
+    border-radius: var(--r2);
+    background: color-mix(in srgb, var(--warn) 6%, transparent);
+    line-height: 1.4;
+}
+
+#recBanner .ic { flex: 0 0 auto; }
+
+/* Сводка замечаний: по центру строки, с теми же боковыми отступами. */
+.iss-box { padding: 0 var(--s4); }
+.iss-box[open] { padding-bottom: var(--s3); }
+.iss-box summary { min-height: 36px; padding: 0; align-items: center; }
+.iss { padding: 6px 10px; }

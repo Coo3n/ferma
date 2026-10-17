@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Android Farm — быстрый вход в проект</title>
+<!-- Исходник docs/onboarding.pdf. Пересобрать: node docs/tools/onboarding-pdf.js -->
+<style>
+    @font-face { font-family: "Golos Text"; font-weight: 400 700; src: url("../../frontend/fonts/golos-cyrillic.woff2") format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+    @font-face { font-family: "Golos Text"; font-weight: 400 700; src: url("../../frontend/fonts/golos-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F, U+2190-21FF, U+2212; }
+    :root { --ink: #1b1d1c; --dim: #5d6461; --line: #dfe3e1; --soft: #f3f5f4; --accent: #1fa463; --accent-soft: #e6f6ee; --warn: #b7791f; --code: #f6f7f6; }
+    @page { size: A4; margin: 16mm 16mm 18mm; }
+    * { box-sizing: border-box; }
+    body { font-family: "Golos Text", Arial, sans-serif; color: var(--ink); font-size: 10.5pt; line-height: 1.55; margin: 0; }
+    h1 { font-size: 26pt; line-height: 1.15; margin: 0 0 8pt; }
+    h2 { font-size: 16pt; margin: 0 0 8pt; padding-top: 2pt; border-bottom: 2px solid var(--accent); padding-bottom: 4pt; }
+    h3 { font-size: 12pt; margin: 14pt 0 5pt; }
+    p { margin: 0 0 7pt; }
+    h2, h3 { break-after: avoid; }
+    .page { page-break-after: always; }
+    .page:last-child { page-break-after: auto; }
+    .lead { font-size: 12pt; color: var(--dim); }
+    code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9pt; background: var(--code); padding: 1px 4px; border-radius: 3px; }
+    pre { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8.6pt; line-height: 1.45; background: var(--code); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 6px; padding: 8pt 10pt; margin: 4pt 0 9pt; white-space: pre-wrap; page-break-inside: avoid; }
+    pre .c { color: #7b8480; }
+    table { width: 100%; border-collapse: collapse; margin: 4pt 0 10pt; font-size: 9.6pt; page-break-inside: auto; }
+    tr { page-break-inside: avoid; }
+    th { text-align: left; font-weight: 600; color: var(--dim); border-bottom: 1.5px solid var(--line); padding: 4pt 6pt; }
+    td { border-bottom: 1px solid var(--line); padding: 4pt 6pt; vertical-align: top; }
+    td:first-child { white-space: nowrap; }
+    .box { background: var(--accent-soft); border-radius: 8px; padding: 9pt 12pt; margin: 6pt 0 10pt; page-break-inside: avoid; }
+    .box.warn { background: #fdf3e2; }
+    .box b:first-child { display: block; margin-bottom: 2pt; }
+    img.shot { width: 100%; border-radius: 8px; border: 1px solid var(--line); margin: 4pt 0 8pt; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
+    .grid2 img { width: 100%; border-radius: 6px; border: 1px solid var(--line); }
+    .cap { font-size: 8.5pt; color: var(--dim); margin-top: -4pt; }
+    .cover { display: flex; flex-direction: column; gap: 10pt; }
+    .cover img.shot { width: 88%; }
+    .tag { display: inline-block; background: var(--accent); color: white; font-weight: 600; border-radius: 99px; padding: 2pt 10pt; font-size: 9pt; }
+    ol.steps { padding-left: 16pt; } ol.steps li { margin-bottom: 4pt; }
+    .flow { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8.6pt; background: var(--soft); border-radius: 6px; padding: 9pt 11pt; white-space: pre; line-height: 1.5; margin: 4pt 0 10pt; page-break-inside: avoid; }
+    .toc li { margin: 2pt 0; }
+</style>
+</head>
+<body>
+
+<!-- 1. Обложка -->
+<section class="page cover">
+    <div>
+        <span class="tag">для владельца проекта</span>
+        <h1 style="margin-top:18pt">Android Farm<br>быстрый вход в проект</h1>
+        <p class="lead">Что где лежит, как одно нажатие кнопки доходит до телефона, Python ровно в том объёме, который нужен этому проекту, и три пошаговых примера, как добавить фичу самому.</p>
+        <img class="shot" src="../images/pult.png" style="margin-top:14pt">
+    </div>
+    <div>
+        <h3>Содержание</h3>
+        <ol class="toc">
+            <li>Проект за одну страницу</li>
+            <li>Что за что отвечает: сервер</li>
+            <li>Что за что отвечает: сайт</li>
+            <li>Путь одного нажатия: от кнопки до телефона</li>
+            <li>Python за 20 минут — на коде этого проекта</li>
+            <li>FastAPI: как устроен API</li>
+            <li>Сценарии и ctx</li>
+            <li>JavaScript сайта: пять вещей, которые надо знать</li>
+            <li>Добавляем фичу: три примера</li>
+            <li>Тесты</li>
+            <li>Шпаргалка</li>
+        </ol>
+    </div>
+</section>
+
+<!-- 2. Проект за страницу -->
+<section class="page">
+    <h2>1. Проект за одну страницу</h2>
+    <p>Ферма — это <b>сервер</b> на Python, который говорит с телефонами через <code>adb</code>, и <b>сайт</b>, который показывает всё человеку. Они общаются только через HTTP-запросы на адреса <code>/api/…</code>.</p>
+<div class="flow">android-farm/
+├── backend/              СЕРВЕР (Python)
+│   ├── farm/             код сервера — это Python-пакет «farm»
+│   │   ├── api/          адреса /api/… (по файлу на раздел)
+│   │   ├── devices/      реестр телефонов и очередь запусков
+│   │   ├── control/      действия с телефоном: нажать, ввести, открыть приложение
+│   │   ├── recorder/     конструктор сценариев
+│   │   ├── context.py    ctx — то, чем пользуются сценарии
+│   │   ├── config.py     все настройки
+│   │   └── server.py     точка входа
+│   ├── scenarios/        сценарии: один .py-файл = один сценарий
+│   ├── guards/           правила «какое окно закрывать само»
+│   └── tests/            тесты (телефон не нужен)
+├── frontend/             САЙТ (HTML + CSS + JS, без сборки)
+│   ├── index.html        разметка всех разделов
+│   ├── design/tokens.css цвета, шрифты, отступы
+│   ├── strings/ru.json   все тексты
+│   ├── css/  js/         стили и логика по разделам
+│   └── dev_server.py     запуск сайта отдельно от сервера
+├── data/                 ваши данные: аккаунты, имена телефонов, логи (не в git)
+├── docs/                 документация
+└── run.sh                запустить всё одной командой</div>
+    <div class="box"><b>Главное правило</b>Вызовы идут только сверху вниз: сайт → API → сервисы → <code>control/</code> → телефон. Нижний слой никогда не знает о верхнем. Поэтому любой кусок можно понять и проверить отдельно.</div>
+<div class="flow"> Сайт (браузер)
+    │  fetch('/api/devices/R58N1004/action', {type: 'tap', x: .5, y: .5})
+    ▼
+ api/screen.py         роутер: проверил запрос → вызвал функцию
+    ▼
+ control/input.py      tap(): перевёл доли экрана в пиксели
+    ▼
+ adb.py                adb -s R58N1004 shell input tap 540 1200
+    ▼
+ 📱 телефон</div>
+</section>
+
+<!-- 3. Сервер -->
+<section class="page">
+    <h2>2. Что за что отвечает: сервер</h2>
+    <table>
+        <tr><th>Файл</th><th>Что делает</th><th>Когда открывать</th></tr>
+        <tr><td><code>server.py</code></td><td>собирает приложение: подключает API, защиту, раздачу сайта</td><td>редко</td></tr>
+        <tr><td><code>config.py</code></td><td>все настройки; каждую можно задать переменной <code>FARM_…</code></td><td>поменять порт, папку, таймауты</td></tr>
+        <tr><td><code>api/*.py</code></td><td>адреса /api/…: принять запрос, вызвать сервис, вернуть JSON</td><td>новый адрес API</td></tr>
+        <tr><td><code>api/screen.py</code></td><td>экран и действия: нажатия, клавиши, поворот, скриншот, видео; словарь <code>ACTIONS</code></td><td>новое действие с телефоном</td></tr>
+        <tr><td><code>api/bulk.py</code></td><td>массовые действия с разбросом по времени, установка APK, файлы</td><td>действие на многих телефонах</td></tr>
+        <tr><td><code>devices/registry.py</code></td><td>какие телефоны подключены, заряд, температура, имена, группы, теги</td><td>новое свойство телефона</td></tr>
+        <tr><td><code>devices/runner.py</code></td><td>очередь запусков: поток на телефон, отмена, остановка «ждёт человека»</td><td>как идут запуски</td></tr>
+        <tr><td><code>context.py</code></td><td><code>ctx</code>: клик, ввод, ожидание, проверка экрана, развилки, сторож</td><td>новая команда для сценариев</td></tr>
+        <tr><td><code>scenarios.py</code></td><td>находит и загружает сценарии из папки, проверяет готовность телефонов</td><td>редко</td></tr>
+        <tr><td><code>resolve.py</code></td><td>ищет кнопку: селектор → текст → OCR → картинка → координаты</td><td>«не находит кнопку»</td></tr>
+        <tr><td><code>guards.py</code> · <code>obstacle.py</code></td><td>стражи и слепки незнакомых экранов — как ферма учится закрывать окна</td><td>обучение, отводы</td></tr>
+        <tr><td><code>deviations.py</code></td><td>раздел «Проблемы»: одинаковые случаи сливаются в одну строку</td><td>новый вид проблемы</td></tr>
+        <tr><td><code>schedule.py</code></td><td>смены: запуск по дням и окнам времени</td><td>расписание</td></tr>
+        <tr><td><code>accounts.py</code></td><td>аккаунты соцсетей и раздача их по телефонам</td><td>аккаунты</td></tr>
+        <tr><td><code>recorder/</code></td><td>конструктор: шаги ⇄ код сценария, сохранение</td><td>конструктор</td></tr>
+        <tr><td><code>control/</code></td><td>низкоуровневые действия: ввод, приложения, скриншоты, стабильность экрана</td><td>как именно нажимаем</td></tr>
+        <tr><td><code>streaming/</code></td><td>трансляция экрана: один захват на телефон, сколько угодно зрителей</td><td>тормозит экран</td></tr>
+        <tr><td><code>adb.py</code></td><td>обёртка над программой adb</td><td>редко</td></tr>
+        <tr><td><code>security.py</code></td><td>защита от чужих сайтов и вход по токену</td><td>доступ по сети</td></tr>
+    </table>
+</section>
+
+<!-- 4. Сайт -->
+<section class="page">
+    <h2>3. Что за что отвечает: сайт</h2>
+    <table>
+        <tr><th>Файл</th><th>Что делает</th></tr>
+        <tr><td><code>index.html</code></td><td>разметка всех разделов. Раздел — <code>&lt;section id="view-fleet"&gt;</code>, <code>view-device</code>, <code>view-jobs</code>…</td></tr>
+        <tr><td><code>design/tokens.css</code></td><td>дизайн-токены: <code>--accent</code>, <code>--fs-3</code>, <code>--s4</code>… Компоненты пишут только их</td></tr>
+        <tr><td><code>strings/ru.json</code></td><td>все тексты: <code>"pult.skrinshot": "Скриншот"</code></td></tr>
+        <tr><td><code>js/i18n.js</code></td><td><code>t('ключ')</code> и подстановка текстов в разметку</td></tr>
+        <tr><td><code>js/core.js</code></td><td>общее: состояние <code>S</code>, <code>api()</code>, <code>post()</code>, <code>toast()</code>, модалки</td></tr>
+        <tr><td><code>js/app.js</code></td><td>переключение разделов <code>showView()</code>, опросы сервера, запуск страницы</td></tr>
+        <tr><td><code>js/fleet.js</code></td><td>«Ферма»: плитки, фильтры, выбор, «Требуют внимания»</td></tr>
+        <tr><td><code>js/pult.js</code></td><td>пульт телефона</td></tr>
+        <tr><td><code>js/screen.js</code></td><td>экран телефона: трансляция, жесты, клавиши, <code>act()</code></td></tr>
+        <tr><td><code>js/bulk.js</code></td><td>массовые действия, синхронное управление, загрузка файлов</td></tr>
+        <tr><td><code>js/rundialog.js</code></td><td>окно «Запуск сценария»</td></tr>
+        <tr><td><code>js/jobs.js</code> · <code>deviations.js</code></td><td>«Запуски» и «Проблемы», полоса решения «ждёт человека»</td></tr>
+        <tr><td><code>js/schedule.js</code> · <code>accounts.js</code></td><td>«Расписание» и «Аккаунты»</td></tr>
+        <tr><td><code>js/recorder.js</code> и соседи</td><td>конструктор сценариев (самая большая часть)</td></tr>
+    </table>
+    <div class="grid2">
+        <div><img src="../images/fleet.png"><p class="cap">fleet.js — раздел «Ферма»</p></div>
+        <div><img src="../images/problems.png"><p class="cap">deviations.js — «Проблемы»</p></div>
+    </div>
+    <div class="box"><b>Как найти код кнопки</b>Откройте <code>index.html</code>, найдите текст кнопки (Ctrl+F) — рядом <code>onclick="pultShot()"</code>. Функция с этим именем лежит в файле с тем же началом: <code>pult…</code> → <code>pult.js</code>, <code>fleet…</code> → <code>fleet.js</code>, <code>rec…</code> → <code>recorder.js</code>.</div>
+</section>
+
+<!-- 5. Путь нажатия -->
+<section class="page">
+    <h2>4. Путь одного нажатия: «Запустить сценарий»</h2>
+    <ol class="steps">
+        <li><b>Сайт.</b> Кнопка в <code>index.html</code> зовёт <code>openRunDialog()</code> (<code>rundialog.js</code>). Человек выбирает сценарий и телефоны, жмёт «Запустить» — уходит запрос:
+<pre>post('/api/run', {scenario: 'warmup_vk', serials: ['R58N1001', 'R58N1002'], params: {minutes: 10}})</pre></li>
+        <li><b>API.</b> <code>api/scenarios.py</code> принимает запрос и отдаёт работу очереди:
+<pre>@router.post("/api/run")
+def run_scenario(payload: dict = Body(...)):
+    key = payload.get("scenario")
+    serials = payload.get("serials") or []
+    if not key:
+        raise HTTPException(400, "не указан сценарий")   <span class="c"># ошибка уйдёт на сайт тостом</span>
+    jobs = runner.submit(key, serials, payload.get("params"), ...)</pre></li>
+        <li><b>Очередь.</b> <code>devices/runner.py</code> кладёт по задаче на каждый телефон. У каждого телефона свой поток: телефоны работают параллельно, но на одном телефоне задачи идут по очереди.</li>
+        <li><b>Сценарий.</b> Поток создаёт <code>ctx</code> (<code>context.py</code>) и вызывает <code>run(ctx)</code> из файла сценария.</li>
+        <li><b>Действия.</b> <code>ctx.click(text="Войти")</code> → <code>resolve.py</code> находит кнопку → <code>control/input.py</code> → <code>adb</code> → телефон.</li>
+        <li><b>Если что-то не так</b> — стражи закрывают известные окна; если не помогло, задача встаёт в статус <i>ждёт</i>, сайт показывает «Показать, как быть», браузер пищит.</li>
+        <li><b>Сайт видит прогресс</b> — <code>app.js</code> раз в 2 секунды спрашивает <code>GET /api/jobs</code> и перерисовывает «Запуски».</li>
+    </ol>
+    <img class="shot" src="../images/runs.png" style="width:78%">
+</section>
+
+<!-- 6. Python -->
+<section class="page">
+    <h2>5. Python за 20 минут — на коде этого проекта</h2>
+    <h3>Модули и импорт</h3>
+    <p>Каждый <code>.py</code>-файл — модуль, папка с <code>__init__.py</code> — пакет. <code>farm/control/input.py</code> импортируется как <code>farm.control.input</code>. Точка в начале — «из этого же пакета».</p>
+<pre>from .. import adb, config          <span class="c"># подняться на уровень вверх (farm) и взять adb.py, config.py</span>
+from ..devices import registry       <span class="c"># farm/devices/registry.py</span></pre>
+    <h3>Переменные, списки, словари</h3>
+<pre>serials = ["R58N1001", "R58N1002"]          <span class="c"># список</span>
+payload = {"type": "tap", "x": 0.5}          <span class="c"># словарь (как JSON)</span>
+payload["x"]                                 <span class="c"># 0.5</span>
+payload.get("y", 0)                          <span class="c"># 0 — если ключа нет, без ошибки</span>
+online = [d for d in devices if d.online]    <span class="c"># «списковое включение»: отфильтровать</span>
+name = f"Phone {i + 1}"                      <span class="c"># f-строка: подстановка в текст</span></pre>
+    <h3>Функции и типы</h3>
+<pre>def tap(serial: str, x: float, y: float) -> None:   <span class="c"># подсказки типов: что принимает/возвращает</span>
+    ax, ay = to_pixels(serial, x, y)                 <span class="c"># функция вернула два значения</span>
+    if via_u2(serial, lambda d: d.click(ax, ay)):    <span class="c"># lambda — короткая безымянная функция</span>
+        return
+    adb.shell(serial, ["input", "tap", str(ax), str(ay)])</pre>
+    <h3>Классы и dataclass</h3>
+    <p><code>@dataclass</code> — класс-«анкета»: перечисляете поля, Python сам пишет конструктор.</p>
+<pre>@dataclass
+class Device:
+    serial: str
+    state: str = "offline"
+    battery: int | None = None          <span class="c"># число или «нет данных»</span>
+    tags: list[str] = field(default_factory=list)
+
+    @property                           <span class="c"># вычисляемое поле: device.online без скобок</span>
+    def online(self) -> bool:
+        return self.state == "device"</pre>
+    <h3>Ошибки</h3>
+<pre>try:
+    png = adb.exec_out(serial, ["screencap", "-p"])
+except Exception as e:
+    raise HTTPException(500, f"скриншот не снялся: {e}")   <span class="c"># сайт покажет текст тостом</span></pre>
+</section>
+
+<section class="page">
+    <h3>Декораторы</h3>
+    <p>Строка с <code>@</code> над функцией «оборачивает» её. В проекте это почти всегда регистрация адреса API:</p>
+<pre>@router.get("/{serial}/screenshot")     <span class="c"># «вызывай эту функцию на GET /api/devices/…/screenshot»</span>
+def screenshot(serial: str): ...</pre>
+    <h3>Настройки из окружения и пути</h3>
+<pre>PORT = int(os.getenv("FARM_PORT", "8777"))         <span class="c"># FARM_PORT=9000 ./run.sh</span>
+DATA_DIR = PROJECT_DIR / "data"                     <span class="c"># Path: «/» склеивает пути</span>
+(DATA_DIR / "accounts.json").read_text("utf-8")</pre>
+    <h3>with и блокировки</h3>
+    <p>Телефоны обслуживаются параллельными потоками; чтобы два потока не испортили общий словарь, его трогают под замком:</p>
+<pre>with _records_lock:            <span class="c"># внутри блока — только один поток</span>
+    _records[serial] = {...}</pre>
+    <h3>Что почитать дальше</h3>
+    <table>
+        <tr><th>Тема</th><th>Где в проекте посмотреть</th></tr>
+        <tr><td>простой модуль без зависимостей</td><td><code>farm/deviations.py</code>, <code>farm/obstacle.py</code></td></tr>
+        <tr><td>API от начала до конца</td><td><code>farm/api/screen.py</code></td></tr>
+        <tr><td>потоки и очередь</td><td><code>farm/devices/runner.py</code></td></tr>
+        <tr><td>сценарий</td><td><code>scenarios/warmup_vk.py</code> + <code>scenarios/_human.py</code></td></tr>
+        <tr><td>тесты с подменами</td><td><code>tests/test_watch.py</code>, <code>tests/test_pult_api.py</code></td></tr>
+    </table>
+    <div class="box"><b>Как читать незнакомый файл</b>1) Docstring вверху — зачем модуль. 2) Имена функций без подчёркивания — то, что модуль даёт наружу. 3) Функции с <code>_</code> в начале — внутренние, их можно пропустить при первом чтении.</div>
+
+    <h2 style="break-before:page">6. FastAPI: как устроен API</h2>
+<pre>router = APIRouter(prefix="/api/devices")       <span class="c"># общий префикс для файла</span>
+
+@router.post("/{serial}/action")               <span class="c"># {serial} попадает в аргумент</span>
+def action(serial: str, payload: dict = Body(...)):   <span class="c"># тело запроса — словарь</span>
+    handler = ACTIONS.get(payload.get("type"))
+    if handler is None:
+        raise HTTPException(400, "неизвестное действие")   <span class="c"># 400 — ошибка запроса</span>
+    return handler(serial, payload) or {"ok": True}       <span class="c"># словарь → JSON</span></pre>
+    <p>Новый файл роутера подключается одной строкой в <code>farm/api/__init__.py</code>: <code>router.include_router(новый.router)</code>.</p>
+</section>
+
+<!-- 7. Сценарии -->
+<section class="page">
+    <h2>7. Сценарии и ctx</h2>
+    <p>Сценарий — файл в <code>backend/scenarios/</code> с функцией <code>run(ctx)</code>. Записанные конструктором сценарии — такие же файлы, их можно читать и править.</p>
+<pre>NAME = "Прогрев VK"
+PARAMS = {"minutes": {"label": "Минут на телефон", "type": "number", "default": 10}}
+
+def run(ctx):
+    ctx.launch_app("com.vkontakte.android", stop_first=True)
+    ctx.click(text="Лента", timeout=10)
+    for _ in range(20):
+        ctx.swipe(0.5, 0.75, 0.5, 0.3)
+        ctx.sleep(3)
+        ctx.on_track("com.vkontakte.android")    <span class="c"># сторож: своё ли приложение, листается ли</span>
+    ctx.home()</pre>
+    <table>
+        <tr><th>Команда</th><th>Что делает</th></tr>
+        <tr><td><code>ctx.click(text=…)</code> / <code>ctx.click_target(sel, text, img, at)</code></td><td>нажать; второй ищет в несколько слоёв</td></tr>
+        <tr><td><code>ctx.type("текст")</code> · <code>ctx.key("back")</code></td><td>ввести текст, нажать клавишу</td></tr>
+        <tr><td><code>ctx.tap(x, y)</code> · <code>ctx.swipe(…)</code></td><td>нажатие и свайп в долях экрана (0…1)</td></tr>
+        <tr><td><code>ctx.launch_app(pkg)</code> · <code>ctx.open_url(url)</code></td><td>открыть приложение, ссылку</td></tr>
+        <tr><td><code>ctx.expect_screen(name, any=[…])</code></td><td>«я обязан быть на этом экране» — иначе спросит человека</td></tr>
+        <tr><td><code>ctx.which_screen({…})</code></td><td>развилка: какой из экранов сейчас</td></tr>
+        <tr><td><code>ctx.on_track(pkg)</code></td><td>сторож долгих циклов</td></tr>
+        <tr><td><code>ctx.account("vk")</code></td><td>логин и пароль аккаунта этого телефона</td></tr>
+        <tr><td><code>ctx.run("block")</code></td><td>выполнить другой сценарий как блок</td></tr>
+        <tr><td><code>ctx.params["minutes"]</code></td><td>параметры из окна запуска</td></tr>
+        <tr><td><code>ctx.log("…")</code> · <code>ctx.screenshot()</code></td><td>строка в журнал, снимок в артефакты</td></tr>
+    </table>
+    <div class="box warn"><b>Не храните пароли в сценариях</b>Используйте <code>ctx.account("vk")["password"]</code> — пароль лежит в <code>data/accounts.json</code>, а не в коде, который видят все.</div>
+
+    <h2 style="break-before:page">8. JavaScript сайта: пять вещей</h2>
+    <ol class="steps">
+        <li><b><code>S</code></b> — всё состояние: <code>S.devices</code>, <code>S.jobs</code>, <code>S.active</code> (открытый телефон).</li>
+        <li><b><code>api(path)</code> / <code>post(path, body)</code></b> — запрос к серверу; ошибка уже по-русски.</li>
+        <li><b><code>toast(t('ключ'), 'ok')</code></b> — сообщение внизу экрана.</li>
+        <li><b><code>onclick="функция()"</code></b> в разметке — так кнопки вызывают код.</li>
+        <li><b>Опросы</b> в <code>app.js</code> обновляют <code>S</code> и перерисовывают разделы сами — руками перерисовывать почти никогда не нужно.</li>
+    </ol>
+</section>
+
+<!-- 9. Примеры -->
+<section class="page">
+    <h2>9. Добавляем фичу: три примера</h2>
+    <h3>Пример 1. Кнопка «Без звука» в пульте</h3>
+    <ol class="steps">
+        <li><b>Сервер</b>, <code>backend/farm/api/screen.py</code> — функция и строка в <code>ACTIONS</code>:
+<pre>def _mute(serial, p):
+    adb.shell(serial, "media volume --stream 3 --set 0", timeout=SHELL_TIMEOUT)
+
+ACTIONS = {
+    ...
+    "mute": _mute,
+}</pre></li>
+        <li><b>Текст</b>, <code>frontend/strings/ru.json</code>: <code>"pult.bez_zvuka": "Без звука",</code></li>
+        <li><b>Кнопка</b>, <code>frontend/index.html</code>, внутри <code>&lt;div class="pult-keys"&gt;</code>:
+<pre>&lt;button class="key" data-live onclick="act({type:'mute'})" data-t="pult.bez_zvuka"&gt;
+    &lt;svg class="ic"&gt;&lt;use href="#i-volume-low"/&gt;&lt;/svg&gt;Без звука&lt;/button&gt;</pre></li>
+        <li><b>Бонус:</b> то же действие сразу работает на многих телефонах: <code>bulkAction({type: 'mute'}, 'Без звука')</code>.</li>
+    </ol>
+    <h3>Пример 2. Новый адрес API</h3>
+<pre><span class="c"># backend/farm/api/devices.py</span>
+@router.get("/groups/count")
+def groups_count():
+    counts = {}
+    for d in registry.all():
+        name = d.group or "без группы"
+        counts[name] = counts.get(name, 0) + 1
+    return counts                      <span class="c"># GET /api/devices/groups/count → {"VK-10": 12, ...}</span></pre>
+    <h3>Пример 3. Новый сценарий</h3>
+<pre><span class="c"># backend/scenarios/open_settings.py — появится в «Сценариях» сам</span>
+NAME = "Открыть настройки"
+DESCRIPTION = "Открывает настройки и возвращается домой"
+PARAMS = {"pause": {"label": "Пауза, с", "type": "number", "default": 2}}
+
+def run(ctx):
+    ctx.launch_app("com.android.settings")
+    ctx.sleep(ctx.params["pause"])
+    ctx.home()</pre>
+</section>
+
+<!-- 10-11 -->
+<section class="page">
+    <h2>10. Тесты</h2>
+    <p>Тесты лежат в <code>backend/tests/</code>, телефон им не нужен: всё, что ходит в adb, подменяется через <code>monkeypatch</code>.</p>
+<pre>def test_поворот(phone):                       <span class="c"># phone — подготовка из фикстуры</span>
+    res = api_screen.action("A", {"type": "rotate"})
+    assert res["landscape"] is True             <span class="c"># assert: «должно быть так», иначе тест красный</span>
+    assert "settings put system user_rotation 1" in phone</pre>
+<pre>cd backend
+../.venv/bin/python -m pytest -q                      <span class="c"># все тесты (~30 секунд)</span>
+../.venv/bin/python -m pytest -q tests/test_watch.py  <span class="c"># один файл</span>
+../.venv/bin/python -m pytest -q -k поворот           <span class="c"># по части имени</span></pre>
+    <div class="box"><b>Привычка</b>Сделали фичу — напишите один тест по образцу соседнего файла и прогоните все тесты перед коммитом.</div>
+
+    <h2 style="margin-top:14pt">11. Шпаргалка</h2>
+    <table>
+        <tr><th>Задача</th><th>Команда / место</th></tr>
+        <tr><td>запустить ферму</td><td><code>./run.sh</code> → http://127.0.0.1:8777</td></tr>
+        <tr><td>только API / только сайт</td><td><code>FARM_SERVE_FRONTEND=0 ./run.sh</code> · <code>python3 frontend/dev_server.py</code></td></tr>
+        <tr><td>поменять текст</td><td><code>frontend/strings/ru.json</code></td></tr>
+        <tr><td>поменять цвет / размер</td><td><code>frontend/design/tokens.css</code></td></tr>
+        <tr><td>новое действие с телефоном</td><td><code>ACTIONS</code> в <code>backend/farm/api/screen.py</code></td></tr>
+        <tr><td>новый сценарий</td><td><code>backend/scenarios/имя.py</code> с <code>run(ctx)</code></td></tr>
+        <tr><td>настройки</td><td><code>backend/farm/config.py</code>, переменные <code>FARM_*</code></td></tr>
+        <tr><td>где мои данные</td><td><code>data/</code> — аккаунты, имена, расписание, артефакты запусков</td></tr>
+        <tr><td>посмотреть ответ API</td><td><code>curl 127.0.0.1:8777/api/devices</code></td></tr>
+        <tr><td>тесты</td><td><code>cd backend &amp;&amp; ../.venv/bin/python -m pytest -q</code></td></tr>
+        <tr><td>переснять скриншоты доков</td><td><code>node docs/tools/screenshots.js</code></td></tr>
+        <tr><td>подробнее про механизмы</td><td><code>docs/guide.md</code> · <code>docs/architecture.md</code></td></tr>
+    </table>
+    <div class="grid2" style="margin-top:8pt">
+        <div><img src="../images/builder.png"><p class="cap">Конструктор (recorder.js)</p></div>
+        <div><img src="../images/design-tokens.png"><p class="cap">Дизайн-токены (design/tokens.css)</p></div>
+    </div>
+</section>
+</body>
+</html>

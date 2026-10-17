@@ -1,0 +1,606 @@
+/* Базовые элементы: кнопки, поля, чипы, модалка, тосты, пустые состояния.
+   Токены (цвета, кегли, отступы) — в design/tokens.css. */
+
+* {
+    box-sizing: border-box
+}
+
+/* Любой display в авторских стилях перебивает hidden из таблицы браузера, и
+   узел остаётся на экране вопреки атрибуту. Правило чинит это разом — иначе
+   каждый .flag, .alert и .badge приходится защищать вручную. */
+[hidden] {
+    display: none !important
+}
+
+html, body {
+    height: 100%;
+    margin: 0
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font: var(--fs-3)/var(--lh) var(--sans);
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+@keyframes ripple {
+    0% {
+        opacity: .6;
+        transform: scale(0);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1);
+    }
+}
+
+/* Фон: одно неподвижное пятно акцентного цвета сверху. Второе, фиолетовое,
+   убрано: оно единственное в интерфейсе тянуло в другой тон и спорило с
+   зелёным. */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    /* зелёное пятно сверху убрано: спокойный ровный фон */
+    background: none;
+}
+
+/* ------------------------------------------------------------------ иконки */
+
+/* Масштаб задаёт viewBox внутри каждого <symbol> в спрайте, а не эти
+   правила: <use> подтягивает систему координат символа и вписывает её в
+   размер иконки. overflow здесь обязан оставаться скрытым — иначе пути
+   вылезают за бокс и наезжают на подпись кнопки. */
+.ic {
+    width: var(--icon-md);
+    height: var(--icon-md);
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    overflow: hidden;
+}
+
+svg.ic {
+    display: inline-block;
+    vertical-align: -.18em
+}
+
+/* Единственная залитая иконка: точка записи должна читаться как индикатор. */
+.ic.dotrec {
+    fill: currentColor;
+    stroke: none
+}
+
+/* ------------------------------------------------------------------ кнопки */
+
+button, input, select, textarea {
+    font: inherit;
+    color: inherit
+}
+
+button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s2);
+    /* Обычная кнопка — мягкая заливка без рамки. Рамка у каждой кнопки
+       превращала панель в решётку из одинаковых прямоугольников, и главное
+       действие терялось среди второстепенных. */
+    background: var(--panel2);
+    border: 1px solid transparent;
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: var(--r2);
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+    transition: background var(--fast) var(--ease),
+    border-color var(--fast) var(--ease),
+    color var(--fast) var(--ease),
+    transform var(--fast) var(--spring),
+    filter var(--fast) var(--ease);
+}
+
+button::before {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle, color-mix(in srgb, var(--accent) 25%, transparent) 0%, transparent 65%);
+    opacity: 0;
+}
+
+button:not(:disabled).ripple::before {
+    animation: ripple 400ms var(--spring) forwards;
+}
+
+/* Тап-цель набирается собственной высотой кнопки, а не невидимым ::after
+   вокруг. Прозрачная накладка при gap 4px в панели вкладок перекрывала бы
+   соседа и воровала его клики — цена больше пользы. */
+button {
+    min-height: 32px
+}
+
+button.sm {
+    min-height: 30px
+}
+
+button:hover:not(:disabled) {
+    background: var(--panel3)
+}
+
+/* Нажатие: кнопка чуть проседает под пальцем и гаснет.
+
+   Прежний комментарий здесь предостерегал от transform, «потому что он
+   дёргает соседей». Это не так: transform рисуется поверх раскладки и
+   рефлоу не вызывает — сдвинуть соседей может только изменение размеров
+   или отступов. scale безопасен и даёт то самое ощущение отклика, ради
+   которого нажатие вообще подсвечивают. */
+button:active:not(:disabled) {
+    transform: scale(.97);
+    filter: brightness(.92);
+    transition-duration: 60ms;
+}
+
+/* Ссылка, которая выглядит как кнопка (скачивание файла: <a download>). */
+a.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s2);
+    background: var(--panel2);
+    border: 1px solid transparent;
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: var(--r2);
+    white-space: nowrap;
+    text-decoration: none;
+    font-weight: 500;
+    min-height: 32px;
+    transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+
+a.btn.sm {
+    min-height: 30px;
+    padding: 4px 9px;
+    font-size: var(--fs-2);
+    border-radius: var(--r1);
+    gap: 6px
+}
+
+a.btn.sm .ic {
+    width: var(--icon-sm);
+    height: var(--icon-sm)
+}
+
+a.btn:hover {
+    background: var(--panel3)
+}
+
+button:disabled {
+    opacity: .42;
+    cursor: not-allowed
+}
+
+button.primary {
+    background: var(--accent-fill);
+    border-color: var(--accent-fill);
+    color: var(--accent-ink);
+    font-weight: 650;
+}
+
+button.primary:hover:not(:disabled) {
+    background: var(--accent-fill-hi);
+    border-color: var(--accent-fill-hi)
+}
+
+button.accent {
+    color: var(--accent);
+    border-color: transparent;
+    background: var(--accent-dim)
+}
+
+button.accent:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 20%, transparent)
+}
+
+/* Опасная кнопка — красный текст без рамки. Красные прямоугольники в
+   каждой строке списка кричали громче настоящих тревог. Рамка
+   появляется на взводе (data-armed) и под курсором. */
+button.danger {
+    color: var(--bad);
+    border-color: transparent;
+    background: transparent
+}
+
+button.danger:hover:not(:disabled),
+button.danger[data-armed] {
+    background: var(--bad-dim);
+    border-color: var(--bad-line)
+}
+
+button.ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--dim)
+}
+
+button.ghost:hover:not(:disabled) {
+    background: var(--panel3);
+    color: var(--text)
+}
+
+button.sm {
+    padding: 4px 10px;
+    font-size: var(--fs-2);
+    border-radius: var(--r1);
+    gap: 6px
+}
+
+button.sm .ic {
+    width: var(--icon-sm);
+    height: var(--icon-sm)
+}
+
+button.key {
+    font-size: var(--fs-2);
+    padding: 7px 12px;
+    background: var(--panel2)
+}
+
+button.key:hover:not(:disabled) {
+    border-color: var(--accent-line);
+    color: var(--accent)
+}
+
+/* Иконка без подписи обязана нести имя в aria-label — правило проверяется
+   глазами при ревью, но хотя бы делаем такую кнопку квадратной. */
+button:not(:has(:not(svg))) {
+    padding: 6px
+}
+
+/* ------------------------------------------------------------------- поля */
+
+input[type=text], input[type=number], input[type=time], input[type=date], select, textarea {
+    background-color: var(--well);
+    border: 1px solid var(--line);
+    border-radius: var(--r2);
+    padding: 6px 10px;
+    width: 100%;
+    font-family: var(--sans);
+    font-size: var(--fs-3);
+    transition: border-color var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+}
+
+/* Плейсхолдер обязан читаться, а не намекать: прежний #525d6d давал 2.9:1. */
+/* Свой шеврон вместо системного: системный в тёмной теме сидел вплотную
+   к тексту и не по центру, а у узких списков («Все платформы») налезал на
+   подпись. Один рисунок на все select сайта. */
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 28px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23939e9b' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 10px 6px;
+    cursor: pointer;
+}
+
+input::placeholder {
+    color: var(--dim)
+}
+
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+input[type=checkbox] {
+    accent-color: var(--accent);
+    width: 15px;
+    height: 15px;
+    cursor: pointer
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--r1)
+}
+
+/* Клавиатурный переход к содержимому — иначе табом идти через всю шапку. */
+.skip {
+    position: absolute;
+    left: var(--s3);
+    top: -60px;
+    z-index: 200;
+    background: var(--accent-fill);
+    color: var(--accent-ink);
+    padding: 8px 14px;
+    border-radius: var(--r2);
+    font-weight: 650;
+    text-decoration: none;
+    transition: top var(--mid) var(--ease);
+}
+
+.skip:focus {
+    top: var(--s3)
+}
+
+::selection {
+    background: color-mix(in srgb, var(--accent) 25%, transparent)
+}
+
+::-webkit-scrollbar {
+    width: 9px;
+    height: 9px
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--panel3);
+    border-radius: var(--r1);
+    border: 2px solid transparent;
+    background-clip: content-box
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--line-hover);
+    background-clip: content-box
+}
+
+::-webkit-scrollbar-track {
+    background: transparent
+}
+
+/* ------------------------------------------------------------ мелочи */
+
+.empty {
+    padding: var(--s6) var(--s4);
+    color: var(--dim);
+    text-align: center;
+    font-size: var(--fs-2);
+    line-height: 1.8
+}
+
+/* ------------------------------------------------------- пустое состояние */
+
+/* Развёрнутая заглушка: рисунок, заголовок, объяснение, шаги и действие.
+   Пустой раздел — обычно самый первый экран, который человек здесь видит
+   (ни одного телефона, ни одного сценария, ни одной задачи), и строчка
+   серого текста на нём читается как поломка сервера, а не как «сделайте
+   вот это». Рисунки — вшитый SVG, не картинки по ссылке: ферма управляет
+   телефонами по USB и обязана подниматься без интернета (та же причина,
+   по которой спрайт иконок лежит в репозитории, — см. frontend/icons.svg).
+   Вектор к тому же берёт цвет темы через currentColor и не мылится.
+
+   Используется в «Ферме», «Сценариях», «Задачах», «Отклонениях» и
+   конструкторе — вид пустого раздела должен быть один во всём продукте. */
+/* Обёртка центрирует заглушку по обеим осям и задаёт систему координат для
+   container query ниже. Отдельным узлом, а не на .emptybig: контейнер
+   нельзя стилизовать его же собственным @container — правила применяются
+   только к потомкам. Заодно решается вертикальное центрирование: раньше
+   заглушка липла к верхнему краю, а под ней оставалась пустая половина
+   экрана, из-за чего раздел выглядел оборванным, а не пустым. */
+.emptywrap {
+    container-type: inline-size;
+    flex: 1;
+    display: grid;
+    place-items: center;
+    min-height: 100%;
+    padding: var(--s4);
+}
+
+/* Список, в котором вместо строк стоит заглушка, обязан занять всю
+   доступную высоту. Сам по себе .scroll — блок с высотой по содержимому:
+   заглушке не от чего центрироваться, и она липнет к верхнему краю, а под
+   ней остаётся пустая половина экрана. :has() включает это только когда
+   список пуст — со строками растягивать контейнер незачем. */
+.scroll:has(> .emptywrap),
+#jobLogEmpty:has(> .emptywrap),
+#dvnList:has(> .emptywrap),
+#accList:has(> .emptywrap) {
+    display: flex;
+    flex: 1;
+}
+
+.emptybig {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s4);
+    max-width: 52ch;
+    text-align: center;
+}
+
+.emptybig .art {
+    width: 150px;
+    height: 120px;
+    color: var(--accent);
+    opacity: .85;
+}
+
+/* Заголовок крупнее и с поджатым трекингом: это единственная строка,
+   которую человек прочтёт наверняка, и она должна читаться как заголовок
+   раздела, а не как ещё одна подпись в интерфейсе. Новых шрифтов не
+   заводим — ферма работает без интернета, веб-шрифт с CDN не загрузится;
+   вес и трекинг дают иерархию на той же системной гарнитуре. */
+.emptybig h3 {
+    margin: 0;
+    font-size: var(--fs-5);
+    font-weight: 680;
+    letter-spacing: -.02em;
+    line-height: 1.25;
+    color: var(--text);
+}
+
+.emptybig p {
+    margin: 0;
+    max-width: 46ch;
+    color: var(--dim);
+    font-size: var(--fs-3);
+    line-height: 1.7;
+    text-wrap: pretty;   /* не оставляет одно слово на последней строке */
+}
+
+/* Кнопка заглушки — единственное действие на пустом экране, поэтому
+   крупнее обычной .sm и акцентная: ей и положено быть точкой входа. */
+.emptybig > button {
+    margin-top: var(--s1);
+    padding: 9px 18px;
+    font-size: var(--fs-3);
+    font-weight: 600;
+    border-radius: var(--pill);
+    color: var(--accent);
+    border-color: transparent;
+    background: var(--accent-dim);
+}
+
+.emptybig > button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* Шаги — колонка одинаковой ширины: плитки разной длины, центрованные
+   каждая по себе, давали рваный край и выглядели сдвинутыми. */
+.emptybig ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: var(--s2);
+    width: min(100%, 360px);
+}
+
+.emptybig li {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    padding: 9px var(--s3);
+    border-radius: var(--r2);
+    background: var(--panel2);
+    color: var(--text2);
+    font-size: var(--fs-3);
+    text-align: left;
+}
+
+.emptybig li b {
+    display: grid;
+    place-items: center;
+    width: 19px;
+    height: 19px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    box-shadow: inset 0 0 0 1px var(--accent-line);
+    color: var(--accent);
+    font: 650 var(--fs-1) var(--sans);
+}
+
+/* Узкая колонка: рисунок мельче, шаги встают друг под другом — в 360px
+   три плитки в ряд не помещаются и разъезжаются в кашу.
+
+   Container query, а не класс-флаг и не @media: ширина зависит от
+   контейнера, а не от окна. Панель конструктора то узкая (рядом зеркало
+   экрана), то во всю страницу — при фиксированном классе заглушка в одном
+   из режимов обязательно выглядела бы неправильно.
+
+   Контейнер — .emptywrap, не сама .emptybig: собственный @container её бы
+   не тронул (правила достаются только потомкам), и узкий вид не включался
+   бы никогда. */
+@container (max-width: 460px) {
+    .emptybig { gap: var(--s3); }
+    .emptybig .art { width: 104px; height: 84px; }
+    .emptybig h3 { font-size: var(--fs-4); }
+    .emptybig p { font-size: var(--fs-2); }
+    .emptybig ol { width: 100%; }
+}
+
+/* Анимация рисунка — один раз на появление, а не вечный цикл: пустой
+   экран не должен мигать в углу глаза, пока человек читает инструкцию. */
+@media (prefers-reduced-motion: no-preference) {
+    .emptybig .art {
+        animation: art-in 420ms var(--ease) both;
+    }
+}
+
+@keyframes art-in {
+    from { opacity: 0; transform: translateY(6px) scale(.97); }
+    to { opacity: .85; transform: none; }
+}
+
+.warn {
+    color: var(--warn);
+    font-size: var(--fs-2);
+    margin-top: var(--s1);
+    display: flex;
+    gap: 6px;
+    align-items: flex-start
+}
+
+.warn[hidden] {
+    display: none
+}
+
+.sp {
+    flex: 1
+}
+
+.grow {
+    flex: 1;
+    min-width: 0
+}
+
+/* Цифры в таблицах и метриках не должны прыгать при обновлении. */
+.tnum {
+    font-variant-numeric: tabular-nums
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1
+    }
+    50% {
+        opacity: .3
+    }
+}
+
+@keyframes slide {
+    from {
+        opacity: 0;
+        transform: translateX(18px)
+    }
+    to {
+        opacity: 1;
+        transform: none
+    }
+}
+
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translateY(6px)
+    }
+    to {
+        opacity: 1;
+        transform: none
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation: none !important;
+        transition: none !important
+    }
+}

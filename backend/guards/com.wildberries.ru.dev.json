@@ -1,0 +1,30 @@
+[
+ {
+  "name": "wb_retry_error",
+  "when": {
+   "any": [
+    {
+     "textContains": "Что-то пошло не так"
+    }
+   ]
+  },
+  "action": {
+   "run": "wb_retry_error"
+  },
+  "max_fires": 2
+ },
+ {
+  "name": "zakryt_vsplyvayuschee_okno",
+  "when": {
+   "any": [
+    {
+     "textContains": "21-insole13.7cm"
+    }
+   ]
+  },
+  "action": {
+   "run": "zakryt_vsplyvayuschee_okno"
+  },
+  "max_fires": 2
+ }
+]

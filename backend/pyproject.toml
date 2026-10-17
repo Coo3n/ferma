@@ -1,0 +1,9 @@
+[project]
+name = "android-farm"
+version = "0.2.0"
+description = "Локальная ферма Android-телефонов: экраны в браузере, сценарии, массовые действия"
+requires-python = ">=3.9"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

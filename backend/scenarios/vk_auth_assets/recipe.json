@@ -1,0 +1,542 @@
+{
+ "meta": {
+  "name": "vk_auth",
+  "description": "",
+  "watch_popups": true,
+  "human": true
+ },
+ "params": {},
+ "steps": [
+  {
+   "kind": "shell",
+   "args": {
+    "cmd": "pm clear com.vkontakte.android"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "launch_app",
+   "args": {
+    "package": "com.vkontakte.android"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "expect",
+   "args": {
+    "name": "screen1"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": [
+    "description=\"Уведомление Система Android:\"",
+    "description=\"Уведомление RuStore: Самокат\"",
+    "description=\"Уведомление Обновление: Доступно обновление\""
+   ],
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "description=\"Закрыть\"",
+    "fallbacks": []
+   },
+   "param": null,
+   "note": "View",
+   "texts": [],
+   "crop": "04_click.png",
+   "point": [
+    0.9016,
+    0.6696
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "expect",
+   "args": {
+    "name": "screen1"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": [
+    "description=\"Уведомление Система Android:\"",
+    "description=\"Уведомление RuStore: Самокат\"",
+    "description=\"Уведомление Обновление: Доступно обновление\""
+   ],
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"com.vkontakte.android:id/layout_email_or_phone\"",
+    "fallbacks": []
+   },
+   "param": null,
+   "note": "«layout_email_or_phone»",
+   "texts": [],
+   "crop": null,
+   "point": [
+    0.5,
+    0.3433
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "type",
+   "args": {
+    "value": "66876947099",
+    "clear": false
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "long_tap",
+   "args": {
+    "x": 0.498158273381295,
+    "y": 0.41756207441162,
+    "duration": 0.8
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"com.vkontakte.android:id/password_container\"",
+    "fallbacks": []
+   },
+   "param": null,
+   "note": "«password_container»",
+   "texts": [],
+   "crop": null,
+   "point": [
+    0.5,
+    0.2448
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "type",
+   "args": {
+    "value": "03SJDI5rNQAskJqs",
+    "clear": false
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"com.vkontakte.android:id/vk_toggle_button\"",
+    "fallbacks": []
+   },
+   "param": null,
+   "note": "LinearLayout",
+   "texts": [],
+   "crop": null,
+   "point": [
+    0.9066,
+    0.2448
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"com.vkontakte.android:id/vk_loading_btn_textView\"",
+    "fallbacks": []
+   },
+   "param": null,
+   "note": "«Продолжить»",
+   "texts": [
+    "Продолжить"
+   ],
+   "crop": null,
+   "point": [
+    0.5,
+    0.5396
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"not-robot-captcha-checkbox\"",
+    "fallbacks": [
+     "description=\"Я не робот\""
+    ]
+   },
+   "param": null,
+   "note": "«Я не робот»",
+   "texts": [
+    "Я не робот"
+   ],
+   "crop": "13_click.png",
+   "point": [
+    0.498,
+    0.8418
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "expect",
+   "args": {
+    "name": "screen4"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": [
+    "resourceId=\"checkbox-modal-label\"",
+    "resourceId=\"not-robot-captcha-checkbox\"",
+    "description=\"Подтвердите, что вы не робот\""
+   ],
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"android:id/autofill_save_no\"",
+    "fallbacks": [
+     "text=\"Никогда\""
+    ]
+   },
+   "param": null,
+   "note": "«Никогда»",
+   "texts": [
+    "Никогда"
+   ],
+   "crop": "15_click.png",
+   "point": [
+    0.1566,
+    0.9469
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "text=\"Далее\"",
+    "fallbacks": []
+   },
+   "param": null,
+   "note": "View",
+   "texts": [],
+   "crop": null,
+   "point": [
+    0.5004,
+    0.9314
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "text=\"Далее\"",
+    "fallbacks": []
+   },
+   "param": null,
+   "note": "View",
+   "texts": [],
+   "crop": null,
+   "point": [
+    0.5004,
+    0.9314
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "text=\"Далее\"",
+    "fallbacks": []
+   },
+   "param": null,
+   "note": "View",
+   "texts": [],
+   "crop": null,
+   "point": [
+    0.5004,
+    0.9314
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "text=\"Выйти\"",
+    "fallbacks": []
+   },
+   "param": null,
+   "note": "«Выйти»",
+   "texts": [
+    "Выйти"
+   ],
+   "crop": null,
+   "point": [
+    0.9061,
+    0.0686
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "tap",
+   "args": {
+    "x": 0.8996546762589928,
+    "y": 0.6677756777049945
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "description=\"Закрыть\"",
+    "fallbacks": []
+   },
+   "param": null,
+   "note": "«Закрыть»",
+   "texts": [
+    "Закрыть"
+   ],
+   "crop": null,
+   "point": [
+    0.9016,
+    0.6696
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "stop_app",
+   "args": {
+    "package": "com.vkontakte.android"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "key",
+   "args": {
+    "name": "home"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "expect",
+   "args": {
+    "name": "screen5"
+   },
+   "selector": null,
+   "param": null,
+   "note": "",
+   "texts": [],
+   "crop": null,
+   "point": null,
+   "any": [
+    "resourceId=\"com.mi.android.globallauncher:id/widget_container\"",
+    "resourceId=\"com.android.chrome:id/text_container\"",
+    "resourceId=\"com.android.chrome:id/microphone_icon\""
+   ],
+   "arms": null,
+   "report": null,
+   "pos": null
+  },
+  {
+   "kind": "click",
+   "args": {},
+   "selector": {
+    "call": "click",
+    "args": "description=\"Страница 1. Итого страниц: 3\"",
+    "fallbacks": []
+   },
+   "param": null,
+   "note": "«Страница 1. Итого страниц: 3»",
+   "texts": [
+    "Страница 1. Итого страниц: 3"
+   ],
+   "crop": null,
+   "point": [
+    0.5,
+    0.8335
+   ],
+   "any": null,
+   "arms": null,
+   "report": null,
+   "pos": null
+  }
+ ],
+ "screen_width": 1220,
+ "line_map": {
+  "9": 0,
+  "10": 1,
+  "11": 2,
+  "12": 3,
+  "13": 4,
+  "14": 5,
+  "15": 6,
+  "16": 7,
+  "17": 8,
+  "18": 9,
+  "19": 10,
+  "20": 11,
+  "21": 12,
+  "22": 13,
+  "23": 14,
+  "24": 15,
+  "25": 16,
+  "26": 17,
+  "27": 18,
+  "28": 19,
+  "29": 20,
+  "30": 21,
+  "31": 22,
+  "32": 23,
+  "33": 24
+ },
+ "code_sha256": "b0b06cf14fa72c2bbbbc720300857f4bca10b0b66a47b073a3f8a67f775c1949"
+}

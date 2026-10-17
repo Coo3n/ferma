@@ -1,0 +1,524 @@
+.stage {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    min-height: 0;
+    background: var(--well);
+    background-image: radial-gradient(var(--line-soft) 1px, transparent 1px);
+    background-size: 22px 22px;
+}
+
+#screen {
+    max-width: calc(100% - 16px);
+    max-height: calc(100% - 16px);
+    border-radius: 20px;
+    cursor: crosshair;
+    background: #000;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+    box-shadow: 0 0 0 6px var(--panel),
+    0 0 0 7px var(--line),
+    0 22px 60px rgba(0, 0, 0, .6),
+    0 0 60px color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+#screen.dead {
+    opacity: .25;
+    filter: grayscale(1)
+}
+
+/* Витрина: курсор-прицел обещал бы управление, которого нет. */
+.stage.ro #screen {
+    cursor: pointer;
+}
+
+/* Локальный след жеста — см. screen.js: gestureTrailStart/Move/End. Ни один
+   элемент не перехватывает мышь, иначе он сам мешал бы мышеупу долистать
+   до конца свайпа. */
+.gesture-trail {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 6;
+}
+
+.gesture-dot {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--accent) 85%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+    transition: opacity .2s;
+}
+
+.gesture-line {
+    position: absolute;
+    height: 2px;
+    margin-top: -1px;
+    background: color-mix(in srgb, var(--accent) 55%, transparent);
+    transform-origin: 0 50%;
+    transition: opacity .2s;
+}
+
+.gesture-trail.fade .gesture-dot,
+.gesture-trail.fade .gesture-line {
+    opacity: 0;
+}
+
+/* Шапка зеркала. Живёт в колонке зеркала, а не в панели устройства во всю
+   ширину: управляет трансляцией и исчезает вместе с ней, когда зеркало
+   свёрнуто. Высота совпадает с рядами конструктора слева — иначе экран и
+   холст начинались бы на разной высоте. */
+.mirror-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    padding: 7px var(--s3);
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--panel);
+    flex: 0 0 auto;
+    min-height: 41px;
+    flex-wrap: wrap;   /* в узкой колонке кнопки переходят на строку, а не режутся */
+}
+
+/* Узкое зеркало: «стоп-кадр» и «В окне» сжимаются до значков (подпись
+   остаётся для скринридера и в title), чтобы шапка жила одной строкой. */
+.col.mirror {
+    container: mirror / inline-size;
+}
+
+@container mirror (max-width: 440px) {
+    .mirror-head > button:not(.live-switch) > span {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+    .mirror-head > button:not(.live-switch) {
+        padding: 6px;
+    }
+}
+
+.mirror-head .live-switch {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+#btnLiveControl.on {
+    color: var(--accent);
+    border-color: var(--accent-line);
+    background: var(--accent-dim);
+}
+
+.pad {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--panel);
+    border-top: 1px solid var(--line-soft);
+    flex: 0 0 auto;
+}
+
+.pad.sub {
+    border-top: none;
+    padding-top: 0
+}
+
+/* Две понятные группы вместо россыпи: клавиши телефона одним рядом,
+   ниже — «Разблокировать» и режим клавиатуры. Разделитель .div теперь
+   принудительный перенос строки, а не вертикальная черта: в колонке
+   340px черта оказывалась на стыке строк и кнопки рвались как попало. */
+.pad:not(.sub) > .key:nth-child(-n+4) {
+    flex: 1 1 0;
+    justify-content: center;
+}
+
+.pad:not(.sub) > .key:nth-child(4) {
+    flex: 0 0 auto;
+}
+
+.pad:not(.sub) > .div {
+    flex: 0 0 100%;
+    height: 0;
+    margin: -3px 0;
+    background: none;
+}
+
+/* Ввод текста: поле на всю ширину, действия — рядом одним рядом. */
+.pad.sub .grow {
+    flex: 1 1 100%;
+}
+
+.pad.sub > .div {
+    display: none;
+}
+
+.pad.sub > button {
+    flex: 1 1 0;
+    justify-content: center;
+}
+
+.pad .grow {
+    flex: 1;
+    min-width: 120px
+}
+
+.kb {
+    color: var(--dim);
+    font-size: var(--fs-2);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer
+}
+
+/* «Живая клавиатура» стоит в ряду с кнопками устройства, и голым текстом с
+   галкой читалась как подпись, случайно попавшая между кнопок. Это режим:
+   оформляем его кнопкой-переключателем — та же пилюля, что у .key, плюс
+   явное включённое состояние. Форма говорит «это можно нажать», цвет —
+   «сейчас включено», и от соседних кнопок она отличается ровно тем, что
+   залипает. */
+.pad .kb {
+    padding: 7px 10px;
+    border: 1px solid transparent;
+    border-radius: var(--r2);
+    background: var(--panel2);
+    gap: 6px;
+    transition: background var(--fast) var(--ease),
+    border-color var(--fast) var(--ease),
+    color var(--fast) var(--ease);
+}
+
+.pad .kb:hover {
+    background: var(--panel3);
+    color: var(--text);
+}
+
+/* :has() — состояние держит вложенный input, а красить надо всю пилюлю. */
+.pad .kb:has(input:checked) {
+    color: var(--accent);
+    background: var(--accent-dim);
+}
+
+/* Разделитель между аппаратными клавишами и составными действиями:
+   «Назад/Домой/Задачи/Питание» — одна кнопка телефона каждая, а
+   «Разблокировать» — цепочка из питания и свайпа. Разный смысл при
+   одинаковом виде читается как один ряд равноправных клавиш. */
+.pad .div {
+    width: 1px;
+    align-self: stretch;
+    margin: 2px 3px;
+    background: var(--line);
+    flex: 0 0 auto;
+}
+
+/* Переключатель «Управлять телефоном»: выключен — экран только показывает,
+   включён — клики уходят на телефон. */
+.live-switch {
+    gap: 8px;
+}
+
+.live-switch .sw {
+    position: relative;
+    width: 26px;
+    height: 14px;
+    border-radius: 7px;
+    background: var(--line);
+    transition: background var(--fast) var(--ease);
+    flex: 0 0 auto;
+}
+
+.live-switch .sw::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text2);
+    transition: transform var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+
+.live-switch.on .sw {
+    background: var(--accent-fill);
+}
+
+.live-switch.on .sw::after {
+    transform: translateX(12px);
+    background: var(--accent-ink);
+}
+
+.live-switch.on {
+    color: var(--accent-hi);
+    border-color: var(--accent-line);
+}
+
+/* ----------------------------------------------------------------- пульт */
+
+/* Пульт (pult.js): телефон открыли с фермы — экран слева во всю высоту,
+   справа панель телефона. Конструктор и разделитель спрятаны, зеркало видно
+   даже свёрнутым в конструкторе. */
+.col.pult {
+    display: none;
+}
+
+.work.pult-on,
+.work.pult-on.mirror-off {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 400px);
+}
+
+.work.pult-on > .build,
+.work.pult-on > .wsplit,
+.work.pult-on #padKeys {
+    display: none;
+}
+
+.work.pult-on > .mirror {
+    visibility: visible;
+    overflow: visible;
+    border-left: none;
+}
+
+.work.pult-on > .pult {
+    display: flex;
+    border-left: 1px solid var(--line-soft);
+    background: var(--panel);
+    animation: pult-in var(--mid) var(--ease-out);
+}
+
+/* Конструктор появляется так же мягко, как уходит пульт. */
+.work:not(.pult-on) > .build {
+    animation: pult-fade var(--mid) var(--ease-out);
+}
+
+@keyframes pult-in {
+    from { opacity: 0; transform: translateX(12px); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes pult-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.pult-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    min-height: 41px;
+    padding: 6px var(--s3);
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.pult-id {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.pult-id strong {
+    font-size: var(--fs-4);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pult-meta {
+    font-size: var(--fs-2);
+    color: var(--dim);
+}
+
+.pult-slot[data-slot="held"]:not(:empty) {
+    padding: var(--s2) var(--s3) 0;
+}
+
+.pult-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s4);
+    padding: var(--s4);
+}
+
+.pult-sect h4 {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    min-height: 30px;
+    margin: 0 0 var(--s2);
+    font-size: var(--fs-2);
+    font-weight: 600;
+    color: var(--text2);
+}
+
+.pult-paste {
+    margin-left: auto;
+    font-weight: 400;
+}
+
+/* Клавиши телефона — плитками: значок над подписью, крупная цель для мыши. */
+.pult-keys {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.pult-keys .key {
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    min-height: 58px;
+    padding: var(--s2) var(--s1);
+}
+
+.pult-keys .key .ic {
+    width: var(--icon-lg);
+    height: var(--icon-lg);
+}
+
+.pult-apps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 124px;
+    overflow: auto;
+}
+
+.pult-apps .chip {
+    background: var(--panel2);
+}
+
+.pult-apps .chip:hover:not(:disabled) {
+    background: var(--panel3);
+}
+
+.pult-apps .dim,
+.pult-jobs .dim {
+    font-size: var(--fs-2);
+}
+
+/* Поле текста и «живая клавиатура» — те же узлы, что под экраном
+   конструктора (pultPlace); в пульте без своей подложки. */
+.pult .pad.sub {
+    padding: 0;
+    background: none;
+}
+
+.pult .kb {
+    margin-top: var(--s2);
+    padding-left: 0;
+}
+
+.pult-drop {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    padding: var(--s3);
+    border: 1px dashed var(--line);
+    border-radius: var(--r2);
+    color: var(--dim);
+    font-size: var(--fs-2);
+    cursor: pointer;
+    transition: border-color var(--fast), background-color var(--fast), color var(--fast);
+}
+
+.pult-drop b {
+    color: var(--text);
+    font-weight: 500;
+}
+
+.pult-drop:hover,
+.pult-drop:focus-visible,
+.pult-drop.drag {
+    border-color: var(--accent-line);
+    background-color: var(--accent-dim);
+    color: var(--text);
+}
+
+.work.pult-on .stage.drag {
+    outline: 2px dashed var(--accent-line);
+    outline-offset: -10px;
+}
+
+.pult-row {
+    display: flex;
+    gap: 6px;
+    margin-top: var(--s2);
+}
+
+.pult-row > button {
+    flex: 1;
+    justify-content: center;
+}
+
+#btnPultRec.on {
+    color: var(--bad);
+    background: var(--bad-dim);
+}
+
+.pult-jobs {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+button.pult-job {
+    display: grid;
+    grid-template-columns: 8px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s2);
+    width: 100%;
+    padding: 6px var(--s2);
+    background: transparent;
+    text-align: left;
+    font-size: var(--fs-2);
+}
+
+button.pult-job:hover {
+    background: var(--panel2);
+}
+
+.pult-job span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.pult-job small {
+    color: var(--dim);
+    font-size: var(--fs-1);
+}
+
+.pult-job i {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--pill);
+    background: var(--off);
+}
+
+.pult-job.st-passed i { background: var(--ok); }
+.pult-job.st-failed i { background: var(--bad); }
+.pult-job.st-running i, .pult-job.st-queued i { background: var(--busy); }
+.pult-job.st-held i { background: var(--warn); }
+
+.pult-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    padding: var(--s3) var(--s4);
+    border-top: 1px solid var(--line-soft);
+}

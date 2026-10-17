@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#161817">
+    <title>Android Farm</title>
+    <link rel="stylesheet" href="design/tokens.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/fleet.css">
+    <link rel="stylesheet" href="css/screen.css">
+    <link rel="stylesheet" href="css/recorder.css">
+    <link rel="stylesheet" href="css/work.css">
+    <link rel="stylesheet" href="css/bulk.css">
+    <link rel="stylesheet" href="css/overlays.css">
+    <link rel="stylesheet" href="css/repair.css">
+    <link rel="stylesheet" href="css/steptools.css">
+    <link rel="stylesheet" href="css/schedule.css">
+    <!-- Первый кадр не показываем, пока app.js не выберет раздел по адресу:
+         в разметке «Ферма» выбрана по умолчанию, и при обновлении на другой
+         вкладке подсветка было видно, как она перескакивает. Страховка — если
+         скрипты не загрузились, через 2 с страница всё равно появится. -->
+    <style>
+        html.boot body { visibility: hidden }
+        /* Первые ~секунда: всё, что рисуется при загрузке (скелет, плитки,
+           заглушки, смена раздела), встаёт сразу в конечное положение, а не
+           играет входные анимации одна поверх другой — на обновлении они
+           дёргались. Длительность 0, а не animation:none: так конец
+           анимации достигнут и она не стартует заново, когда класс снимется. */
+        html.nofx *, html.nofx *::before, html.nofx *::after {
+            animation-duration: 0s !important;
+            animation-delay: 0s !important;
+            transition-duration: 0s !important;
+            transition-delay: 0s !important;
+        }
+    </style>
+    <script>
+        document.documentElement.classList.add('boot', 'nofx');
+        setTimeout(function () { document.documentElement.classList.remove('boot'); }, 2000);
+        setTimeout(function () { document.documentElement.classList.remove('nofx'); }, 1200);
+    </script>
+</head>
+<body>
+<!-- Спрайт иконок (icons.svg) вклеивается сюда до первой отрисовки:
+     внешний SVG через <use href="file#id"> не наследует currentColor, и
+     иконки перестали бы краситься темой. Синхронно — чтобы не мигали. -->
+<script>
+    (function () {
+        try {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', 'icons.svg', false);
+            xhr.send();
+            if (xhr.status === 200) document.write(xhr.responseText);
+        } catch (e) { /* без иконок, но рабочий */ }
+    })();
+</script>
+
+<a class="skip" href="#main" data-t="common.k_osnovnomu_soderzhimomu">К основному содержимому</a>
+
+<header>
+    <h1>
+        <span class="mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+                <path d="M7 9.5h10v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 16.5z" fill="currentColor"/>
+                <path d="M8.6 9.5a3.4 3.4 0 0 1 6.8 0" stroke="currentColor" stroke-width="1.6"
+                      stroke-linecap="round"/>
+                <path d="m8.2 5.2 1 1.6M15.8 5.2l-1 1.6" stroke="currentColor" stroke-width="1.6"
+                      stroke-linecap="round"/>
+                <rect x="3.5" y="10" width="2.4" height="6" rx="1.2" fill="currentColor"/>
+                <rect x="18.1" y="10" width="2.4" height="6" rx="1.2" fill="currentColor"/>
+            </svg>
+        </span>
+        <span class="wm">Android&nbsp;Farm</span>
+    </h1>
+
+    <nav class="nav" aria-label="Разделы" data-t-aria-label="nav.razdely">
+        <button class="navbtn" data-view="fleet" onclick="showView('fleet')" data-t="nav.ferma">
+            <svg class="ic" aria-hidden="true">
+                <use href="#i-grid"/>
+            </svg>
+            Ферма
+        </button>
+        <button class="navbtn" data-view="scen" onclick="showView('scen')" data-t="nav.stsenarii">
+            <svg class="ic" aria-hidden="true">
+                <use href="#i-scroll"/>
+            </svg>
+            Сценарии
+        </button>
+        <button class="navbtn" data-view="jobs" onclick="showView('jobs')" data-t="nav.zapuski">
+            <svg class="ic" aria-hidden="true">
+                <use href="#i-activity"/>
+            </svg>
+            Запуски
+            <span class="badge" id="navJobs" hidden title="Сколько запусков идёт сейчас" data-t-title="nav.skolko_zapuskov_idet_seychas"></span>
+            <span class="badge b-failed" id="navDeviations" hidden
+                  title="Новых проблем — ещё никто не смотрел" data-t-title="nav.novyh_problem_esche_nikto"></span>
+        </button>
+        <button class="navbtn" data-view="accounts" onclick="showView('accounts')" data-t="nav.akkaunty">
+            <svg class="ic" aria-hidden="true">
+                <use href="#i-shield"/>
+            </svg>
+            Аккаунты
+        </button>
+    </nav>
+
+    <span class="sp"></span>
+
+    <!-- Открытое устройство — это контекст, а не четвёртый раздел: в него
+         заходят из фермы, а не переключаются как между разделами. Поэтому оно
+         стоит вне навигации и показывает, что именно открыто и как это
+         закрыть. Раньше кнопка висела среди разделов и сбивала с толку. -->
+    <span class="ctx" id="navDevice" hidden>
+        <button class="ctx-go" data-view="device" onclick="showView('device')"
+                title="Вернуться к телефону" data-t-title="nav.vernutsya_k_telefonu">
+            <svg class="ic" aria-hidden="true">
+                <use href="#i-phone"/>
+            </svg>
+            <span id="navDeviceName" data-t="nav.telefon">Телефон</span>
+        </button>
+        <button class="ctx-x" onclick="closeDevice()"
+                title="Закрыть телефон" aria-label="Закрыть телефон" data-t-title="nav.zakryt_telefon" data-t-aria-label="nav.zakryt_telefon">
+            <svg class="ic" aria-hidden="true">
+                <use href="#i-x"/>
+            </svg>
+        </button>
+    </span>
+
+    <span class="stat" id="stStatus" data-t="nav.podklyuchenie">подключение…</span>
+    <span class="stat" id="stJobs"></span>
+    <button class="sm icon" onclick="restartAdb(event)" aria-label="Переподключить телефоны"
+            title="Если телефон пропал или завис" data-t-title="nav.esli_telefon_propal_ili" data-t-aria-label="nav.perepodklyuchit_telefony">
+        <svg class="ic" aria-hidden="true">
+            <use href="#i-refresh"/>
+        </svg>
+    </button>
+</header>
+
+<main id="main">
+
+    <!-- ============================================================ ФЕРМА -->
+    <section class="view loading" id="view-fleet" aria-label="Все телефоны" data-t-aria-label="fleet.vse_telefony">
+        <div class="bar">
+            <div class="find">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-search"/>
+                </svg>
+                <input type="text" id="devSearch" placeholder="имя или номер телефона"
+                       aria-label="Поиск по телефонам"
+                       oninput="filterDevices(this.value)"
+                       onkeydown="if(event.key==='Escape'){this.value='';filterDevices('')}" data-t-placeholder="fleet.imya_ili_nomer_telefona" data-t-aria-label="fleet.poisk_po_telefonam">
+            </div>
+
+            <!-- Фильтр по состоянию — это карточки обзора ниже; отдельные
+                 чипы повторяли их один в один. Здесь — только группа. -->
+            <select id="groupFilter" class="sm" aria-label="Группа" hidden
+                    onchange="setGroupFilter(this.value)" data-t-aria-label="fleet.gruppa"></select>
+            <select id="tagFilter" class="sm" aria-label="Тег" hidden
+                    onchange="setTagFilter(this.value)" data-t-aria-label="fleet.teg"></select>
+
+            <button class="sm" id="groupRunBtn" hidden onclick="openRunDialog({mode: 'groups'})"
+                    title="Каждой группе — свой сценарий, одним запуском" data-t="fleet.po_gruppam" data-t-title="fleet.kazhdoy_gruppe_svoy_stsenariy">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-play"/>
+                </svg>
+                По группам
+            </button>
+            <div class="seg" role="group" aria-label="Размер плиток" data-t-aria-label="fleet.razmer_plitok">
+                <button class="sm" data-density-btn="l" onclick="setDensity('l')" title="Крупно — видно экран" data-t-title="fleet.krupno_vidno_ekran">L</button>
+                <button class="sm" data-density-btn="m" onclick="setDensity('m')" title="Средне" data-t-title="fleet.sredne">M</button>
+                <button class="sm" data-density-btn="s" onclick="setDensity('s')" title="Мелко — 40+ телефонов на одном экране" data-t-title="fleet.melko_40_telefonov_na">S</button>
+            </div>
+
+            <span class="sp"></span>
+
+            <button class="sm" onclick="selectAll(!S.selected.size)">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-check-square"/>
+                </svg>
+                <span id="selAllLabel" data-t="fleet.vybrat_vse">Выбрать все</span>
+            </button>
+        </div>
+
+        <div class="scroll grow" id="fleetScroll">
+            <!-- Обзор: четыре числа, которые спрашивают первыми. Каждая
+                 карточка — это же и фильтр, поэтому она кнопка. -->
+            <div class="kpis" id="fleetStats" role="group" aria-label="Обзор фермы" data-t-aria-label="fleet.obzor_fermy"></div>
+
+            <div class="sect">
+                <h2 data-t="fleet.telefony">Телефоны</h2>
+                <span class="sect-n tnum" id="fleetShown"></span>
+                <!-- Подсказки «клик по карточке — открыть рабочее место»
+                     здесь нет намеренно: карточка сама показывает «Открыть»
+                     при наведении (см. .tile .open) и ведёт себя как кнопка.
+                     Постоянная строка повторяла то, что уже сказано в самом
+                     месте действия, и висела насовсем — научив однажды,
+                     дальше работала шумом. -->
+            </div>
+
+            <div class="tiles" id="fleet"></div>
+            <div class="hiddenzone" id="fleetHidden"></div>
+        </div>
+
+        <!-- Панель запуска: появляется, только когда что-то выбрано. -->
+        <div class="runbar" id="runbar" hidden>
+            <span class="count" id="runCount"></span>
+            <span class="sp"></span>
+            <button class="sm" onclick="selectAll(false)" data-t="fleet.otmena">Отмена</button>
+            <button id="runSync" onclick="startSync()" title="Клик на одном телефоне — повтор на всех выбранных" data-t="fleet.sinhronno" data-t-title="fleet.klik_na_odnom_telefone">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-crosshair"/>
+                </svg>
+                Синхронно
+            </button>
+            <button onclick="bulkMenu()" title="Установка, файлы, текст, перезагрузка, группы, теги" data-t="fleet.deystviya" data-t-title="fleet.ustanovka_fayly_tekst_perezagruzka">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-layers"/>
+                </svg>
+                Действия
+            </button>
+            <button class="primary" onclick="openRunDialog()" data-t="fleet.zapustit_stsenariy">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-play"/>
+                </svg>
+                Запустить сценарий
+            </button>
+        </div>
+    </section>
+
+    <!-- ======================================================= УСТРОЙСТВО -->
+    <!-- Рабочее место — конструктор сценария, а не набор вкладок с
+         инструментами. Граф занимает всю площадь, зеркало экрана стоит
+         сбоку узкой колонкой и сворачивается: смотреть на телефон нужно
+         в момент клика по нему, строить сюжет — всё остальное время.
+         Разовые команды (запуск пакета, ссылка, adb shell, дампы) живут в
+         диалоге «Управление» — они нужны раз в сессию и не стоят
+         постоянного места на экране. -->
+    <section class="view" id="view-device" aria-label="Рабочее место телефона" data-t-aria-label="device.rabochee_mesto_telefona">
+        <!-- Отдельной панели устройства здесь больше нет. Она несла пять
+             элементов, из которых четыре нашли себе место получше:
+             «пауза»/«В окне» — в шапку зеркала (управляют трансляцией),
+             «Починить» и заряд с температурой — в диалог «Управление»
+             (чинят раз в день, а заряд виден на плитке фермы). Остались
+             крошка «← Ферма / имя» и вход в «Управление» — они встали в
+             первый ряд конструктора, и строка над рабочим местом ушла. -->
+        <div class="work" id="work">
+            <!-- конструктор сценария -->
+            <div class="col build">
+                <div class="recbar">
+                    <div class="recbar-row">
+                        <!-- Крошка: откуда пришли и где мы. Заряд, температура
+                             и версия Android ушли в подсказку — на виду они
+                             дублировали плитку фермы, а строку занимали. -->
+                        <button class="sm ghost crumb" onclick="showView('fleet')"
+                                title="Вернуться к ферме"
+                                aria-label="Вернуться к ферме" data-t-title="device.vernutsya_k_ferme" data-t-aria-label="device.vernutsya_k_ferme">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-back"/>
+                            </svg>
+                            <span data-t="device.ferma">Ферма</span>
+                        </button>
+                        <strong class="crumb-name" id="scrTitle" data-t="device.ekran">Экран</strong>
+                        <button class="sm ghost" id="btnToPult" onclick="pultBack()"
+                                title="Вернуться к пульту телефона" aria-label="К пульту" data-t-title="device.vernutsya_k_pultu_telefona" data-t-aria-label="device.k_pultu">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-grid"/>
+                            </svg>
+                        </button>
+
+                        <span class="recbar-sep" aria-hidden="true"></span>
+
+                        <button class="sm" id="btnRecStart" onclick="recStart()" data-t="device.zapis">
+                            <svg class="ic dotrec" aria-hidden="true">
+                                <use href="#i-record"/>
+                            </svg>
+                            Запись
+                        </button>
+                        <button class="sm" id="btnRecPause" onclick="recPause()" disabled title="Пауза записи" data-t="device.pauza" data-t-title="device.pauza_zapisi">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-pause"/>
+                            </svg>
+                            Пауза
+                        </button>
+                        <!-- hidden по умолчанию: в покое чип молчит (см.
+                             recSync), а показать его до первого recSync
+                             значит мигнуть «не записывается» на загрузке. -->
+                        <span class="stat sm" id="recState" hidden data-t="device.ne_zapisyvaetsya">не записывается</span>
+
+
+                        <span class="sp"></span>
+
+                        <button class="sm" id="btnRecRun" onclick="recRunOpen()"
+                                title="Прогнать на этом телефоне" data-t="device.proverit" data-t-title="device.prognat_na_etom_telefone">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-play"/>
+                            </svg>
+                            Проверить
+                        </button>
+                        <button class="sm" id="btnRecModeOff" onclick="recModeOff()"
+                                title="Выйти из обучения, не сохраняя автозакрытие" hidden data-t-title="device.vyyti_iz_obucheniya_ne">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-undo"/>
+                            </svg>
+                            <span data-t="device.ne_uchit">Не учить</span>
+                        </button>
+                        <button class="primary sm" id="btnRecSave" onclick="recSaveForm()">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-save"/>
+                            </svg>
+                            <span data-t="device.sohranit_stsenariy">Сохранить сценарий</span>
+                        </button>
+                    </div>
+
+                    <div class="recbar-row sub">
+                        <div class="chips" id="recViewToggle">
+                            <button class="chip on" data-view="scheme" aria-pressed="true"
+                                    onclick="recSetView('scheme')" data-t="device.shema">Схема
+                            </button>
+                            <button class="chip" data-view="list" aria-pressed="false"
+                                    onclick="recSetView('list')" data-t="device.spisok">Список
+                            </button>
+                        </div>
+                        
+                        <button class="sm" onclick="recLibOpen()"
+                                title="Добавить шаг вручную" data-t="device.shag" data-t-title="device.dobavit_shag_vruchnuyu">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-plus"/>
+                            </svg>
+                            Шаг
+                        </button>
+                        <button class="sm" id="btnRecAnchor" onclick="recAnchorHere()"
+                                title="Сценарий проверит, что дошёл до этого экрана" data-t="device.proverka_ekrana" data-t-title="device.stsenariy_proverit_chto_doshel">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-crosshair"/>
+                            </svg>
+                            Проверка экрана
+                        </button>
+                        <button class="sm" id="btnRecBranch" onclick="recBranchHere()"
+                                title="Если на экране то-то — выполнить блок" data-t="device.razvilka" data-t-title="device.esli_na_ekrane_to">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-branch"/>
+                            </svg>
+                            Развилка
+                        </button>
+                        <span class="recbar-sep" aria-hidden="true"></span>
+                        <button class="sm ghost" id="btnRecUndo" onclick="recUndo()"
+                                title="Отменить (Ctrl/⌘+Z)" aria-label="Отменить" disabled data-t-title="device.otmenit_ctrl_z" data-t-aria-label="device.otmenit">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-undo"/>
+                            </svg>
+                        </button>
+                        <button class="sm ghost" id="btnRecRedo" onclick="recRedo()"
+                                title="Вернуть (Ctrl/⌘+Y или Ctrl/⌘+Shift+Z)" aria-label="Вернуть" disabled data-t-title="device.vernut_ctrl_y_ili" data-t-aria-label="device.vernut">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-redo"/>
+                            </svg>
+                        </button>
+                        <button class="sm ghost" id="btnRecDiff" onclick="recDiff()" hidden
+                                title="Отличия от сохранённой версии" data-t="device.izmeneniya" data-t-title="device.otlichiya_ot_sohranennoy_versii">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-diff"/>
+                            </svg>
+                            Изменения
+                        </button>
+                        <button class="sm ghost" id="btnRecCode" onclick="recPreview()"
+                                title="Показать код сценария" aria-label="Код сценария" data-t-title="device.pokazat_kod_stsenariya" data-t-aria-label="device.kod_stsenariya">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-code"/>
+                            </svg>
+                        </button>
+
+                        <span class="recbar-sep" aria-hidden="true"></span>
+
+                        <!-- Настройка записи, а не действие: ставится один раз
+                             до старта. В ряду с «Запись» и «Сохранить» она
+                             занимала место наравне с кнопками, которые жмут
+                             постоянно, и роняла ряд в перенос на 1280px. -->
+                        <label class="kb"
+                               title="Паузы между действиями станут шагами «Подождать»" data-t="device.pauzy" data-t-title="device.pauzy_mezhdu_deystviyami_stanut">
+                            <input type="checkbox" id="recPauses" onchange="REC.pauses=this.checked">
+                            паузы
+                        </label>
+
+                        <!-- Масштаб холста: развилка на пять веток шире любой
+                             панели, и без «вписать» её концы уходили за край. -->
+                        <span class="recbar-sep" aria-hidden="true"></span>
+
+
+                        <span class="sp"></span>
+
+                        <!-- Вход в диалог устройства: запуск приложения,
+                             ссылка, adb shell, дампы, «Починить». -->
+                        <button class="sm ghost" onclick="devToolsOpen()"
+                                title="Приложения, ссылки, починка, консоль" data-t="device.upravlenie" data-t-title="device.prilozheniya_ssylki_pochinka_konsol">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-sliders"/>
+                            </svg>
+                            Управление
+                        </button>
+
+                        <button class="sm ghost" id="btnMirror" onclick="mirrorToggle()"
+                                aria-pressed="true"
+                                title="Свернуть экран" data-t-title="device.svernut_ekran">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-panel"/>
+                            </svg>
+                            <span data-t="device.ekran">Экран</span>
+                        </button>
+                    </div>
+                    <!-- Задача на этом устройстве стоит и ждёт решения: тот же
+                         decisionBar, что на «Задачах» (jobs.js) — «открыть
+                         устройство» иначе приводило сюда без единого слова о
+                         том, что тут держат и почему. Пусто, когда не ждут. -->
+                    <div id="deviceHeldBar"></div>
+                    <div class="warn" id="recBanner" hidden></div>
+                    <div class="runbar" id="recRun" hidden></div>
+                </div>
+
+                <div class="sch" id="recScheme">
+                    <!-- Холст прокручивается и масштабируется сам, .sch-spine
+                         несёт размер сюжета: панель вокруг него не ездит. -->
+                        <div class="zoom zoom-float" id="recZoom">
+                            <button class="sm ghost" onclick="grZoomBy(-1)" aria-label="Мельче" data-t-aria-label="device.melche">
+                                <svg class="ic" aria-hidden="true">
+                                    <use href="#i-zoom-out"/>
+                                </svg>
+                            </button>
+                            <button class="sm ghost tnum" id="btnZoomLevel" onclick="grZoomSet(1)"
+                                    title="Вернуть 100%" data-t-title="device.vernut_100">100%
+                            </button>
+                            <button class="sm ghost" onclick="grZoomBy(1)" aria-label="Крупнее" data-t-aria-label="device.krupnee">
+                                <svg class="ic" aria-hidden="true">
+                                    <use href="#i-zoom-in"/>
+                                </svg>
+                            </button>
+                            <button class="sm ghost" onclick="grZoomFit()" title="Вписать весь сюжет в окно"
+                                    aria-label="Вписать" data-t-title="device.vpisat_ves_syuzhet_v" data-t-aria-label="device.vpisat">
+                                <svg class="ic" aria-hidden="true">
+                                    <use href="#i-fit"/>
+                                </svg>
+                            </button>
+                        </div>
+                    <div class="sch-view" id="recCanvas">
+                        <div class="sch-spine"></div>
+                    </div>
+                    <details class="sch-foot" id="recSide">
+                        <summary data-t="device.vsplyvayuschie_okna_i_pomehi">Всплывающие окна и помехи</summary>
+                        <div class="sch-side-wrap"></div>
+                    </details>
+                </div>
+                <div class="scroll" id="recSteps" hidden></div>
+            </div>
+
+            <!-- Границу двигают мышью: сколько места отдать графу, а сколько
+                 зеркалу, зависит от сюжета, а не от нашей догадки. -->
+            <div class="wsplit" id="workSplit" role="separator" aria-orientation="vertical"
+                 tabindex="0" aria-label="Ширина зеркала экрана: стрелками влево-вправо"
+                 onpointerdown="workSplitStart(event)" onkeydown="workSplitKey(event)" data-t-aria-label="device.shirina_zerkala_ekrana_strelkami"></div>
+
+            <!-- зеркало экрана -->
+            <div class="col mirror" id="mirror">
+                <!-- Шапка зеркала: управление трансляцией живёт рядом с самой
+                     трансляцией и прячется вместе с ней (.work.mirror-off).
+                     Раньше эти кнопки стояли в панели устройства во всю
+                     ширину и продолжали висеть там, когда зеркало свёрнуто —
+                     управление невидимым. -->
+                <div class="mirror-head">
+                    <!-- Один переключатель вместо пары «только просмотр» + «управлять»:
+                         это одно состояние, и два элемента читались как два режима. -->
+                    <button class="sm live-switch" id="btnLiveControl" data-live-toggle
+                            role="switch" aria-checked="false" onclick="toggleLiveControl()"
+                            title="Кликать мышью без записи шагов" data-t-title="device.klikat_myshyu_bez_zapisi">
+                        <span class="sw" aria-hidden="true"></span>
+                        <span data-t="device.upravlyat_telefonom">Управлять телефоном</span>
+                    </button>
+                    <span class="sp"></span>
+                    <button class="sm" id="btnStream" onclick="toggleStream()"
+                            title="Заморозить кадр" data-t-title="device.zamorozit_kadr">
+                        <svg class="ic" aria-hidden="true">
+                            <use href="#i-pause"/>
+                        </svg>
+                        <span data-t="device.stop_kadr">стоп-кадр</span>
+                    </button>
+                    <button class="sm" onclick="openScrcpy()" aria-label="Открыть в отдельном окне"
+                            title="Плавный экран в отдельном окне" data-t-title="device.plavnyy_ekran_v_otdelnom" data-t-aria-label="device.otkryt_v_otdelnom_okne">
+                        <svg class="ic" aria-hidden="true">
+                            <use href="#i-external"/>
+                        </svg>
+                        <span data-t="device.v_okne">В окне</span>
+                    </button>
+                </div>
+                <div class="syncbar" id="syncBar" hidden>
+                    <svg class="ic" aria-hidden="true">
+                        <use href="#i-layers"/>
+                    </svg>
+                    <span id="syncCount"></span>
+                    <label class="inline-check" title="Случайная задержка, чтобы клики не совпадали" data-t-title="device.sluchaynaya_zaderzhka_chtoby_kliki">
+                        <select id="syncJitter" onchange="setJitter(this.value)" aria-label="Разброс между телефонами" data-t-aria-label="device.razbros_mezhdu_telefonami">
+                            <option value="off" data-t="device.bez_razbrosa">без разброса</option>
+                            <option value="fast" data-t="device.0_2_1_s">0.2–1 с</option>
+                            <option value="safe" data-t="device.0_5_3_s">0.5–3 с</option>
+                        </select>
+                    </label>
+                    <button class="sm" onclick="stopSync()" data-t="device.vyklyuchit">Выключить</button>
+                </div>
+                <div class="stage">
+                    <img id="screen" alt="Экран телефона" data-t-alt="device.ekran_telefona">
+                    <div id="recLayer"></div>
+                    <div class="emptybig" id="scrEmpty">
+                        <svg class="art" viewBox="0 0 150 120" fill="none" aria-hidden="true">
+                            <rect x="49" y="12" width="52" height="86" rx="9"
+                                  stroke="currentColor" stroke-width="2" opacity=".9"/>
+                            <rect x="55" y="19" width="40" height="66" rx="4"
+                                  fill="currentColor" opacity=".08"/>
+                            <path d="M67 16h16" stroke="currentColor" stroke-width="2"
+                                  stroke-linecap="round" opacity=".7"/>
+                            <circle cx="75" cy="91" r="2.4" fill="currentColor" opacity=".7"/>
+                            <path d="M26 44h14M33 37v14" stroke="currentColor" stroke-width="2"
+                                  stroke-linecap="round" opacity=".4"/>
+                            <circle cx="120" cy="70" r="3" stroke="currentColor"
+                                    stroke-width="2" opacity=".3"/>
+                        </svg>
+                        <h3 id="scrEmptyTitle" data-t="device.telefon_ne_vybran">Телефон не выбран</h3>
+                        <p id="scrEmptyText" data-t="device.otkroyte_telefon_na_ferme">Откройте телефон на ферме.</p>
+                        <button class="sm" id="scrEmptyFleet" onclick="showView('fleet')" data-t="device.vybrat_na_ferme">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-grid"/>
+                            </svg>
+                            Выбрать на ферме
+                        </button>
+                    </div>
+                </div>
+                <div class="pad" id="padKeys">
+                    <button class="key" data-live onclick="sendKey('back')" data-t="device.nazad">
+                        <svg class="ic" aria-hidden="true">
+                            <use href="#i-left"/>
+                        </svg>
+                        Назад
+                    </button>
+                    <button class="key" data-live onclick="sendKey('home')" data-t="device.domoy">
+                        <svg class="ic" aria-hidden="true">
+                            <use href="#i-home"/>
+                        </svg>
+                        Домой
+                    </button>
+                    <button class="key" data-live onclick="sendKey('recents')" data-t="device.nedavnie">
+                        <svg class="ic" aria-hidden="true">
+                            <use href="#i-layers"/>
+                        </svg>
+                        Недавние
+                    </button>
+                    <button class="key" data-live onclick="sendKey('power')" aria-label="Питание" data-t-aria-label="device.pitanie">
+                        <svg class="ic" aria-hidden="true">
+                            <use href="#i-power"/>
+                        </svg>
+                    </button>
+                    <span class="div" aria-hidden="true"></span>
+                    <button class="key" data-live onclick="doUnlock()" data-t="device.razblokirovat">
+                        <svg class="ic" aria-hidden="true">
+                            <use href="#i-unlock"/>
+                        </svg>
+                        Разблокировать
+                    </button>
+                    <span class="sp"></span>
+                    <label class="kb" id="kbLabel"
+                           title="Всё, что печатаете, уходит в телефон" data-t="device.zhivaya_klaviatura" data-t-title="device.vse_chto_pechataete_uhodit">
+                        <input type="checkbox" id="kbCapture" data-live>
+                        <svg class="ic" aria-hidden="true">
+                            <use href="#i-keyboard"/>
+                        </svg>
+                        Живая клавиатура
+                    </label>
+                </div>
+                <div class="pad sub" id="padText">
+                    <input type="text" class="grow" id="textInput" data-live
+                           aria-label="Текст в активное поле телефона"
+                           placeholder="Текст → в поле, на котором стоит курсор…"
+                           onkeydown="if(event.key==='Enter')sendText()" data-t-placeholder="device.tekst_v_pole_na" data-t-aria-label="device.tekst_v_aktivnoe_pole">
+                    <button class="accent" data-live onclick="sendText()"
+                            title="Дописать в поле (Enter)" data-t="device.vvesti" data-t-title="device.dopisat_v_pole_enter">Ввести</button>
+                    <button data-live onclick="sendText(true)"
+                            title="Стереть поле и ввести этот текст" data-t="device.zamenit" data-t-title="device.steret_pole_i_vvesti">
+                        Заменить
+                    </button>
+                    <!-- Не «отправить текст», а отдельная клавиша Enter на
+                         устройстве: подтвердить форму, перейти к поиску. Без
+                         подписи её путали с «Ввести». -->
+                    <span class="div" aria-hidden="true"></span>
+                    <button data-live onclick="sendKey('enter')"
+                            title="Нажать Enter на телефоне" data-t-title="device.nazhat_enter_na_telefone">
+                        <svg class="ic" aria-hidden="true">
+                            <use href="#i-enter"/>
+                        </svg>
+                        Enter
+                    </button>
+                </div>
+            </div>
+
+            <!-- Пульт: телефон открыли с фермы, чтобы им управлять. Экран слева
+                 во всю высоту, справа — всё, что можно сделать с телефоном.
+                 Конструктор появляется по «Записать сценарий» (pultSync). -->
+            <aside class="col pult" id="pult" aria-label="Пульт телефона" data-t-aria-label="pult.pult_telefona">
+                <div class="pult-head">
+                    <button class="sm ghost crumb" onclick="showView('fleet')"
+                            title="Вернуться к ферме" aria-label="Вернуться к ферме" data-t-title="pult.vernutsya_k_ferme" data-t-aria-label="pult.vernutsya_k_ferme">
+                        <svg class="ic" aria-hidden="true">
+                            <use href="#i-back"/>
+                        </svg>
+                        <span data-t="pult.ferma">Ферма</span>
+                    </button>
+                    <div class="pult-id">
+                        <strong id="pultName" data-t="pult.telefon">Телефон</strong>
+                        <span class="pult-meta" id="pultMeta"></span>
+                    </div>
+                </div>
+                <div class="pult-slot" data-slot="held"></div>
+                <div class="pult-body">
+                    <section class="pult-sect">
+                        <h4 data-t="pult.knopki">Кнопки</h4>
+                        <div class="pult-keys">
+                            <button class="key" data-live onclick="sendKey('back')" data-t="pult.nazad"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg>Назад</button>
+                            <button class="key" data-live onclick="sendKey('home')" data-t="pult.domoy"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg>Домой</button>
+                            <button class="key" data-live onclick="sendKey('recents')" data-t="pult.nedavnie"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg>Недавние</button>
+                            <button class="key" data-live onclick="sendKey('volume_down')" data-t="pult.tishe"><svg class="ic" aria-hidden="true"><use href="#i-volume-low"/></svg>Тише</button>
+                            <button class="key" data-live onclick="sendKey('volume_up')" data-t="pult.gromche"><svg class="ic" aria-hidden="true"><use href="#i-volume-high"/></svg>Громче</button>
+                            <button class="key" data-live onclick="pultRotate()" data-t="pult.povernut"><svg class="ic" aria-hidden="true"><use href="#i-rotate"/></svg>Повернуть</button>
+                            <button class="key" data-live onclick="doUnlock()" data-t="pult.razbudit"><svg class="ic" aria-hidden="true"><use href="#i-unlock"/></svg>Разбудить</button>
+                            <button class="key" data-live onclick="act({type:'screen_off'})" data-t="pult.pogasit"><svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg>Погасить</button>
+                            <button class="key" data-live onclick="sendKey('power')" data-t="pult.pitanie"><svg class="ic" aria-hidden="true"><use href="#i-power"/></svg>Питание</button>
+                        </div>
+                    </section>
+                    <section class="pult-sect">
+                        <h4 data-t="pult.prilozheniya">Приложения</h4>
+                        <div class="pult-apps" id="pultApps"></div>
+                    </section>
+                    <section class="pult-sect">
+                        <h4 data-t="pult.tekst">Текст
+                            <button class="sm ghost pult-paste" data-live onclick="pultPaste()"
+                                    title="Вставить в телефон то, что скопировано на компьютере" data-t="pult.iz_bufera" data-t-title="pult.vstavit_v_telefon_to">
+                                <svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg>из буфера</button>
+                        </h4>
+                        <div class="pult-slot" data-slot="text"></div>
+                        <div class="pult-slot" data-slot="kb"></div>
+                    </section>
+                    <section class="pult-sect">
+                        <h4 data-t="pult.fayly_i_zapis">Файлы и запись</h4>
+                        <label class="pult-drop" id="pultDrop" tabindex="0"
+                               onkeydown="if(event.key==='Enter')$('pultFile').click()">
+                            <input type="file" id="pultFile" hidden onchange="pultFiles(this.files);this.value=''">
+                            <svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg>
+                            <span data-t="pult.syuda_ili_na_ekran"><b data-t="pult.peretaschite_apk_ili_fayl">Перетащите APK или файл</b> — сюда или на экран</span>
+                        </label>
+                        <div class="pult-row">
+                            <button class="sm" data-live onclick="pultShot()" data-t="pult.skrinshot">
+                                <svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg>Скриншот</button>
+                            <button class="sm" id="btnPultRec" data-live onclick="pultRecord()">
+                                <svg class="ic" aria-hidden="true"><use href="#i-video"/></svg><span data-t="pult.video_ekrana">Видео экрана</span></button>
+                        </div>
+                    </section>
+                    <section class="pult-sect">
+                        <h4 data-t="pult.poslednie_zapuski">Последние запуски</h4>
+                        <div class="pult-jobs" id="pultJobs"></div>
+                    </section>
+                </div>
+                <div class="pult-foot">
+                    <button class="sm ghost" onclick="devToolsOpen()" title="Ссылка, починка связи, консоль" data-t="pult.upravlenie" data-t-title="pult.ssylka_pochinka_svyazi_konsol">
+                        <svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg>Управление</button>
+                    <span class="sp"></span>
+                    <button class="primary" id="btnRecBegin" onclick="recBegin()">
+                        <svg class="ic dotrec" aria-hidden="true"><use href="#i-record"/></svg>
+                        <span data-t="pult.zapisat_stsenariy">Записать сценарий</span></button>
+                </div>
+            </aside>
+        </div>
+    </section>
+
+    <!-- ======================================================== СЦЕНАРИИ -->
+    <section class="view" id="view-scen" aria-label="Сценарии" data-t-aria-label="scen.stsenarii">
+        <div class="bar">
+            <strong data-t="scen.stsenarii">Сценарии</strong>
+            <span class="stat" id="scenCount"></span>
+            <span class="sp"></span>
+            <button class="sm accent" id="btnScenRecord" onclick="recNew()" data-t="scen.sozdat_zapisyu">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-record"/>
+                </svg>
+                Создать записью
+            </button>
+        </div>
+        <div class="split">
+            <div class="scroll" id="scList"></div>
+            <div class="scroll pad-box">
+                <div class="box" id="scParams"></div>
+                <div class="box" id="scSteps" hidden></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================== ЗАДАЧИ -->
+    <section class="view" id="view-jobs" aria-label="Запуски" data-t-aria-label="jobs.zapuski">
+        <div class="bar">
+            <!-- «Задачи» и «Проблемы» — один вопрос «что с запусками»: один
+                 раздел, два вида. Проблемы — это задачи, требующие внимания. -->
+            <div class="seg runs-seg" role="tablist" aria-label="Запуски" data-t-aria-label="jobs.zapuski">
+                <button class="sm on" role="tab" aria-selected="true"
+                        onclick="showView('jobs')" data-t="jobs.vse_zapuski">Все запуски</button>
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('deviations')" data-t="jobs.problemy">Проблемы <span class="seg-n" data-dvn-count></span></button>
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('schedule')" data-t="jobs.raspisanie">Расписание</button>
+            </div>
+            <span class="sp"></span>
+            <a class="btn sm" href="/api/jobs/export.csv" download
+               title="Таблица запусков для Excel" data-t="jobs.skachat_tablitsu" data-t-title="jobs.tablitsa_zapuskov_dlya_excel">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-down"/>
+                </svg>
+                Скачать таблицу
+            </a>
+            <button class="sm" id="btnClearJobs" onclick="clearJobs()" data-t="jobs.ochistit_zavershennye">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-trash"/>
+                </svg>
+                Очистить завершённые
+            </button>
+            <button class="sm danger" id="btnCancelAll" onclick="cancelAll(event)" data-t="jobs.ostanovit_vse_zapuski">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-x"/>
+                </svg>
+                Остановить все запуски
+            </button>
+        </div>
+        <div class="batchbar" id="jobBatch" hidden></div>
+        <div class="split">
+            <div class="scroll" id="jobList"></div>
+            <div class="logwrap">
+                <!-- Живой экран задачи: пока прогон идёт (queued/running/held),
+                     видно, что сейчас на устройстве, без похода на «Ферма» или
+                     «открыть устройство». Кадр обновляется сам по себе — тот же
+                     механизм, что у плиток на «Ферме», см. fleet.js:thumbArm. -->
+                <div id="jobLive"></div>
+                <!-- Полоса решения над журналом: остановленная задача держит
+                     устройство, и пока она ждёт, это главное на экране. -->
+                <div id="jobHeld"></div>
+                <div id="jobRepair"></div>
+                <div id="jobSteps"></div>
+                <!-- Заглушка отдельным узлом, а не текстом внутри <pre>:
+                     в моноширинный журнал рисунок и кнопку не вложить, и
+                     подсказка выглядела бы строкой лога. -->
+                <div id="jobLogEmpty"></div>
+                <pre class="log" id="jobLog" hidden></pre>
+                <div class="arts" id="jobArts" hidden></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ====================================================== ОТКЛОНЕНИЯ -->
+    <!-- Отдельный раздел, а не фильтр по журналу задач: журнал отвечает
+         «что стало с задачей», отклонения — «где ферма пошла не по сценарию»
+         и что с этим сделать. Одна строка на причину, а не на устройство.
+         Слово «тревоги» занято здоровьем устройств — см. фильтр на ферме. -->
+    <section class="view" id="view-deviations" aria-label="Проблемы запусков" data-t-aria-label="problems.problemy_zapuskov">
+        <div class="bar">
+            <!-- «Задачи» и «Проблемы» — один вопрос «что с запусками»: один
+                 раздел, два вида. Проблемы — это задачи, требующие внимания. -->
+            <div class="seg runs-seg" role="tablist" aria-label="Запуски" data-t-aria-label="problems.zapuski">
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('jobs')" data-t="problems.vse_zapuski">Все запуски</button>
+                <button class="sm on" role="tab" aria-selected="true"
+                        onclick="showView('deviations')" data-t="problems.problemy">Проблемы <span class="seg-n" data-dvn-count></span></button>
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('schedule')" data-t="problems.raspisanie">Расписание</button>
+            </div>
+            <div class="hs-legend" id="dvnKinds" role="group" aria-label="Тип проблемы" data-t-aria-label="problems.tip_problemy"></div>
+            <span class="stat" id="dvnCount"></span>
+            <span class="sp"></span>
+            <button class="sm" onclick="deviationsSeenAll()" data-t="problems.otmetit_vse_prochitannym">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-check"/>
+                </svg>
+                Отметить всё прочитанным
+            </button>
+            <button class="sm danger" onclick="deviationsClear()" data-t="problems.ochistit_spisok">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-trash"/>
+                </svg>
+                Очистить список
+            </button>
+        </div>
+        <div class="scroll" id="dvnList"></div>
+    </section>
+
+    <!-- ====================================================== РАСПИСАНИЕ -->
+    <!-- Смены: сценарий сам запускается по дням и в окно времени, каждый
+         телефон — в своё случайное время. Вкладка «Запусков», а не пятый
+         раздел: это тоже ответ на «что и когда запускается». -->
+    <section class="view" id="view-schedule" aria-label="Расписание запусков" data-t-aria-label="schedule.raspisanie_zapuskov">
+        <div class="bar">
+            <div class="seg runs-seg" role="tablist" aria-label="Запуски" data-t-aria-label="schedule.zapuski">
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('jobs')" data-t="schedule.vse_zapuski">Все запуски</button>
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('deviations')" data-t="schedule.problemy">Проблемы <span class="seg-n" data-dvn-count></span></button>
+                <button class="sm on" role="tab" aria-selected="true"
+                        onclick="showView('schedule')" data-t="schedule.raspisanie">Расписание</button>
+            </div>
+            <span class="stat" id="schCount"></span>
+            <span class="sp"></span>
+            <button class="sm primary" onclick="schEdit()" data-t="schedule.novaya_smena">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-plus"/>
+                </svg>
+                Новая смена
+            </button>
+        </div>
+        <div class="scroll" id="schList"></div>
+    </section>
+
+    <!-- ========================================================= АККАУНТЫ -->
+    <section class="view" id="view-accounts" aria-label="Аккаунты" data-t-aria-label="accounts.akkaunty">
+        <div class="bar">
+            <div class="find">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-search"/>
+                </svg>
+                <input type="text" id="accSearch" placeholder="логин, телефон, заметка"
+                       aria-label="Поиск по аккаунтам" oninput="accFilter()" data-t-placeholder="accounts.login_telefon_zametka" data-t-aria-label="accounts.poisk_po_akkauntam">
+            </div>
+            <select id="accPlatform" class="sm" aria-label="Платформа" onchange="accFilter()" data-t-aria-label="accounts.platforma"></select>
+            <span class="sect-n" id="accSummary"></span>
+            <span class="sp"></span>
+            <button class="sm" id="btnAccAutobind" onclick="accAutobind()"
+                    title="Каждому телефону без аккаунта — свободный" data-t="accounts.razdat_telefonam" data-t-title="accounts.kazhdomu_telefonu_bez_akkaunta">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-phone"/>
+                </svg>
+                Раздать телефонам
+            </button>
+            <button class="sm" onclick="accImport()" data-t="accounts.vstavit_spiskom">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-copy"/>
+                </svg>
+                Вставить списком
+            </button>
+            <button class="sm primary" onclick="accAdd()" data-t="accounts.dobavit">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-plus"/>
+                </svg>
+                Добавить
+            </button>
+        </div>
+        <div class="scroll grow" id="accList"></div>
+    </section>
+<script>
+    /* Раздел из адреса выбираем сразу, до первой отрисовки: app.js потом
+       видит, что нужный раздел уже включён, и ничего не переключает, —
+       ни подсветка вкладки, ни анимация появления не перезапускаются. */
+    (function () {
+        var name = location.hash.replace(/^#/, '').split('/')[0] || 'fleet';
+        if (!document.getElementById('view-' + name)) name = 'fleet';
+        document.getElementById('view-' + name).classList.add('on');
+        var nav = (name === 'deviations' || name === 'schedule') ? 'jobs' : name;
+        var btn = document.querySelector('.navbtn[data-view="' + nav + '"]');
+        if (btn) { btn.classList.add('on'); btn.setAttribute('aria-current', 'page'); }
+    })();
+</script>
+</main>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle"
+     onclick="if(event.target===this)closeModal()">
+    <div class="sheet">
+        <div class="mhead">
+            <h2 id="mTitle"></h2>
+            <button class="sm" onclick="closeModal()" aria-label="Закрыть" data-t-aria-label="modal.zakryt">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-x"/>
+                </svg>
+            </button>
+        </div>
+        <div class="mbody" id="mBody"></div>
+        <div class="macts" id="mActs"></div>
+    </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- Обычные скрипты, не модули: в разметке инлайновые onclick, а функции
+     из модуля не попадают в глобальную область. Порядок значим:
+     core.js первым, app.js последним. -->
+<script src="js/i18n.js"></script>
+<script src="js/core.js"></script>
+<script src="js/devices.js"></script>
+<script src="js/fleet.js"></script>
+<script src="js/device-modal.js"></script>
+<script src="js/screen.js"></script>
+<script src="js/scenarios.js"></script>
+<script src="js/jobs.js"></script>
+<script src="js/deviations.js"></script>
+<script src="js/schedule.js"></script>
+<script src="js/device-tools.js"></script>
+<script src="js/recorder.js"></script>
+<script src="js/repair.js"></script>
+<script src="js/steptools.js"></script>
+<script src="js/workspace.js"></script>
+<script src="js/bulk.js"></script>
+<script src="js/rundialog.js"></script>
+<script src="js/accounts.js"></script>
+<script src="js/pult.js"></script>
+<script src="js/notify.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
