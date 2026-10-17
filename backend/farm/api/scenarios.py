@@ -21,7 +21,8 @@ def _structure(key: str) -> tuple[int | None, int | None]:
         return None, None
     шаги = рецепт.get("steps") or []
     ветки = sum(1 for шаг in шаги if шаг.get("kind") == "branch")
-    return len(шаги), ветки
+    # Заголовок повтора — рамка вокруг шагов, а не шаг: в счёт не идёт.
+    return sum(1 for шаг in шаги if шаг.get("kind") != "loop"), ветки
 
 
 def _package_of(params: dict) -> str:

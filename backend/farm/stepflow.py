@@ -48,6 +48,22 @@ class StepTracer:
         return False
 
 
+def _cut_loop(loop: ast.For, keep) -> list:
+    """Повтор при запуске «с шага» / проверке одного шага.
+
+    Повтор целиком в диапазоне — остаётся повтором. Диапазон режет его тело
+    (проверяют шаг внутри повтора, запускают с середины тела) — тело идёт
+    один раз, без круга: «проверить шаг 5» не должно листать десять минут.
+    Проверка самого заголовка повтора — один круг всего тела.
+    """
+    inner = [st for st in loop.body if keep(st.lineno)]
+    if keep(loop.lineno):
+        if len(inner) == len(loop.body):
+            return [loop]
+        return inner or list(loop.body)
+    return inner
+
+
 def module_from_step(sc, line_map: dict, start: int, stop: int | None = None):
     """Модуль сценария без шагов до `start` (индекс с нуля) и, если задан `stop`,
     без шагов начиная с него — так прогоняют один шаг: start=i, stop=i+1.
@@ -64,13 +80,20 @@ def module_from_step(sc, line_map: dict, start: int, stop: int | None = None):
     with open(sc.path, "rb") as fh:
         source = fh.read()
     tree = ast.parse(source, sc.path)
+    def keep(lineno: int) -> bool:
+        # Строки без номера шага (watch_popups, humanize) остаются всегда.
+        return lineno not in line_map or (line_map[lineno] >= start
+                                          and (stop is None or line_map[lineno] < stop))
+
     for node in tree.body:
         if isinstance(node, ast.FunctionDef) and node.name == "run":
-            # Строки без номера шага (watch_popups, humanize) остаются всегда.
-            node.body = [st for st in node.body
-                         if st.lineno not in line_map
-                         or (line_map[st.lineno] >= start
-                             and (stop is None or line_map[st.lineno] < stop))] or [ast.Pass()]
+            body = []
+            for st in node.body:
+                if isinstance(st, ast.For) and st.lineno in line_map:
+                    body += _cut_loop(st, keep)
+                elif keep(st.lineno):
+                    body.append(st)
+            node.body = body or [ast.Pass()]
             break
     else:
         raise ValueError("нет функции run(ctx)")

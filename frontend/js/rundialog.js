@@ -23,7 +23,8 @@ const RD_STATUS = {
 /* Кого запускаем: занятые встают в очередь, «нужен вход» — пробуем. */
 const RD_RUNNABLE = new Set(['ready', 'busy', 'login']);
 
-const RD = window.RD = {mode: 'devices', who: 'all', group: '', tag: '', check: null, timer: null, seq: 0};
+const RD = window.RD = {mode: 'devices', who: 'phones', picked: new Set(), query: '',
+    group: '', tag: '', check: null, timer: null, seq: 0};
 
 function rdGroups() {
     return [...new Set(S.devices.map(d => d.group).filter(Boolean))].sort();
@@ -38,7 +39,7 @@ function rdOnline(list) {
 }
 
 function rdTargets() {
-    if (RD.who === 'selected') return [...S.selected];
+    if (RD.who === 'phones') return rdOnline(S.devices.filter(d => RD.picked.has(d.serial)));
     if (RD.who === 'group') return rdOnline(S.devices.filter(d => d.group === RD.group));
     if (RD.who === 'tag') return rdOnline(S.devices.filter(d => (d.tags || []).includes(RD.tag)));
     return rdOnline(S.devices);
@@ -57,7 +58,13 @@ function openRunDialog(opts) {
     if (RD.mode === 'groups') return rdGroupsOpen();
 
     const key = opts.scenario || store.get(RD_LAST_KEY, '') || S.scenario || S.scenarios[0].key;
-    RD.who = S.selected.size ? 'selected' : 'all';
+    /* По умолчанию — конкретные телефоны, а не вся ферма: отмечены выбранные
+       на ферме, а если ничего не выбрано — открытый в пульте. Запуск на всех
+       сразу — только явным выбором «Все в сети». */
+    RD.who = 'phones';
+    RD.query = '';
+    const active = S.devices.find(d => d.serial === S.active && d.online);
+    RD.picked = new Set(S.selected.size ? S.selected : active ? [active.serial] : []);
     RD.group = rdGroups()[0] || '';
     RD.tag = FLEET.tag || rdTags()[0] || '';
     RD.check = null;
@@ -95,22 +102,71 @@ function rdScenarioChanged() {
 function rdRenderWho() {
     const groups = rdGroups();
     const tags = rdTags();
-    const n = S.selected.size;
     const btn = (who, label, disabled) => `<button class="sm${RD.who === who ? ' on' : ''}"
         ${disabled ? 'disabled' : ''} aria-pressed="${RD.who === who}"
         onclick="rdSetWho('${who}')">${label}</button>`;
     $('rdWho').innerHTML = `<div class="seg">
-        ${btn('selected', `Выбранные · ${n}`, !n)}
+        ${btn('phones', esc(t('run.telefony', {n: rdOnline(S.devices.filter(d => RD.picked.has(d.serial))).length})))}
         ${btn('group', 'Группа', !groups.length)}
         ${btn('tag', 'По тегу', !tags.length)}
         ${btn('all', `Все в сети · ${rdOnline(S.devices).length}`)}
       </div>
+      ${RD.who === 'phones' ? rdPickerHtml() : ''}
       ${RD.who === 'group' ? `<select id="rdGroup" onchange="RD.group=this.value;rdRefresh()">${groups.map(g =>
         `<option value="${esc(g)}" ${g === RD.group ? 'selected' : ''}>${esc(g)}</option>`).join('')}</select>` : ''}
-      ${RD.who === 'tag' ? `<select id="rdTag" aria-label="Тег" onchange="RD.tag=this.value;rdRefresh()">${tags.map(t =>
-        `<option value="${esc(t)}" ${t === RD.tag ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>` : ''}`;
+      ${RD.who === 'tag' ? `<select id="rdTag" aria-label="Тег" onchange="RD.tag=this.value;rdRefresh()">${tags.map(tg =>
+        `<option value="${esc(tg)}" ${tg === RD.tag ? 'selected' : ''}>${esc(tg)}</option>`).join('')}</select>` : ''}`;
     const tagBtn = $('rdWho').querySelector(`[onclick="rdSetWho('tag')"]`);
-    disableWithReason(tagBtn, !tags.length, 'Тегов пока нет: выберите телефоны → Действия → Теги');
+    disableWithReason(tagBtn, !tags.length, t('run.tegov_net'));
+}
+
+/* Выбор телефонов прямо в окне запуска: поиск по имени, группе и тегу,
+   отметка кликом. Видны только телефоны в сети — офлайн запустить нельзя,
+   а сорок серых строк мешали бы найти нужные. */
+function rdPickerHtml() {
+    const q = RD.query.trim().toLowerCase();
+    const online = S.devices.filter(d => d.online && !S.hidden.has(d.serial));
+    const shown = online.filter(d => !q || [d.name, d.group, ...(d.tags || [])]
+        .some(v => String(v || '').toLowerCase().includes(q)));
+    return `<div class="rd-pick">
+      <div class="rd-pick-bar">
+        <input type="search" id="rdPickQ" placeholder="${esc(t('run.poisk_telefona'))}" value="${esc(RD.query)}"
+               aria-label="${esc(t('run.poisk_telefona'))}" oninput="rdPickQuery(this.value)">
+        <button class="sm ghost" onclick="rdPickShown(true)">${esc(t('run.otmetit_vidimye'))}</button>
+        <button class="sm ghost" onclick="rdPickShown(false)">${esc(t('run.snyat'))}</button>
+      </div>
+      <div class="rd-pick-list" role="group" aria-label="${esc(t('run.telefony_dlya_zapuska'))}">${shown.length
+        ? shown.map(d => `<button class="rd-ph${RD.picked.has(d.serial) ? ' on' : ''}" aria-pressed="${RD.picked.has(d.serial)}"
+            onclick="rdPick('${esc(d.serial)}')"><b>${esc(d.name)}</b>${d.busy_job ? `<i>${esc(t('run.zanyat'))}</i>` : ''}${
+            [d.group, ...(d.tags || [])].filter(Boolean).map(v => `<small>${esc(v)}</small>`).join('')}</button>`).join('')
+        : `<span class="dim">${esc(t('run.nikogo_ne_naydeno'))}</span>`}</div>
+    </div>`;
+}
+
+function rdPick(serial) {
+    if (RD.picked.has(serial)) RD.picked.delete(serial);
+    else RD.picked.add(serial);
+    rdRenderWho();
+    rdRefresh();
+}
+
+function rdPickQuery(value) {
+    RD.query = value;
+    rdRenderWho();
+    const input = $('rdPickQ');
+    if (input) {
+        input.focus();
+        input.setSelectionRange(value.length, value.length);
+    }
+}
+
+function rdPickShown(on) {
+    const q = RD.query.trim().toLowerCase();
+    S.devices.filter(d => d.online && !S.hidden.has(d.serial) && (!q || [d.name, d.group, ...(d.tags || [])]
+        .some(v => String(v || '').toLowerCase().includes(q))))
+        .forEach(d => (on ? RD.picked.add(d.serial) : RD.picked.delete(d.serial)));
+    rdRenderWho();
+    rdRefresh();
 }
 
 function rdSetWho(who) {

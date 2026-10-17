@@ -371,7 +371,9 @@ function tileMetrics(box, device) {
     const tags = device.tags || [];
     if (tags.length) {
         bits.push(`<span class="m tags" title="Теги: ${esc(tags.join(', '))}">${
-            tags.slice(0, 2).map(t => `<span class="tagchip">${esc(t)}</span>`).join('')}${
+            tags.slice(0, 2).map(tg => `<span class="tagchip" role="button" tabindex="-1"
+                title="${esc(t('fleet.pokazat_tolko_teg', {teg: tg}))}"
+                onclick="event.stopPropagation();fleetShowTag(this.textContent)">${esc(tg)}</span>`).join('')}${
             tags.length > 2 ? `<span class="tagmore">+${tags.length - 2}</span>` : ''}</span>`);
     }
     if (device.battery != null) {
@@ -831,3 +833,11 @@ function openDevice(serial) {
             [...ev.dataTransfer.files]);
     });
 })();
+
+
+/* Клик по тегу на плитке — показать на ферме только телефоны с этим тегом. */
+function fleetShowTag(tag) {
+    setTagFilter(tag);
+    const sel = $('tagFilter');
+    if (sel) sel.value = tag;
+}

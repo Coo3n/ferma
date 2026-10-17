@@ -168,7 +168,7 @@
     <h2>4. Путь одного нажатия: «Запустить сценарий»</h2>
     <ol class="steps">
         <li><b>Сайт.</b> Кнопка в <code>index.html</code> зовёт <code>openRunDialog()</code> (<code>rundialog.js</code>). Человек выбирает сценарий и телефоны, жмёт «Запустить» — уходит запрос:
-<pre>post('/api/run', {scenario: 'warmup_vk', serials: ['R58N1001', 'R58N1002'], params: {minutes: 10}})</pre></li>
+<pre>post('/api/run', {scenario: 'vk_auth', serials: ['R58N1001', 'R58N1002'], params: {minutes: 10}})</pre></li>
         <li><b>API.</b> <code>api/scenarios.py</code> принимает запрос и отдаёт работу очереди:
 <pre>@router.post("/api/run")
 def run_scenario(payload: dict = Body(...)):
@@ -244,7 +244,7 @@ DATA_DIR = PROJECT_DIR / "data"                     <span class="c"># Path: «/�
         <tr><td>простой модуль без зависимостей</td><td><code>farm/deviations.py</code>, <code>farm/obstacle.py</code></td></tr>
         <tr><td>API от начала до конца</td><td><code>farm/api/screen.py</code></td></tr>
         <tr><td>потоки и очередь</td><td><code>farm/devices/runner.py</code></td></tr>
-        <tr><td>сценарий</td><td><code>scenarios/warmup_vk.py</code> + <code>scenarios/_human.py</code></td></tr>
+        <tr><td>сценарий</td><td><code>scenarios/_template.py</code> — шаблон со всеми возможностями ctx</td></tr>
         <tr><td>тесты с подменами</td><td><code>tests/test_watch.py</code>, <code>tests/test_pult_api.py</code></td></tr>
     </table>
     <div class="box"><b>Как читать незнакомый файл</b>1) Docstring вверху — зачем модуль. 2) Имена функций без подчёркивания — то, что модуль даёт наружу. 3) Функции с <code>_</code> в начале — внутренние, их можно пропустить при первом чтении.</div>
@@ -265,7 +265,7 @@ def action(serial: str, payload: dict = Body(...)):   <span class="c"># тело
 <section class="page">
     <h2>7. Сценарии и ctx</h2>
     <p>Сценарий — файл в <code>backend/scenarios/</code> с функцией <code>run(ctx)</code>. Записанные конструктором сценарии — такие же файлы, их можно читать и править.</p>
-<pre>NAME = "Прогрев VK"
+<pre>NAME = "Листать ленту VK"
 PARAMS = {"minutes": {"label": "Минут на телефон", "type": "number", "default": 10}}
 
 def run(ctx):

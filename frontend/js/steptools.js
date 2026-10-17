@@ -348,6 +348,9 @@ function recSelBar() {
       <button class="sm" onclick="recSelPause()" title="Вставить паузу после каждого выбранного шага">после каждого</button>
     </div>
     <div class="selbar-grp">
+      <button class="sm" onclick="recSelLoop()" title="${esc(t('rec.povtoryat_po_krugu_podskazka'))}">${recIcon('rotate')} ${esc(t('rec.povtoryat_po_krugu'))}</button>
+    </div>
+    <div class="selbar-grp">
       <button class="sm" onclick="recSelDup()">${recIcon('copy')} дублировать</button>
       <button class="sm danger" onclick="recSelDelete()">${recIcon('trash')} удалить</button>
     </div>
@@ -394,7 +397,8 @@ function recSelPause() {
         out.push(step);
         if (chosen.has(step.id)) {
             out.push({id: REC.nextId++, kind: 'sleep', args: {seconds: seconds},
-                param: null, note: '', warn: ''});
+                param: null, note: '', warn: '',
+                inLoop: step.kind === 'loop' ? step.id : (step.inLoop || null)});
         }
     }
     REC.steps = out;

@@ -29,10 +29,21 @@ ARGS = {
     "screenshot": ((), ("name",)),
     "expect": (("name",), ()),
     "branch": (("name",), ("timeout",)),
+    # Повтор по кругу: следующие `span` шагов — тело цикла. Сколько — `times`
+    # раз или `minutes` минут (ровно одно из двух); между кругами пауза
+    # pause_min…pause_max секунд; watch — сторож (ctx.on_track) на каждом круге.
+    "loop": (("span",), ("times", "minutes", "pause_min", "pause_max", "watch")),
 }
 
-NUMERIC = {"x", "y", "x1", "y1", "x2", "y2", "duration", "seconds", "timeout"}
-BOOLEAN = {"clear"}
+NUMERIC = {"x", "y", "x1", "y1", "x2", "y2", "duration", "seconds", "timeout",
+           "span", "times", "minutes", "pause_min", "pause_max"}
+BOOLEAN = {"clear", "watch"}
+
+# Потолки повтора: сутки и десять тысяч кругов — дальше это уже не сценарий,
+# а забытый на ночь цикл, который держит телефон.
+LOOP_TIMES_MAX = 10000
+LOOP_MINUTES_MAX = 24 * 60
+LOOP_PAUSE_MAX = 600
 
 # Шаги, чьё значение можно вынести в PARAMS. Селекторы сюда не входят:
 # они хранятся готовой строкой из farm/ui/selectors.py и не разбираются.
@@ -52,7 +63,7 @@ _LABELS = {
     "unlock": "Разблокировать", "launch_app": "Запуск приложения",
     "stop_app": "Остановка приложения", "open_url": "Открыть ссылку",
     "shell": "Команда shell", "sleep": "Пауза", "screenshot": "Скриншот",
-    "expect": "Якорь экрана", "branch": "Развилка",
+    "expect": "Якорь экрана", "branch": "Развилка", "loop": "Повтор",
 }
 
 
@@ -70,6 +81,9 @@ def label_of(step: dict) -> str:
                 if args.get("account") else args.get("value", ""))
     elif kind == "key":
         tail = args.get("name", "")
+    elif kind == "loop":
+        tail = (f'{int(args["times"])} раз' if args.get("times")
+                else f'{_minutes_text(args.get("minutes"))} мин')
     elif kind == "click":
         m = re.search(r'(?:text|description|resourceId)\w*="([^"]{1,40})"',
                       ((step.get("selector") or {}).get("args") or ""))
@@ -77,6 +91,10 @@ def label_of(step: dict) -> str:
     note = step.get("note")
     text = f"{base}: {tail}" if tail else base
     return f"{text} — {note}" if note else text
+
+
+def _minutes_text(value) -> str:
+    return f"{round(float(value or 0), 1):g}"
 
 
 class StepError(ValueError):
@@ -385,6 +403,8 @@ def normalize_step(raw) -> dict:
     if retries:
         step["retries"] = retries
     _check_account(kind, step["args"])
+    if kind == "loop":
+        _check_loop(step["args"])
     if step["args"].get("account"):
         step["param"] = None   # аккаунт и параметр — два источника одного значения
     return step
@@ -412,12 +432,53 @@ def _retries(kind: str, raw):
     return n
 
 
+def _check_loop(args: dict) -> None:
+    """Повтор: целое тело, ровно одно из «раз»/«минут», разумные паузы."""
+    span = args["span"]
+    if span != int(span) or span < 1:
+        raise StepError("повтор: в нём должен быть хотя бы один шаг")
+    args["span"] = int(span)
+    times, minutes = args.get("times"), args.get("minutes")
+    if (times is None) == (minutes is None):
+        raise StepError("повтор: укажите либо сколько раз, либо сколько минут")
+    if times is not None:
+        if times != int(times) or not 1 <= times <= LOOP_TIMES_MAX:
+            raise StepError(f"повтор: от 1 до {LOOP_TIMES_MAX} раз")
+        args["times"] = int(times)
+    if minutes is not None and not 0 < minutes <= LOOP_MINUTES_MAX:
+        raise StepError(f"повтор: от 0 до {LOOP_MINUTES_MAX} минут")
+    lo, hi = args.get("pause_min"), args.get("pause_max")
+    if (lo is None) != (hi is None):
+        raise StepError("повтор: пауза задаётся парой «от» и «до»")
+    if lo is not None and not 0 <= lo <= hi <= LOOP_PAUSE_MAX:
+        raise StepError(f"повтор: пауза от 0 до {LOOP_PAUSE_MAX} с, «от» не больше «до»")
+
+
+def check_loops(steps: list) -> None:
+    """Тело каждого повтора целиком внутри сценария; повторы не вложены.
+
+    Вложенный цикл в конструкторе читался бы хуже, чем два сценария, — а
+    кому он нужен, тот вынесет внутренний повтор в блок.
+    """
+    end = -1
+    for i, step in enumerate(steps):
+        if step["kind"] != "loop":
+            continue
+        if i <= end:
+            raise StepError(f"шаг {i + 1}: повтор внутри повтора не поддерживается")
+        end = i + step["args"]["span"]
+        if end >= len(steps):
+            raise StepError(f"шаг {i + 1}: повтор захватывает шаги за концом сценария")
+
+
 def normalize_steps(raw) -> list:
     if raw is None:
         return []
     if not isinstance(raw, list):
         raise StepError("шаги должны быть списком")
-    return [normalize_step(item) for item in raw]
+    steps = [normalize_step(item) for item in raw]
+    check_loops(steps)
+    return steps
 
 
 def normalize_meta(raw) -> dict:

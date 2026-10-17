@@ -383,6 +383,8 @@ function recLabel(step) {
             return `Подождать ${a.seconds} с`;
         case 'screenshot':
             return 'Снимок экрана' + (a.name ? ` «${a.name}»` : '');
+        case 'loop':
+            return loopLabel(step);
         default:
             return step.kind;
     }
@@ -406,6 +408,9 @@ function recPush(step) {
        друг за другом, а не в конец сюжета. */
     const at = REC.insertAfter ? REC.steps.findIndex(s => s.id === REC.insertAfter) : -1;
     if (at >= 0) {
+        /* Запись внутри повтора дописывает его тело. */
+        const prev = REC.steps[at];
+        step.inLoop = prev.kind === 'loop' ? prev.id : (prev.inLoop || null);
         REC.steps.splice(at + 1, 0, step);
         REC.insertAfter = step.id;
     } else {
@@ -770,7 +775,8 @@ function grLayout() {
     let maxX = GR_COL_X + nodeW;
 
     REC.steps.forEach(step => {
-        const here = step.pos ? {x: step.pos[0], y: step.pos[1]} : {x: GR_COL_X, y};
+        const here = step.pos ? {x: step.pos[0], y: step.pos[1]}
+            : {x: GR_COL_X + (step.inLoop ? GR_LOOP_INDENT : 0), y};
         pos.set(step.id, here);
 
         let blockHeight = GR_ROW_H;
@@ -934,7 +940,7 @@ function grRender() {
         return html;
     }).join('');
     return `<div class="gr-canvas" style="width:${layout.width}px;height:${layout.height}px">
-      <svg class="gr-edges" width="${layout.width}" height="${layout.height}">${edges}</svg>
+      <svg class="gr-edges" width="${layout.width + 40}" height="${layout.height}">${grLoopFrames(layout)}${edges}</svg>
       ${nodes}
     </div>`;
 }
@@ -1038,6 +1044,7 @@ function grDragStart(ev, id) {
    восемнадцать одинаковых строк, и глазу не за что было зацепиться. */
 const SCH_ICONS = {
     branch: ['branch', 'branch'],
+    loop: ['loop', 'rotate'],
     expect: ['anchor', 'crosshair'],
     launch_app: ['block', 'play'],
     stop_app: ['block', 'stop'],
@@ -1728,6 +1735,7 @@ function recLayers(step) {
 
 function recCode(step, index) {
     const a = step.args;
+    if (step.kind === 'loop') return loopCode(step);
     /* Зеркалит codegen._branch: единственный шаг, который занимает больше
        одной строки, — ветвление и есть несколько строк. */
     if (step.kind === 'branch') {
@@ -1946,7 +1954,7 @@ function recThumb(step) {
 
 function recRow(step, index) {
     const open = REC.open === step.id;
-    return `<div class="rs ${open ? 'open' : ''} ${REC.sel && REC.sel.has(step.id) ? 'sel' : ''}"
+    return `<div class="rs ${open ? 'open' : ''} ${REC.sel && REC.sel.has(step.id) ? 'sel' : ''} ${loopRowClass(step)}"
        data-id="${step.id}"
        ondragstart="recDragStart(event, ${step.id})" ondragend="recDragEnd(event)"
        ondragover="recDragOver(event, ${step.id})" ondragleave="recDragLeave(event)"
@@ -1981,11 +1989,12 @@ function recRow(step, index) {
     ${open ? `<div class="rs-code">${esc(recCode(step, index))}</div>` : ''}
     ${recMark(step, open)}
     ${open ? recThumb(step) + recAlts(step) + recAnchorEditor(step)
-        + recBranchEditor(step) + recValueEditor(step) + recFlexEditor(step) : ''}
+        + recBranchEditor(step) + recLoopEditor(step) + recValueEditor(step) + recFlexEditor(step) : ''}
   </div>`;
 }
 
 function recRender() {
+    recLoopsFix();
     recSchemeSpine();
     recSchemeRefresh();
     const box = $('recSteps');
@@ -2013,10 +2022,14 @@ function recDelete(id) {
 
 function recMove(id, delta) {
     const index = REC.steps.findIndex(step => step.id === id);
-    const target = index + delta;
-    if (index < 0 || target < 0 || target >= REC.steps.length) return;
-    const [step] = REC.steps.splice(index, 1);
-    REC.steps.splice(target, 0, step);
+    if (index < 0) return;
+    /* Повтор двигается целиком — заголовок вместе с телом (loopBlock). */
+    const block = loopBlock(REC.steps[index]);
+    const target = delta < 0 ? index - 1 : index + block.length;
+    if (target < 0 || target >= REC.steps.length) return;
+    REC.steps.splice(index, block.length);
+    REC.steps.splice(delta < 0 ? target : target - block.length + 1, 0, ...block);
+    loopPlace(block[0], delta < 0);
     recRender();
     recSave();
 }
@@ -2083,11 +2096,16 @@ function recDrop(ev, id) {
 
     const from = REC.steps.findIndex(step => step.id === REC.drag);
     if (from < 0) return;
-    const [step] = REC.steps.splice(from, 1);
+    const block = loopBlock(REC.steps[from]);   // повтор переезжает целиком
+    if (block.some(s => s.id === id)) return;
+    REC.steps.splice(from, block.length);
     /* Цель ищем ПОСЛЕ изъятия: индексы за вырезанным шагом сдвинулись, и
        поиск до splice ставил бы шаг на позицию мимо на единицу. */
     const to = REC.steps.findIndex(s => s.id === id);
-    REC.steps.splice(выше ? to : to + 1, 0, step);
+    const цель = REC.steps[to];
+    REC.steps.splice(выше ? to : to + 1, 0, ...block);
+    /* Бросили под строку повтора — значит, в повтор. */
+    loopPlace(block[0], !выше && (цель.kind === 'loop' || !!цель.inLoop));
     REC.drag = null;
     recRender();
     recSave();
@@ -2349,6 +2367,7 @@ function recPayload(meta) {
             note: step.kind === 'click' ? step.note : '',
         };
         if (step.kind === 'expect') out.any = step.any || [];
+        if (step.kind === 'loop') out.args = loopPayloadArgs(step);
         if (step.kind === 'branch') {
             out.arms = (step.arms || []).map(arm => ({
                 name: arm.name, any: arm.any || [], run: arm.run || '',
@@ -2638,6 +2657,7 @@ async function editScenario(key) {
     REC.nextId = 1;
     REC.params = рецепт.params || {};
     REC.steps = (рецепт.steps || []).map(шаг => recAdopt(шаг, рецепт.assets || {}));
+    recLoopsFromSpan();
     REC.open = null;
     REC.edit = {key: key, meta: рецепт.meta || {}};
     /* Ширина устройства записи: кропы приехали с него, и масштаб шаблона на

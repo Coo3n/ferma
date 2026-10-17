@@ -9,6 +9,7 @@ from __future__ import annotations
 import inspect
 import json
 import logging
+import random
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -1100,6 +1101,48 @@ class DeviceContext:
         except OSError as e:
             self.log(f"слепок обойдённой преграды не сохранился: {e}")
             return ""
+
+    # ------------------------------------------------------------------ повтор
+    LOOP_LOG_EVERY = 10   # в журнал — первый круг и каждый десятый, а не тысяча строк
+
+    def loop(self, times: int | None = None, minutes: float | None = None,
+             pause: tuple | None = None, watch: bool = False):
+        """Повтор по кругу: `for _ in ctx.loop(minutes=10, pause=(1, 3)):`.
+
+        Ровно одно из `times` (сколько раз) и `minutes` (сколько минут). Между
+        кругами — случайная пауза из `pause` (секунды «от», «до»). `watch` —
+        сторож: приложение, что было впереди на старте повтора, должно там и
+        оставаться, а экран — меняться (ctx.on_track). Отмена запуска
+        прерывает повтор на ближайшем круге.
+        """
+        if (times is None) == (minutes is None):
+            raise ValueError("ctx.loop: укажите либо times, либо minutes")
+        start = time.monotonic()
+        package = ""
+        if watch:
+            try:
+                package = self.current_app()
+            except Exception:  # noqa: BLE001 — без пакета сторож молчит
+                package = ""
+        i = 0
+        while True:
+            self.check_cancel()
+            if times is not None and i >= times:
+                break
+            if minutes is not None and time.monotonic() - start >= minutes * 60:
+                break
+            if i:
+                if pause:
+                    self.sleep(random.uniform(float(pause[0]), float(pause[1])))
+                    if minutes is not None and time.monotonic() - start >= minutes * 60:
+                        break
+                if package:
+                    self.on_track(package)
+            if i == 0 or (i + 1) % self.LOOP_LOG_EVERY == 0:
+                self.log(f"повтор: круг {i + 1}" + (f" из {times}" if times else ""))
+            yield i
+            i += 1
+        self.log(f"повтор закончен: кругов {i}")
 
     # ------------------------------------------------------------------ сторож
     def on_track(self, package: str, moved: bool = True) -> bool:

@@ -522,3 +522,42 @@ button.pult-job:hover {
     padding: var(--s3) var(--s4);
     border-top: 1px solid var(--line-soft);
 }
+
+/* Теги телефона под именем в пульте. */
+.pult-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    margin-top: 3px;
+}
+
+.pult-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px 4px 1px 8px;
+    border-radius: var(--pill);
+    background: var(--panel3);
+    color: var(--text2);
+    font-size: var(--fs-1);
+}
+
+button.pult-tag-x {
+    padding: 0 4px;
+    min-height: 0;
+    background: none;
+    color: var(--dim);
+    font-size: var(--fs-2);
+    line-height: 1;
+}
+
+button.pult-tag-x:hover { color: var(--bad); background: none; }
+
+button.pult-tag-add {
+    min-height: 0;
+    padding: 1px 8px;
+    font-size: var(--fs-1);
+}
+
+.tile .metrics .tagchip[role="button"] { cursor: pointer; }

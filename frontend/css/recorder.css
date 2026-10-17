@@ -834,3 +834,72 @@
 .rs.open:not(.sel) {
     background: var(--panel2);
 }
+
+/* ------------------------------------------------------------ повтор по кругу
+
+   Повтор — рамка, а не ещё одна строка: заголовок «↻ Повторять 10 мин»
+   сверху, шаги тела со сдвигом и линией слева, рамка закрывается под
+   последним шагом тела. Цвет — акцент на приглушённой подложке: повтор
+   меняет ход сценария, его должно быть видно, но не громче ошибок. */
+.rs.rs-loop {
+    background: var(--accent-dim);
+    border-left: 3px solid var(--accent-line);
+    border-bottom-color: transparent;
+}
+
+.rs.rs-loop .rs-label { font-weight: 600; }
+
+.rs.rs-in-loop {
+    margin-left: var(--s4);
+    border-left: 3px solid var(--accent-line);
+}
+
+.rs.rs-loop-end {
+    border-bottom: 1px solid var(--accent-line);
+    margin-bottom: var(--s2);
+}
+
+.loop-ed {
+    display: grid;
+    gap: var(--s2);
+    margin-top: var(--s2);
+    padding: var(--s3);
+    background: var(--panel);
+    border-radius: var(--r2);
+}
+
+.loop-ed-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    flex-wrap: wrap;
+    font-size: var(--fs-2);
+}
+
+.loop-ed-k {
+    min-width: 150px;
+    color: var(--text2);
+}
+
+.loop-ed input[type="number"] { width: 72px; }
+.loop-ed .loop-ed-n { width: 88px; }
+
+.rs-loop-offer { margin-top: var(--s2); }
+
+/* Схема: рамка вокруг заголовка и тела, стрелка «к началу круга» справа. */
+.gr-loop-box {
+    fill: var(--accent-dim);
+    stroke: var(--accent-line);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 4;
+}
+
+.gr-loop-back {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 2;
+}
+
+.gr-loop-arrow { fill: var(--accent); }
+
+.gr-node.loop { border-color: var(--accent-line); }

@@ -79,6 +79,7 @@ function pultRender() {
     if (!device.online) bits.unshift(t('pult.ne_v_seti'));
     else if (device.busy_job) bits.unshift(t('pult.idet_zapusk'));
     setText($('pultMeta'), bits.join(' · '));
+    pultTagsRender(device);
 
     const continues = REC.steps.length;
     setText($('btnRecBegin').querySelector('span'),
@@ -87,6 +88,43 @@ function pultRender() {
     if (PULT.appsFor !== device.serial && device.online) pultLoadApps(device.serial);
     if (PULT.recFor !== device.serial) pultRecRestore(device.serial);
     pultJobs();
+}
+
+/* Теги — прямо под именем телефона: здесь о них и думают («этот прогрет»).
+   Массово — через «Действия → Теги» на ферме. */
+function pultTagsRender(device) {
+    const box = $('pultTags');
+    const tags = device.tags || [];
+    const key = device.serial + '|' + tags.join('|');
+    if (box.dataset.key === key) return;
+    box.dataset.key = key;
+    box.innerHTML = tags.map(tg => `<span class="tagchip pult-tag">${esc(tg)}<button class="pult-tag-x"
+            aria-label="${esc(t('pult.snyat_teg', {teg: tg}))}" title="${esc(t('pult.snyat_teg', {teg: tg}))}"
+            onclick="pultTagRemove(this.dataset.t)" data-t="${esc(tg)}">×</button></span>`).join('')
+        + `<button class="sm ghost pult-tag-add" onclick="pultTagAdd()">${esc(t('pult.plus_teg'))}</button>`;
+}
+
+async function pultTagsSave(tags) {
+    try {
+        await post(`/api/devices/${S.active}/tags`, {tags});
+        await pollDevices();
+    } catch (e) {
+        toast(e.message, 'bad');
+    }
+}
+
+function pultTagAdd() {
+    const device = S.devices.find(d => d.serial === S.active);
+    if (!device) return;
+    promptModal(t('pult.novyy_teg'), t('pult.teg_primer'), '', t('pult.dobavit'), value => {
+        const tag = String(value || '').trim();
+        if (tag) pultTagsSave([...(device.tags || []), tag]);
+    });
+}
+
+function pultTagRemove(tag) {
+    const device = S.devices.find(d => d.serial === S.active);
+    if (device) pultTagsSave((device.tags || []).filter(tg => tg !== tag));
 }
 
 async function pultLoadApps(serial) {

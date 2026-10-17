@@ -119,7 +119,7 @@ function fakeData() {
   await shot('fleet', () => setDensity && setDensity('M'));
   await shot('fleet-selected', () => { ['R58N1001', 'R58N1002', 'R58N1004', 'R58N1005', 'R58N1007'].forEach(s => S.selected.add(s)); renderFleet(); renderRunbar(); });
   await shot('bulk-actions', () => bulkMenu());
-  await shot('run-dialog', () => { closeModal(); openRunDialog({ scenario: 'warmup_vk' }); }, 1800);
+  await shot('run-dialog', () => { closeModal(); openRunDialog({ scenario: 'vk_auth' }); }, 1800);
   await shot('pult', () => { closeModal(); S.selected.clear(); renderRunbar(); openDevice('R58N1003'); }, 2000);
   await shot('builder', () => { recBegin(); }, 1500);
   await shot('scenarios', () => { recPause(); REC.builder = false; showView('scen'); }, 1500);

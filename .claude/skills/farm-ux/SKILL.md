@@ -14,10 +14,11 @@ Design system: **graphite console** (redesign 2026-10-17), tokens in `frontend/d
 - Fleet overview (`renderFleetStats`): filter pills in words + a named attention list («Phone 13 — батарея 9%»). No unlabeled colored cells — users didn't understand them. Tile state via `data-st` (err/busy) — top bar + border.
 - Problems: kind filters + three-level cards (kind+title / detail / facts column). Runs: grouped by launch batch with progress (`runGroupsHtml`).
 - Phone screen from the fleet = «Пульт» (`pult.js`, `.work.pult-on`): screen left full height, right panel with keys (incl. volume/rotate), apps, text (+ из буфера), file drop, screenshot/video, last runs; screen is live at once. Builder appears on «Записать сценарий»/edit/teach (`REC.builder`), «⊞» in the builder goes back. Text field, live keyboard and held bar are the SAME nodes moved into the pult (`PULT_MOVES`) — never duplicate them. (A bare view-only mode without this panel was rejected 2026-10-17.)
-- Stuck runs: long loops call `ctx.on_track(package)`; off-track → guards → HELD `held_kind:'lost'` with main action «Показать, как быть» (teach detour, job resumes after save). Farm asking a human → title «(N) ждёт», beep, browser notification (`notify.js`).
+- Stuck runs: long loops in own scenarios call `ctx.on_track(package)`; off-track → guards → HELD `held_kind:'lost'` with main action «Показать, как быть» (teach detour, job resumes after save). Farm asking a human → title «(N) ждёт», beep, browser notification (`notify.js`).
 - One run entry per screen: no «Запустить» repeated on every list row; no «…» in button labels.
 - Formats/examples (`логин:пароль:прокси`) are never plain mono text: use `.fmt` chips (bulk.css) — fields as chips, `:` in accent, optional part in `--busy`.
 - Words: «телефон» (not «устройство»), «запуск» (not «задача»/«прогон»). Copy is short: empty state = title + one line (+ button), tooltips one phrase.
+- Builder loops («по кругу»): `frontend/js/loops.js`. A loop is a `kind:'loop'` header step; body steps carry `inLoop` and follow it contiguously (span computed on payload). Moves go through `loopPlace`, header moves the whole block. Never nest loops.
 - Builder: step-by-step («Следующий шаг» after a passed single-step check) and «записать после этого шага» (`REC.insertAfter`).
 - Empty states center via `.scroll:has(> .emptywrap)`; an id selector with `display: grid` on a list overrides it — add the id to that rule.
 - All selects use the custom chevron in base.css; if a select rule sets `background:` shorthand, use `background-color` instead.
@@ -94,6 +95,7 @@ Four sections: Ферма · Сценарии · Запуски (tabs «Все �
 
 ## LaiXi parity checklist
 
-Done: preflight before run (accounts/busy/offline), runs filtered by launch batch, mirroring, sync control (+jitter), bulk APK/file/reboot/text/open/clear data, groups + scenario per group, quick phrases, density S/M/L, accounts manager. Schedules «смены» (per-phone random slots in a window, Запуски → Расписание), warm-up templates (VK/Inst/TikTok/TG), device tags (filter, bulk, run by tag), bulk screenshots, screen off, jobs CSV export. Phone pult (volume, rotate, full-size screenshot, screen video, clipboard paste), drag-and-drop APK/file onto screen or tiles, «farm waits» notifications, stuck-run watchdog with teach-and-continue.
+Done: preflight before run (accounts/busy/offline), runs filtered by launch batch, mirroring, sync control (+jitter), bulk APK/file/reboot/text/open/clear data, groups + scenario per group, quick phrases, density S/M/L, accounts manager. Schedules «смены» (per-phone random slots in a window, Запуски → Расписание), device tags (filter, bulk, run by tag), bulk screenshots, screen off, jobs CSV export. Phone pult (volume, rotate, full-size screenshot, screen video, clipboard paste), drag-and-drop APK/file onto screen or tiles, «farm waits» notifications, stuck-run watchdog with teach-and-continue.
+Removed 2026-10-17: ready-made warm-up templates (blind taps, untested on real phones — owner records own scenarios).
 Not planned: multi-computer remote control, chat/inbox management.
 When adding a competitor feature, write it into this list.

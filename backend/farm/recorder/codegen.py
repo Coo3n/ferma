@@ -97,12 +97,26 @@ def _branch(step: dict) -> list:
     return out
 
 
+def _loop(step: dict) -> str:
+    """Заголовок повтора; тело — следующие span шагов с отступом (render_mapped)."""
+    args = step["args"]
+    parts = [f'times={int(args["times"])}' if args.get("times") is not None
+             else f'minutes={_num(args["minutes"])}']
+    if args.get("pause_min") is not None:
+        parts.append(f'pause=({_num(args["pause_min"])}, {_num(args["pause_max"])})')
+    if args.get("watch"):
+        parts.append("watch=True")
+    return f"for _ in ctx.loop({', '.join(parts)}):"
+
+
 def _call(step: dict):
     """Строка вызова — или список строк, если шаг в одну не укладывается."""
     kind, args = step["kind"], step["args"]
 
     if kind == "branch":
         return _branch(step)
+    if kind == "loop":
+        return _loop(step)
 
     if kind == "click":
         selector = step["selector"]
@@ -212,6 +226,7 @@ def render_mapped(meta: dict, params: dict, steps: list,
     if meta.get("human"):
         body.append("ctx.humanize()")
         owners.append(None)
+    loop_end = -1   # индекс последнего шага тела текущего повтора
     for index, step in enumerate(steps):
         строки = _call(step)
         if isinstance(строки, str):
@@ -228,6 +243,10 @@ def render_mapped(meta: dict, params: dict, steps: list,
             # Комментарий вешается на первую строку: у многострочного шага она
             # и есть сам шаг, остальные — его тело.
             строки[0] += f"  # {_comment(note)}"
+        if index <= loop_end:
+            строки = [INDENT + line for line in строки]
+        if step["kind"] == "loop":
+            loop_end = index + step["args"]["span"]
         body += строки
         owners += [index] * len(строки)
     if not body:

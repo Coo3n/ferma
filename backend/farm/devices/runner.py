@@ -165,13 +165,22 @@ def hold_repairable(scenario_key: str, step_index: int) -> bool:
 def _open_step(job: Job, index: int, labels: list) -> None:
     """Шаг `index` начался: закрыть предыдущий как выполненный, открыть новый."""
     now = time.time()
-    if job.timeline and job.timeline[-1].get("t0") and "secs" not in job.timeline[-1]:
+    if job.timeline and job.timeline[-1].get("t0") and "open" in job.timeline[-1]:
         last = job.timeline[-1]
-        last["secs"] = round(now - last["t0"], 2)
+        last["secs"] = round(last.get("secs", 0) + now - last.pop("open"), 2)
     job.step_index = index
     job.step_label = labels[index] if 0 <= index < len(labels) else ""
+    # Повтор по кругу проходит одни и те же шаги сотни раз: запись шага одна,
+    # с числом проходов и суммарным временем, — иначе журнал и отчёт росли бы
+    # на каждом круге. Текущий шаг всегда последний в списке (см. _mark_step).
+    for k, entry in enumerate(job.timeline):
+        if entry["i"] == index:
+            job.timeline.append(job.timeline.pop(k))
+            entry["n"] = entry.get("n", 1) + 1
+            entry["open"] = now
+            return
     job.timeline.append({"i": index, "label": job.step_label,
-                         "status": "ok", "t0": now})
+                         "status": "ok", "t0": now, "open": now})
     job.add_line(f"▶ шаг {index + 1}/{job.step_total}: {job.step_label}")
 
 
@@ -190,8 +199,9 @@ def _finish_timeline(job: Job, art_dir: Path) -> None:
     if not job.timeline:
         return
     last = job.timeline[-1]
-    if "secs" not in last and last.get("t0"):
-        last["secs"] = round(time.time() - last["t0"], 2)
+    if "open" in last:
+        last["secs"] = round(last.get("secs", 0) + time.time() - last.pop("open"), 2)
+    job.timeline.sort(key=lambda t: t["i"])   # после повторов — снова по порядку шагов
     try:
         report = {"job": job.id, "scenario": job.scenario_name,
                   "device": job.device_name, "status": job.status,

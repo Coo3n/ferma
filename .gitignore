@@ -18,4 +18,5 @@ tags.json
 
 # служебные файлы для обмена правками — не в git
 /*.patch
+/*.zip
 /my-state.txt

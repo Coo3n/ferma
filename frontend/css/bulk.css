@@ -839,3 +839,52 @@ button.armed {
     font-size: var(--fs-2);
     color: var(--bad);
 }
+
+/* Окно запуска: выбор конкретных телефонов. Плитки-переключатели с именем,
+   группой и тегами — найти «Phone 12» среди сорока проще глазами, чем в
+   выпадающем списке, а поиск сужает до нужных. */
+.rd-pick {
+    display: grid;
+    gap: var(--s2);
+    margin-top: var(--s2);
+}
+
+.rd-pick-bar {
+    display: flex;
+    gap: var(--s2);
+    align-items: center;
+}
+
+.rd-pick-bar input { flex: 1; }
+
+.rd-pick-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 168px;
+    overflow: auto;
+    padding: 2px;
+}
+
+button.rd-ph {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--panel2);
+    border: 1px solid transparent;
+    border-radius: var(--r2);
+    font-size: var(--fs-2);
+}
+
+button.rd-ph:hover { background: var(--panel3); }
+
+button.rd-ph.on {
+    background: var(--accent-dim);
+    border-color: var(--accent-line);
+    color: var(--text);
+}
+
+.rd-ph b { font-weight: 600; }
+.rd-ph small { color: var(--dim); font-size: var(--fs-1); }
+.rd-ph i { font-style: normal; color: var(--busy); font-size: var(--fs-1); }
