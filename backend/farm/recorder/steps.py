@@ -33,10 +33,25 @@ ARGS = {
     # раз или `minutes` минут (ровно одно из двух); между кругами пауза
     # pause_min…pause_max секунд; watch — сторож (ctx.on_track) на каждом круге.
     "loop": (("span",), ("times", "minutes", "pause_min", "pause_max", "watch")),
+    # «С шансом»: следующие span шагов выполняются с вероятностью percent %.
+    "chance": (("span", "percent"), ()),
+    # «Пока не найдёшь»: крутить следующие span шагов, пока на экране не
+    # появится цель (any — признаки, «любой из»), не больше tries раз.
+    # on_fail — что делать, если так и не нашли: skip (идти дальше),
+    # fail (остановить сценарий), ask (спросить человека).
+    "until": (("span",), ("tries", "on_fail")),
 }
 
+# Блоки — шаги-рамки: тело — следующие span шагов. Вкладываются друг в друга
+# не глубже BLOCK_DEPTH_MAX: «повтор → с шансом → пока не найдёшь» читается,
+# четвёртый уровень — уже нет.
+BLOCKS = {"loop", "chance", "until"}
+BLOCK_DEPTH_MAX = 3
+UNTIL_TRIES_MAX = 200
+UNTIL_ON_FAIL = ("skip", "fail", "ask")
+
 NUMERIC = {"x", "y", "x1", "y1", "x2", "y2", "duration", "seconds", "timeout",
-           "span", "times", "minutes", "pause_min", "pause_max"}
+           "span", "times", "minutes", "pause_min", "pause_max", "percent", "tries"}
 BOOLEAN = {"clear", "watch"}
 
 # Потолки повтора: сутки и десять тысяч кругов — дальше это уже не сценарий,
@@ -64,6 +79,7 @@ _LABELS = {
     "stop_app": "Остановка приложения", "open_url": "Открыть ссылку",
     "shell": "Команда shell", "sleep": "Пауза", "screenshot": "Скриншот",
     "expect": "Якорь экрана", "branch": "Развилка", "loop": "Повтор",
+    "chance": "С шансом", "until": "Пока не найдёшь",
 }
 
 
@@ -84,6 +100,11 @@ def label_of(step: dict) -> str:
     elif kind == "loop":
         tail = (f'{int(args["times"])} раз' if args.get("times")
                 else f'{_minutes_text(args.get("minutes"))} мин')
+    elif kind == "chance":
+        tail = f'{_minutes_text(args.get("percent"))}%'
+    elif kind == "until":
+        m = re.search(r'="([^"]{1,40})"', ((step.get("any") or [""])[0]))
+        tail = m.group(1) if m else ""
     elif kind == "click":
         m = re.search(r'(?:text|description|resourceId)\w*="([^"]{1,40})"',
                       ((step.get("selector") or {}).get("args") or ""))
@@ -200,13 +221,15 @@ def _features(raw, чей: str) -> list:
 
 
 def _anchor(kind: str, raw):
-    """Признаки экрана у шага expect: строки аргументов u2-селекторов."""
+    """Признаки экрана у шага expect и цель у «пока не найдёшь» (until)."""
     if raw in (None, []):
         if kind == "expect":
             raise StepError("шагу expect нужен хотя бы один признак экрана")
+        if kind == "until":
+            raise StepError("«пока не найдёшь»: укажите, что искать на экране")
         return None
-    if kind != "expect":
-        raise StepError(f"поле any допустимо только у expect, не у {kind}")
+    if kind not in ("expect", "until"):
+        raise StepError(f"поле any допустимо только у expect и until, не у {kind}")
     return _features(raw, "any")
 
 
@@ -405,6 +428,10 @@ def normalize_step(raw) -> dict:
     _check_account(kind, step["args"])
     if kind == "loop":
         _check_loop(step["args"])
+    elif kind == "chance":
+        _check_chance(step["args"])
+    elif kind == "until":
+        _check_until(step["args"])
     if step["args"].get("account"):
         step["param"] = None   # аккаунт и параметр — два источника одного значения
     return step
@@ -434,10 +461,7 @@ def _retries(kind: str, raw):
 
 def _check_loop(args: dict) -> None:
     """Повтор: целое тело, ровно одно из «раз»/«минут», разумные паузы."""
-    span = args["span"]
-    if span != int(span) or span < 1:
-        raise StepError("повтор: в нём должен быть хотя бы один шаг")
-    args["span"] = int(span)
+    _span(args, "повтор")
     times, minutes = args.get("times"), args.get("minutes")
     if (times is None) == (minutes is None):
         raise StepError("повтор: укажите либо сколько раз, либо сколько минут")
@@ -454,21 +478,51 @@ def _check_loop(args: dict) -> None:
         raise StepError(f"повтор: пауза от 0 до {LOOP_PAUSE_MAX} с, «от» не больше «до»")
 
 
-def check_loops(steps: list) -> None:
-    """Тело каждого повтора целиком внутри сценария; повторы не вложены.
+def _span(args: dict, что: str) -> None:
+    span = args["span"]
+    if span != int(span) or span < 1:
+        raise StepError(f"{что}: в нём должен быть хотя бы один шаг")
+    args["span"] = int(span)
 
-    Вложенный цикл в конструкторе читался бы хуже, чем два сценария, — а
-    кому он нужен, тот вынесет внутренний повтор в блок.
-    """
-    end = -1
+
+def _check_chance(args: dict) -> None:
+    _span(args, "«с шансом»")
+    if not 0 < args["percent"] <= 100:
+        raise StepError("«с шансом»: от 1 до 100 %")
+
+
+def _check_until(args: dict) -> None:
+    _span(args, "«пока не найдёшь»")
+    tries = args.get("tries", 20)
+    if tries != int(tries) or not 1 <= tries <= UNTIL_TRIES_MAX:
+        raise StepError(f"«пока не найдёшь»: от 1 до {UNTIL_TRIES_MAX} попыток")
+    args["tries"] = int(tries)
+    on_fail = args.get("on_fail") or "skip"
+    if on_fail not in UNTIL_ON_FAIL:
+        raise StepError("«пока не найдёшь»: если не нашли — skip, fail или ask")
+    args["on_fail"] = on_fail
+
+
+def check_blocks(steps: list) -> None:
+    """Тело каждого блока целиком внутри сценария и внутри своего родителя;
+    вложенность не глубже BLOCK_DEPTH_MAX."""
+    ends = []   # концы открытых блоков, внешний первым
     for i, step in enumerate(steps):
-        if step["kind"] != "loop":
+        while ends and i > ends[-1]:
+            ends.pop()
+        if step["kind"] not in BLOCKS:
             continue
-        if i <= end:
-            raise StepError(f"шаг {i + 1}: повтор внутри повтора не поддерживается")
         end = i + step["args"]["span"]
         if end >= len(steps):
-            raise StepError(f"шаг {i + 1}: повтор захватывает шаги за концом сценария")
+            raise StepError(f"шаг {i + 1}: блок захватывает шаги за концом сценария")
+        if ends and end > ends[-1]:
+            raise StepError(f"шаг {i + 1}: блок выходит за границу внешнего блока")
+        if len(ends) >= BLOCK_DEPTH_MAX:
+            raise StepError(f"шаг {i + 1}: блоки вложены глубже {BLOCK_DEPTH_MAX} уровней")
+        ends.append(end)
+
+
+check_loops = check_blocks   # прежнее имя: повторы были первыми блоками
 
 
 def normalize_steps(raw) -> list:
@@ -477,7 +531,7 @@ def normalize_steps(raw) -> list:
     if not isinstance(raw, list):
         raise StepError("шаги должны быть списком")
     steps = [normalize_step(item) for item in raw]
-    check_loops(steps)
+    check_blocks(steps)
     return steps
 
 
@@ -521,3 +575,28 @@ def check_params(params: dict, steps: list) -> None:
         name = step.get("param")
         if name and name not in params:
             raise StepError(f"параметр «{name}» не описан")
+
+
+def schema() -> dict:
+    """Машиночитаемое описание рецепта — для внешних помощников (ИИ), которые
+    собирают или правят сценарий и отправляют его в /api/recorder/validate и
+    /api/recorder/save. Человеческое описание — docs/recipe-format.md."""
+    return {
+        "kinds": {kind: {"required": list(req), "optional": list(opt),
+                         "label": _LABELS.get(kind, kind)}
+                  for kind, (req, opt) in ARGS.items()},
+        "blocks": sorted(BLOCKS),
+        "numeric": sorted(NUMERIC),
+        "boolean": sorted(BOOLEAN),
+        "parametrizable": sorted(PARAMETRIZABLE),
+        "flexible": sorted(FLEXIBLE),
+        "account_fields": sorted(ACCOUNT_FIELDS),
+        "until_on_fail": list(UNTIL_ON_FAIL),
+        "limits": {
+            "block_depth": BLOCK_DEPTH_MAX, "until_tries": UNTIL_TRIES_MAX,
+            "loop_times": LOOP_TIMES_MAX, "loop_minutes": LOOP_MINUTES_MAX,
+            "loop_pause": LOOP_PAUSE_MAX, "fallbacks": MAX_FALLBACKS,
+            "features": ANY_MAX, "arms": ARMS_MAX, "retries": RETRIES_MAX,
+            "texts": TEXTS_MAX,
+        },
+    }

@@ -18,7 +18,8 @@ Design system: **graphite console** (redesign 2026-10-17), tokens in `frontend/d
 - One run entry per screen: no «Запустить» repeated on every list row; no «…» in button labels.
 - Formats/examples (`логин:пароль:прокси`) are never plain mono text: use `.fmt` chips (bulk.css) — fields as chips, `:` in accent, optional part in `--busy`.
 - Words: «телефон» (not «устройство»), «запуск» (not «задача»/«прогон»). Copy is short: empty state = title + one line (+ button), tooltips one phrase.
-- Builder loops («по кругу»): `frontend/js/loops.js`. A loop is a `kind:'loop'` header step; body steps carry `inLoop` and follow it contiguously (span computed on payload). Moves go through `loopPlace`, header moves the whole block. Never nest loops.
+- Builder blocks (`frontend/js/blocks.js`): `loop` ↻ / `chance` 🎲 / `until` 🔎 are header steps; steps inside carry `parent` (header id), contiguous after it, nesting ≤ 3 (`BLOCK_DEPTH_MAX`). Span is computed on payload, restored by `recBlocksFromSpan`. Moves go through `blockPlace`; a header moves its whole block (`blockOf`). Colors: loop accent, chance warn, until busy.
+- Click selectors: main (radio) + «или так» fallbacks (`step.or`, ≤3, custom variants allowed). Auto screen checks are opt-in («авто-проверки», off by default) — screens change. AI helpers use `GET /api/recorder/schema` + `docs/recipe-format.md`.
 - Builder: step-by-step («Следующий шаг» after a passed single-step check) and «записать после этого шага» (`REC.insertAfter`).
 - Empty states center via `.scroll:has(> .emptywrap)`; an id selector with `display: grid` on a list overrides it — add the id to that rule.
 - All selects use the custom chevron in base.css; if a select rule sets `background:` shorthand, use `background-color` instead.

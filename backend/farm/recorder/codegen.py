@@ -109,14 +109,31 @@ def _loop(step: dict) -> str:
     return f"for _ in ctx.loop({', '.join(parts)}):"
 
 
+def _chance(step: dict) -> str:
+    return f'if ctx.chance({_num(step["args"]["percent"])}):'
+
+
+def _until(step: dict) -> str:
+    """Заголовок «пока не найдёшь»: тело крутится, пока цели нет на экране."""
+    args = step["args"]
+    цель = ", ".join(f"dict({a})" for a in step["any"])
+    хвост = [f'tries={int(args.get("tries", 20))}']
+    if args.get("on_fail", "skip") != "skip":
+        хвост.append(f'on_fail={literal(args["on_fail"])}')
+    return f'for _ in ctx.until_found([{цель}], {", ".join(хвост)}):'
+
+
+BLOCK_HEADERS = {"loop": _loop, "chance": _chance, "until": _until}
+
+
 def _call(step: dict):
     """Строка вызова — или список строк, если шаг в одну не укладывается."""
     kind, args = step["kind"], step["args"]
 
     if kind == "branch":
         return _branch(step)
-    if kind == "loop":
-        return _loop(step)
+    if kind in BLOCK_HEADERS:
+        return BLOCK_HEADERS[kind](step)
 
     if kind == "click":
         selector = step["selector"]
@@ -226,8 +243,10 @@ def render_mapped(meta: dict, params: dict, steps: list,
     if meta.get("human"):
         body.append("ctx.humanize()")
         owners.append(None)
-    loop_end = -1   # индекс последнего шага тела текущего повтора
+    ends = []   # индексы последних шагов тел открытых блоков, внешний первым
     for index, step in enumerate(steps):
+        while ends and index > ends[-1]:
+            ends.pop()
         строки = _call(step)
         if isinstance(строки, str):
             строки = [строки]
@@ -243,10 +262,10 @@ def render_mapped(meta: dict, params: dict, steps: list,
             # Комментарий вешается на первую строку: у многострочного шага она
             # и есть сам шаг, остальные — его тело.
             строки[0] += f"  # {_comment(note)}"
-        if index <= loop_end:
-            строки = [INDENT + line for line in строки]
-        if step["kind"] == "loop":
-            loop_end = index + step["args"]["span"]
+        if ends:
+            строки = [INDENT * len(ends) + line for line in строки]
+        if step["kind"] in BLOCK_HEADERS:
+            ends.append(index + step["args"]["span"])
         body += строки
         owners += [index] * len(строки)
     if not body:

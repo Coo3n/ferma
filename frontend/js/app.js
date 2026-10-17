@@ -201,6 +201,7 @@ document.addEventListener('visibilitychange', () => {
 /* ------------------------------------------------------------ запуск */
 
 syncInteractive();   // до первого опроса экран уже обязан быть витриной
+$('recAutoAnchor').checked = recAutoAnchorOn();
 applyHash();
 document.documentElement.classList.remove('boot');
 setTimeout(() => document.documentElement.classList.remove('nofx'), 900);

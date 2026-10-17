@@ -49,11 +49,18 @@ def test_плохой_повтор_отвергается(args, слово):
         steps.normalize_steps([{"kind": "loop", "args": args}, {"kind": "unlock", "args": {}}])
 
 
-def test_тело_за_концом_сценария_и_вложенный_повтор():
+def test_тело_за_концом_сценария_и_границы_вложенности():
+    u = {"kind": "unlock", "args": {}}
     with pytest.raises(steps.StepError, match="за концом"):
-        steps.normalize_steps([_loop(3, times=2), {"kind": "unlock", "args": {}}])
-    with pytest.raises(steps.StepError, match="внутри повтора"):
-        steps.normalize_steps([_loop(2, times=2), _loop(1, times=2), {"kind": "unlock", "args": {}}])
+        steps.normalize_steps([_loop(3, times=2), u])
+    # вложенный повтор теперь можно…
+    steps.normalize_steps([_loop(2, times=2), _loop(1, times=2), u])
+    # …но не шире внешнего и не глубже трёх уровней
+    with pytest.raises(steps.StepError, match="границу внешнего"):
+        steps.normalize_steps([_loop(2, times=2), u, _loop(2, times=2), u, u])
+    with pytest.raises(steps.StepError, match="глубже"):
+        steps.normalize_steps([_loop(4, times=2), _loop(3, times=2), _loop(2, times=2),
+                               _loop(1, times=2), u])
 
 
 # ------------------------------------------------------------------ код

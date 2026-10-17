@@ -380,6 +380,11 @@
                             <input type="checkbox" id="recPauses" onchange="REC.pauses=this.checked">
                             паузы
                         </label>
+                        <label class="kb"
+                               title="Ставить проверку экрана перед первым действием на каждом новом экране" data-t="device.avto_proverki" data-t-title="device.avto_proverki_podskazka">
+                            <input type="checkbox" id="recAutoAnchor" onchange="recAutoAnchorSet(this.checked)">
+                            авто-проверки
+                        </label>
 
                         <!-- Масштаб холста: развилка на пять веток шире любой
                              панели, и без «вписать» её концы уходили за край. -->
@@ -902,7 +907,7 @@
 <script src="js/recorder.js"></script>
 <script src="js/repair.js"></script>
 <script src="js/steptools.js"></script>
-<script src="js/loops.js"></script>
+<script src="js/blocks.js"></script>
 <script src="js/workspace.js"></script>
 <script src="js/bulk.js"></script>
 <script src="js/rundialog.js"></script>

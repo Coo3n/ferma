@@ -48,20 +48,31 @@ class StepTracer:
         return False
 
 
-def _cut_loop(loop: ast.For, keep) -> list:
-    """Повтор при запуске «с шага» / проверке одного шага.
+def _cut(stmts: list, keep, line_map: dict) -> tuple[list, bool]:
+    """Операторы тела, что остаются в диапазоне шагов, и признак «что-то вырезано».
 
-    Повтор целиком в диапазоне — остаётся повтором. Диапазон режет его тело
-    (проверяют шаг внутри повтора, запускают с середины тела) — тело идёт
-    один раз, без круга: «проверить шаг 5» не должно листать десять минут.
-    Проверка самого заголовка повтора — один круг всего тела.
+    Блоки (повтор — for, «с шансом» — if, «пока не найдёшь» — for) режутся
+    рекурсивно. Блок целиком в диапазоне — остаётся блоком. Диапазон режет
+    его тело (проверяют шаг внутри, запускают с середины) — тело идёт один
+    раз и без условия: «проверить шаг 5» не должно листать десять минут или
+    зависеть от шанса. Проверка самого заголовка блока — один проход тела.
     """
-    inner = [st for st in loop.body if keep(st.lineno)]
-    if keep(loop.lineno):
-        if len(inner) == len(loop.body):
-            return [loop]
-        return inner or list(loop.body)
-    return inner
+    out, cut = [], False
+    for st in stmts:
+        if isinstance(st, (ast.For, ast.If)) and st.lineno in line_map:
+            inner, inner_cut = _cut(st.body, keep, line_map)
+            if keep(st.lineno) and not inner_cut:
+                out.append(st)
+                continue
+            cut = True
+            if keep(st.lineno) and not inner:
+                inner, _ = _cut(st.body, lambda n: True, line_map)
+            out += inner
+        elif keep(st.lineno):
+            out.append(st)
+        else:
+            cut = True
+    return out, cut
 
 
 def module_from_step(sc, line_map: dict, start: int, stop: int | None = None):
@@ -87,12 +98,7 @@ def module_from_step(sc, line_map: dict, start: int, stop: int | None = None):
 
     for node in tree.body:
         if isinstance(node, ast.FunctionDef) and node.name == "run":
-            body = []
-            for st in node.body:
-                if isinstance(st, ast.For) and st.lineno in line_map:
-                    body += _cut_loop(st, keep)
-                elif keep(st.lineno):
-                    body.append(st)
+            body, _ = _cut(node.body, keep, line_map)
             node.body = body or [ast.Pass()]
             break
     else:

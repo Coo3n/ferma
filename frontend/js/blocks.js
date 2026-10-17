@@ -1,0 +1,512 @@
+/* Блоки конструктора — рамки вокруг шагов, которые меняют ход сценария:
+
+     ↻ Повторять 10 мин          — крутить шаги внутри (ctx.loop)
+     🎲 С шансом 15%             — выполнить шаги внутри иногда (ctx.chance)
+     🔎 Пока не найдёшь «…»      — крутить шаги, пока цель не появится (ctx.until_found)
+
+   Сценарий — плоский список шагов, поэтому блок — тоже шаг (заголовок), а
+   шаги внутри помнят свой блок: step.parent = id заголовка. Блоки
+   вкладываются (повтор → с шансом), не глубже BLOCK_DEPTH_MAX. На сервер
+   уходит span — сколько шагов за заголовком входит в блок (recPayload),
+   обратно — по span (recBlocksFromSpan).
+
+   Почему ссылка на блок, а не span в шаге: список правят руками — тащат,
+   удаляют, дописывают записью. «Следующие N шагов» от каждой правки
+   съезжали бы, а ссылка остаётся при шаге: вытащили шаг за рамку — вышел,
+   бросили внутрь — вошёл (blockPlace). */
+
+const BLOCK_DEPTH_MAX = 3;
+const BLOCK_KINDS = {
+    loop: {icon: 'rotate', defaults: () => ({times: 10, pause_min: 1, pause_max: 3, watch: true})},
+    chance: {icon: 'dice', defaults: () => ({percent: 15})},
+    until: {icon: 'search', defaults: () => ({tries: 20, on_fail: 'skip'})},
+};
+const UNTIL_ON_FAIL = ['skip', 'fail', 'ask'];
+const UNTIL_FEATS = ['textContains', 'text', 'resourceId', 'descriptionContains'];
+
+/* Ключи строк — буквально: test_strings ищет t('…') в коде. */
+function untilFeatName(k) {
+    return k === 'text' ? t('rec.feat_text') : k === 'resourceId' ? t('rec.feat_id')
+        : k === 'descriptionContains' ? t('rec.feat_opisanie') : t('rec.feat_text_contains');
+}
+
+function untilOnFailName(v) {
+    return v === 'fail' ? t('rec.on_fail_stop') : v === 'ask' ? t('rec.on_fail_ask') : t('rec.on_fail_skip');
+}
+
+function blockAddedHint(kind) {
+    return kind === 'chance' ? t('rec.blok_dobavlen_shans')
+        : kind === 'until' ? t('rec.blok_dobavlen_poka') : t('rec.blok_dobavlen_povtor');
+}
+
+function blockIsHead(step) {
+    return !!(step && BLOCK_KINDS[step.kind]);
+}
+
+function blockById() {
+    return new Map(REC.steps.map(s => [s.id, s]));
+}
+
+/* Цепочка блоков над шагом: ближайший первым. */
+function blockChain(step, byId) {
+    const map = byId || blockById();
+    const out = [];
+    let p = step && step.parent;
+    while (p != null && map.has(p) && out.length <= BLOCK_DEPTH_MAX + 1) {
+        out.push(p);
+        p = map.get(p).parent;
+    }
+    return out;
+}
+
+function blockDepth(step) {
+    return blockChain(step).length;
+}
+
+/* Шаги внутри блока (на любой глубине) — подряд за заголовком. */
+function blockInside(head) {
+    const byId = blockById();
+    const at = REC.steps.indexOf(head);
+    const out = [];
+    for (let i = at + 1; i < REC.steps.length && blockChain(REC.steps[i], byId).includes(head.id); i++) {
+        out.push(REC.steps[i]);
+    }
+    return out;
+}
+
+function blockOf(step) {
+    return blockIsHead(step) ? [step, ...blockInside(step)] : [step];
+}
+
+/* Порядок в списке — источник правды. Идём сверху, держим стек открытых
+   блоков: шаг принадлежит блоку из стека — закрываем вложенные до него;
+   нет — смотрим на следующий шаг: он внутри открытого блока — значит, этот
+   шаг вставлен в середину и тоже внутри; иначе шаг вне блоков. Пустые блоки
+   исчезают: рамка без шагов ничего не делает. */
+function recBlocksFix() {
+    REC.steps.forEach(s => {
+        if ('inLoop' in s) {             // черновики до блоков: повтор помечал inLoop
+            if (s.parent == null && s.inLoop) s.parent = s.inLoop;
+            delete s.inLoop;
+        }
+    });
+    let changed = true;
+    while (changed) {
+        changed = false;
+        const byId = blockById();
+        const stack = [];
+        REC.steps.forEach((step, i) => {
+            if (step.parent != null && stack.includes(step.parent)) {
+                while (stack[stack.length - 1] !== step.parent) stack.pop();
+            } else {
+                const next = REC.steps[i + 1];
+                const nextChain = next ? blockChain(next, byId) : [];
+                let adopt = null;
+                for (let k = stack.length - 1; k >= 0; k--) {
+                    if (nextChain.includes(stack[k])) {
+                        adopt = stack[k];
+                        break;
+                    }
+                }
+                step.parent = adopt;
+                if (adopt == null) stack.length = 0;
+                else while (stack[stack.length - 1] !== adopt) stack.pop();
+            }
+            if (blockIsHead(step)) stack.push(step.id);
+        });
+        const empty = REC.steps.filter(s => blockIsHead(s) && !blockInside(s).length).map(s => s.id);
+        if (empty.length) {
+            REC.steps = REC.steps.filter(s => !empty.includes(s.id));
+            changed = true;
+        }
+    }
+}
+
+/* Рецепт с сервера: span → ссылки на блоки. */
+function recBlocksFromSpan() {
+    const open = [];   // [id, индекс последнего шага блока]
+    REC.steps.forEach((step, i) => {
+        while (open.length && i > open[open.length - 1][1]) open.pop();
+        step.parent = open.length ? open[open.length - 1][0] : null;
+        if (blockIsHead(step)) {
+            open.push([step.id, i + (Number(step.args.span) || 0)]);
+            delete step.args.span;
+        }
+    });
+}
+
+/* Аргументы заголовка для сервера: span + настройки своего вида. */
+function blockPayloadArgs(step) {
+    const a = step.args;
+    const out = {span: blockInside(step).length};
+    if (step.kind === 'loop') {
+        if (a.minutes != null) out.minutes = Number(a.minutes);
+        else out.times = Number(a.times) || 1;
+        if (a.pause_min != null && a.pause_max != null) {
+            out.pause_min = Number(a.pause_min);
+            out.pause_max = Math.max(Number(a.pause_min), Number(a.pause_max));
+        }
+        if (a.watch) out.watch = true;
+    } else if (step.kind === 'chance') {
+        out.percent = Math.min(100, Math.max(1, Number(a.percent) || 1));
+    } else if (step.kind === 'until') {
+        out.tries = Math.max(1, Math.round(Number(a.tries) || 20));
+        out.on_fail = UNTIL_ON_FAIL.includes(a.on_fail) ? a.on_fail : 'skip';
+    }
+    return out;
+}
+
+function blockLoopMeasure(a) {
+    if (a.minutes != null) return t('rec.povtor_minut', {n: recNum(a.minutes)});
+    return t('rec.povtor_raz', {n: a.times, slovo: declOfNum(Number(a.times), t('rec.raz_formy').split('|'))});
+}
+
+function blockTarget(step) {
+    const first = (step.any || [])[0];
+    return first ? recFeatText(first) : t('rec.ne_zadano');
+}
+
+function blockLabel(step) {
+    if (step.kind === 'loop') return t('rec.povtoryat', {mera: blockLoopMeasure(step.args)});
+    if (step.kind === 'chance') return t('rec.s_shansom', {p: recNum(step.args.percent)});
+    return t('rec.poka_ne_naydesh', {chto: blockTarget(step)});
+}
+
+/* Предпросмотр строки — зеркалит codegen (_loop / _chance / _until). */
+function blockCode(step) {
+    const a = blockPayloadArgs(step);
+    if (step.kind === 'chance') return `if ctx.chance(${recNum(a.percent)}):`;
+    if (step.kind === 'until') {
+        const цель = (step.any || []).map(x => `dict(${x})`).join(', ');
+        const fail = a.on_fail !== 'skip' ? `, on_fail=${JSON.stringify(a.on_fail)}` : '';
+        return `for _ in ctx.until_found([${цель}], tries=${a.tries}${fail}):`;
+    }
+    const parts = [a.times != null ? `times=${a.times}` : `minutes=${recNum(a.minutes)}`];
+    if (a.pause_min != null) parts.push(`pause=(${recNum(a.pause_min)}, ${recNum(a.pause_max)})`);
+    if (a.watch) parts.push('watch=True');
+    return `for _ in ctx.loop(${parts.join(', ')}):`;
+}
+
+/* Классы строки списка: заголовок блока, глубина, вид ближайшего блока и
+   «последняя строка блока» — по ним CSS рисует рамки прямо в списке. */
+function blockRowClass(step) {
+    const byId = blockById();
+    const chain = blockChain(step, byId);
+    const cls = [];
+    if (chain.length) {
+        cls.push(`rs-depth-${chain.length}`, `rs-in-${byId.get(chain[0]).kind}`);
+        const next = REC.steps[REC.steps.indexOf(step) + 1];
+        if (!next || !blockChain(next, byId).includes(chain[0])) cls.push('rs-block-end');
+    }
+    if (blockIsHead(step)) cls.push('rs-block', `rs-block-${step.kind}`);
+    return cls.join(' ');
+}
+
+/* ---------------------------------------------------------------- редакторы */
+
+/* Раскрытый шаг. У заголовка — настройки блока. У обычного шага — тихие
+   ссылки «в блок»: возможность находится там, где о ней думают, — глядя на
+   шаг, который хочется крутить или делать иногда. */
+function recBlockEditor(step) {
+    if (!blockIsHead(step)) {
+        if (step.kind === 'branch' || blockDepth(step) >= BLOCK_DEPTH_MAX) return '';
+        return `<div class="rs-block-offer"><span class="dim">${esc(t('rec.v_blok'))}</span>
+      <button class="sm ghost" onclick="recBlockWrap('loop', [${step.id}])">${recIcon('rotate')}${esc(t('rec.blok_povtor'))}</button>
+      <button class="sm ghost" onclick="recBlockWrap('chance', [${step.id}])">${recIcon('dice')}${esc(t('rec.blok_shans'))}</button>
+      <button class="sm ghost" onclick="recBlockWrap('until', [${step.id}])">${recIcon('search')}${esc(t('rec.blok_poka'))}</button>
+    </div>`;
+    }
+    const body = step.kind === 'loop' ? blockLoopEditor(step)
+        : step.kind === 'chance' ? blockChanceEditor(step) : blockUntilEditor(step);
+    return `<div class="blk-ed">${body}
+      <div class="blk-ed-row">
+        <span class="dim">${esc(t('rec.v_bloke_shagov', {n: blockInside(step).length}))}</span>
+        <span class="sp"></span>
+        <button class="sm ghost" onclick="recBlockUnwrap(${step.id})">${esc(t('rec.ubrat_ramku'))}</button>
+      </div>
+    </div>`;
+}
+
+function blockLoopEditor(step) {
+    const a = step.args;
+    const byTime = a.minutes != null;
+    return `<div class="blk-ed-row">
+        <span class="blk-ed-k">${esc(t('rec.skolko'))}</span>
+        <input type="number" class="blk-ed-n" min="1" step="1" aria-label="${esc(t('rec.skolko'))}"
+               value="${byTime ? recNum(a.minutes) : a.times}"
+               onchange="recBlockSet(${step.id}, 'amount', this.value)">
+        <div class="chips" role="group">
+          <button class="chip ${byTime ? '' : 'on'}" aria-pressed="${!byTime}"
+                  onclick="recBlockSet(${step.id}, 'unit', 'times')">${esc(t('rec.raz'))}</button>
+          <button class="chip ${byTime ? 'on' : ''}" aria-pressed="${byTime}"
+                  onclick="recBlockSet(${step.id}, 'unit', 'minutes')">${esc(t('rec.minut'))}</button>
+        </div>
+      </div>
+      <div class="blk-ed-row">
+        <span class="blk-ed-k">${esc(t('rec.pauza_mezhdu_krugami'))}</span>
+        <input type="number" min="0" step="0.5" value="${recNum(a.pause_min ?? 0)}" aria-label="${esc(t('rec.ot'))}"
+               onchange="recBlockSet(${step.id}, 'pause_min', this.value)">
+        <span>–</span>
+        <input type="number" min="0" step="0.5" value="${recNum(a.pause_max ?? 0)}" aria-label="${esc(t('rec.do'))}"
+               onchange="recBlockSet(${step.id}, 'pause_max', this.value)">
+        <span class="dim">${esc(t('rec.sek_sluchayno'))}</span>
+      </div>
+      <label class="kb" title="${esc(t('rec.storozh_podskazka'))}">
+        <input type="checkbox" ${a.watch ? 'checked' : ''} style="accent-color:var(--accent)"
+               onchange="recBlockSet(${step.id}, 'watch', this.checked)">
+        ${esc(t('rec.storozh'))}</label>`;
+}
+
+function blockChanceEditor(step) {
+    const p = Number(step.args.percent) || 0;
+    const chip = v => `<button class="chip ${p === v ? 'on' : ''}" aria-pressed="${p === v}"
+        onclick="recBlockSet(${step.id}, 'percent', ${v})">${v}%</button>`;
+    return `<div class="blk-ed-row">
+        <span class="blk-ed-k">${esc(t('rec.shans'))}</span>
+        <input type="number" class="blk-ed-n" min="1" max="100" step="1" value="${recNum(p)}"
+               aria-label="${esc(t('rec.shans'))}" onchange="recBlockSet(${step.id}, 'percent', this.value)">
+        <span>%</span>
+        <div class="chips" role="group">${[5, 10, 25, 50].map(chip).join('')}</div>
+      </div>
+      <p class="blk-ed-hint">${esc(t('rec.shans_podskazka', {p: recNum(p)}))}</p>`;
+}
+
+function blockUntilEditor(step) {
+    const a = step.args;
+    const after = blockNextClick(step);
+    const feats = (step.any || []).map((args, i) => `<span class="rs-feat" title="${esc(args)}">${esc(recFeatText(args))}
+        <button class="feat-x" aria-label="${esc(t('rec.ubrat'))}" onclick="recUntilDrop(${step.id}, ${i})">×</button></span>`).join('');
+    return `<div class="blk-ed-row">
+        <span class="blk-ed-k">${esc(t('rec.chto_ischem'))}</span>
+        ${feats || `<span class="warn-text">${esc(t('rec.ne_zadano'))}</span>`}
+      </div>
+      <div class="blk-ed-row">
+        <span class="blk-ed-k"></span>
+        <select id="untilKind${step.id}" aria-label="${esc(t('rec.kak_iskat'))}">${UNTIL_FEATS.map(k =>
+            `<option value="${k}">${esc(untilFeatName(k))}</option>`).join('')}</select>
+        <input type="text" id="untilVal${step.id}" placeholder="${esc(t('rec.naprimer_podpisatsya'))}"
+               onkeydown="if(event.key==='Enter')recUntilAdd(${step.id})">
+        <button class="sm" onclick="recUntilAdd(${step.id})">${esc(t('rec.dobavit'))}</button>
+        ${after ? `<button class="sm ghost" onclick="recUntilFromNext(${step.id})"
+            title="${esc(recLabel(after))}">${esc(t('rec.vzyat_iz_shaga', {n: REC.steps.indexOf(after) + 1}))}</button>` : ''}
+      </div>
+      <div class="blk-ed-row">
+        <span class="blk-ed-k">${esc(t('rec.ne_bolshe'))}</span>
+        <input type="number" class="blk-ed-n" min="1" max="200" value="${a.tries ?? 20}" aria-label="${esc(t('rec.ne_bolshe'))}"
+               onchange="recBlockSet(${step.id}, 'tries', this.value)">
+        <span>${esc(t('rec.krugov'))}</span>
+      </div>
+      <div class="blk-ed-row">
+        <span class="blk-ed-k">${esc(t('rec.esli_ne_nashel'))}</span>
+        <select aria-label="${esc(t('rec.esli_ne_nashel'))}" onchange="recBlockSet(${step.id}, 'on_fail', this.value)">${
+            UNTIL_ON_FAIL.map(v => `<option value="${v}" ${a.on_fail === v ? 'selected' : ''}>${esc(untilOnFailName(v))}</option>`).join('')}</select>
+      </div>`;
+}
+
+/* Шаг-клик сразу за блоком «пока не найдёшь» — обычно это и есть цель:
+   «листай, пока не появится „Подписаться“, потом нажми его». */
+function blockNextClick(head) {
+    const next = REC.steps[REC.steps.indexOf(head) + blockOf(head).length];
+    return next && next.kind === 'click' && next.selector ? next : null;
+}
+
+function blockClickFeatures(step) {
+    const all = [step.selector.args, ...recFallbacks(step)];
+    return [...new Set(all)].slice(0, 3);
+}
+
+function recUntilFromNext(id) {
+    const head = recFind(id);
+    const after = head && blockNextClick(head);
+    if (!after) return;
+    head.any = blockClickFeatures(after);
+    recRender();
+    recSave();
+}
+
+function recUntilAdd(id) {
+    const head = recFind(id);
+    const kind = ($('untilKind' + id) || {}).value;
+    const value = String(($('untilVal' + id) || {}).value || '').trim();
+    if (!head || !value || !UNTIL_FEATS.includes(kind)) return;
+    head.any = [...(head.any || []), `${kind}=${JSON.stringify(value)}`].slice(0, 3);
+    recRender();
+    recSave();
+}
+
+function recUntilDrop(id, index) {
+    const head = recFind(id);
+    if (!head) return;
+    head.any = (head.any || []).filter((_, i) => i !== index);
+    recRender();
+    recSave();
+}
+
+function recBlockSet(id, field, value) {
+    const step = recFind(id);
+    if (!blockIsHead(step)) return;
+    const a = step.args;
+    if (field === 'unit') {
+        if (value === 'minutes' && a.minutes == null) {
+            a.minutes = 10;
+            delete a.times;
+        } else if (value === 'times' && a.times == null) {
+            a.times = 10;
+            delete a.minutes;
+        }
+    } else if (field === 'amount') {
+        const n = Math.max(1, Number(value) || 1);
+        if (a.minutes != null) a.minutes = n;
+        else a.times = Math.round(n);
+    } else if (field === 'watch') {
+        a.watch = !!value;
+    } else if (field === 'on_fail') {
+        a.on_fail = UNTIL_ON_FAIL.includes(value) ? value : 'skip';
+    } else if (field === 'percent') {
+        a.percent = Math.min(100, Math.max(1, Number(value) || 1));
+    } else if (field === 'tries') {
+        a.tries = Math.min(200, Math.max(1, Math.round(Number(value) || 1)));
+    } else {
+        a[field] = Math.max(0, Number(value) || 0);
+        if (a.pause_min > (a.pause_max ?? 0)) a.pause_max = a.pause_min;
+    }
+    recRender();
+    recSave();
+}
+
+/* ------------------------------------------------------------ обернуть, убрать */
+
+/* Обернуть шаги в блок. Берётся отрезок от первого до последнего из
+   выбранных; задетый блок попадает в отрезок целиком; все шаги верхнего
+   уровня отрезка обязаны лежать в одном блоке — рамка не может резать
+   чужую рамку пополам. */
+function recBlockWrap(kind, ids) {
+    const idx = ids.map(id => REC.steps.findIndex(s => s.id === id)).filter(i => i >= 0);
+    if (!idx.length || !BLOCK_KINDS[kind]) return;
+    let from = Math.min(...idx), to = Math.max(...idx);
+    for (let i = from; i <= to; i++) {
+        const s = REC.steps[i];
+        if (blockIsHead(s)) to = Math.max(to, i + blockInside(s).length);
+    }
+    const range = REC.steps.slice(from, to + 1);
+    const byId = blockById();
+    const outer = range[0].parent ?? null;
+    const top = range.filter(s => !range.some(o => blockChain(s, byId).includes(o.id)));
+    if (top.some(s => (s.parent ?? null) !== outer)) {
+        toast(t('rec.ramka_rezhet_ramku'), 'bad');
+        return;
+    }
+    const innerDepth = Math.max(0, ...range.map(s => blockChain(s, byId).length
+        - blockChain(range[0], byId).length + (blockIsHead(s) ? 1 : 0)));
+    if (blockChain(range[0], byId).length + 1 + innerDepth > BLOCK_DEPTH_MAX) {
+        toast(t('rec.slishkom_gluboko', {n: BLOCK_DEPTH_MAX}), 'bad');
+        return;
+    }
+    const head = {id: REC.nextId++, kind, args: BLOCK_KINDS[kind].defaults(),
+        param: null, note: '', warn: '', parent: outer};
+    if (kind === 'until') {
+        const after = REC.steps[to + 1];
+        head.any = after && after.kind === 'click' && after.selector ? blockClickFeatures(after) : [];
+    }
+    top.forEach(s => { s.parent = head.id; });
+    REC.steps.splice(from, 0, head);
+    REC.open = head.id;
+    if (REC.sel) REC.sel.clear();
+    recRender();
+    recSave();
+    toast(recFirstHint('block-' + kind, blockAddedHint(kind), t('rec.blok_dobavlen')));
+}
+
+function recSelBlock(kind) {
+    recBlockWrap(kind, REC.steps.filter(s => REC.sel.has(s.id)).map(s => s.id));
+}
+
+/* «Убрать рамку»: шаги остаются на месте, уровнем выше. */
+function recBlockUnwrap(id) {
+    const head = recFind(id);
+    if (!head) return;
+    REC.steps.forEach(s => { if (s.parent === id) s.parent = head.parent ?? null; });
+    REC.steps = REC.steps.filter(s => s.id !== id);
+    if (REC.open === id) REC.open = null;
+    recRender();
+    recSave();
+}
+
+/* Куда попал переставленный шаг (или блок целиком). Сразу за заголовком —
+   внутри него. Между шагами одного блока — в нём. На нижней границе рамки
+   решает направление: пришёл снизу (стрелкой вверх, бросили на строку
+   блока) — вошёл в самый глубокий блок над ним, ушёл вниз — вышел. */
+function blockPlace(step, enter) {
+    const byId = blockById();
+    const i = REC.steps.indexOf(step);
+    const prev = REC.steps[i - 1];
+    const next = REC.steps[i + blockOf(step).length];
+    if (prev && blockIsHead(prev)) {
+        step.parent = prev.id;
+        return;
+    }
+    const prevC = prev ? (prev.parent ?? null) : null;
+    const prevChain = prevC != null ? [prevC, ...blockChain(byId.get(prevC), byId)] : [];
+    const nextP = next ? (next.parent ?? null) : null;
+    if (nextP != null && prevChain.includes(nextP)) step.parent = enter ? prevC : nextP;
+    else step.parent = enter ? prevC : null;
+}
+
+/* Дубль заголовка — дубль всего блока со всеми вложенными. */
+const blockOrigDup = window.recDup;
+window.recDup = function (id) {
+    const head = recFind(id);
+    if (!blockIsHead(head)) return blockOrigDup.apply(this, arguments);
+    const block = blockOf(head);
+    const ids = new Map();
+    const copies = block.map(s => {
+        const c = stCopyOf(s);
+        ids.set(s.id, c.id);
+        return c;
+    });
+    copies.forEach((c, k) => { c.parent = k === 0 ? (head.parent ?? null) : ids.get(block[k].parent); });
+    const at = REC.steps.indexOf(block[block.length - 1]);
+    REC.steps.splice(at + 1, 0, ...copies);
+    REC.open = copies[0].id;
+    recRender();
+    recSave();
+};
+
+/* ------------------------------------------------------------------ схема */
+
+const GR_BLOCK_INDENT = 26;   // каждый уровень вложенности — сдвиг вправо
+const GR_BLOCK_PAD = 10;
+
+/* Рамки блоков на схеме: прямоугольник вокруг заголовка и шагов внутри; у
+   повтора и «пока не найдёшь» — стрелка «назад, к началу круга» справа:
+   блок читается как петля, а не как ещё одна карточка в столбике. */
+function grBlockFrames(layout) {
+    const parts = [];
+    REC.steps.filter(blockIsHead).forEach(head => {
+        const block = blockOf(head);
+        const depth = blockDepth(head);
+        const boxes = block.map(s => layout.pos.get(s.id)).filter(Boolean);
+        if (!boxes.length) return;
+        const pad = GR_BLOCK_PAD - depth * 3;
+        const x1 = Math.min(...boxes.map(b => b.x)) - pad;
+        const y1 = Math.min(...boxes.map(b => b.y)) - pad;
+        const x2 = Math.max(...boxes.map(b => b.x)) + layout.nodeW + pad;
+        const y2 = Math.max(...boxes.map(b => b.y)) + GR_NODE_H + pad;
+        parts.push(`<rect class="gr-block-box gr-block-${head.kind}" x="${x1}" y="${y1}"
+            width="${x2 - x1}" height="${y2 - y1}" rx="12"/>`);
+        if (head.kind === 'chance') return;
+        const last = layout.pos.get(block[block.length - 1].id);
+        const first = layout.pos.get(block[1].id);
+        /* Из нижней части последнего шага в верхнюю часть первого: при
+           одном шаге внутри стрелка всё равно читается как петля. */
+        const ax = x2 + 14;
+        const y0 = last.y + GR_NODE_H * 0.75, y1a = first.y + GR_NODE_H * 0.25;
+        parts.push(`<path class="gr-block-back gr-block-${head.kind}" d="M${last.x + layout.nodeW},${y0}
+            C${ax},${y0} ${ax},${y1a} ${first.x + layout.nodeW},${y1a}"
+            marker-end="url(#grArrow-${head.kind})"/>`);
+    });
+    if (!parts.length) return '';
+    const marker = kind => `<marker id="grArrow-${kind}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7"
+        orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="gr-block-arrow gr-block-${kind}"/></marker>`;
+    return `<defs>${marker('loop')}${marker('until')}</defs>${parts.join('')}`;
+}

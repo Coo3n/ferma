@@ -1144,6 +1144,51 @@ class DeviceContext:
             i += 1
         self.log(f"повтор закончен: кругов {i}")
 
+    def chance(self, percent: float) -> bool:
+        """«С шансом»: `if ctx.chance(15):` — True примерно в 15 случаях из 100."""
+        вышло = random.random() * 100 < float(percent)
+        if вышло:
+            self.log(f"с шансом {percent:g}%: выпало — выполняю")
+        return вышло
+
+    def until_found(self, features: list, tries: int = 20, on_fail: str = "skip"):
+        """«Пока не найдёшь»: `for _ in ctx.until_found([dict(text="Подписаться")]):`.
+
+        Перед каждым кругом смотрит, есть ли цель на экране (любой из
+        признаков `features`): есть — выходит, нет — выполняет тело (свайп,
+        «назад»…). Не нашёл за `tries` кругов — по `on_fail`: skip — идти
+        дальше, fail — остановить сценарий, ask — спросить человека (он
+        может поправить экран и дать ещё круг).
+        """
+        features = list(features or [])
+        if not features:
+            raise ValueError("ctx.until_found: не задано, что искать")
+        что = ", ".join(str(next(iter(f.values()), "?")) for f in features)
+        while True:
+            for i in range(int(tries)):
+                self.check_cancel()
+                if self._wait_features(features, 1):
+                    if i:
+                        self.log(f"нашёл «{что}» за {i} кругов")
+                    return
+                if i == 0:
+                    self.log(f"ищу «{что}»: до {tries} кругов")
+                yield i
+            if self._wait_features(features, 1):
+                return
+            беда = f"не нашёл «{что}» за {tries} кругов"
+            if on_fail == "skip":
+                self.log(f"{беда} — иду дальше")
+                return
+            if on_fail == "fail":
+                self.fail(беда)
+            решение = self._stuck(беда)
+            if решение == HOLD_RETRY:
+                continue
+            if решение in (HOLD_SKIP, HOLD_GO):
+                return
+            self.fail(беда)
+
     # ------------------------------------------------------------------ сторож
     def on_track(self, package: str, moved: bool = True) -> bool:
         """Сторож долгих циклов: мы ещё в своём приложении и экран живой?

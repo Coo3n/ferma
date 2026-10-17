@@ -348,7 +348,10 @@ function recSelBar() {
       <button class="sm" onclick="recSelPause()" title="Вставить паузу после каждого выбранного шага">после каждого</button>
     </div>
     <div class="selbar-grp">
-      <button class="sm" onclick="recSelLoop()" title="${esc(t('rec.povtoryat_po_krugu_podskazka'))}">${recIcon('rotate')} ${esc(t('rec.povtoryat_po_krugu'))}</button>
+      <span class="selbar-k">${esc(t('rec.v_blok'))}</span>
+      <button class="sm" onclick="recSelBlock('loop')" title="${esc(t('rec.blok_povtor_podskazka'))}">${recIcon('rotate')} ${esc(t('rec.blok_povtor'))}</button>
+      <button class="sm" onclick="recSelBlock('chance')" title="${esc(t('rec.blok_shans_podskazka'))}">${recIcon('dice')} ${esc(t('rec.blok_shans'))}</button>
+      <button class="sm" onclick="recSelBlock('until')" title="${esc(t('rec.blok_poka_podskazka'))}">${recIcon('search')} ${esc(t('rec.blok_poka'))}</button>
     </div>
     <div class="selbar-grp">
       <button class="sm" onclick="recSelDup()">${recIcon('copy')} дублировать</button>
@@ -398,7 +401,7 @@ function recSelPause() {
         if (chosen.has(step.id)) {
             out.push({id: REC.nextId++, kind: 'sleep', args: {seconds: seconds},
                 param: null, note: '', warn: '',
-                inLoop: step.kind === 'loop' ? step.id : (step.inLoop || null)});
+                parent: blockIsHead(step) ? step.id : (step.parent ?? null)});
         }
     }
     REC.steps = out;

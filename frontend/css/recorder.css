@@ -109,6 +109,9 @@
 .rs-warn { color: var(--warn); font-size: var(--fs-1); margin-top: 2px; }
 .rs-alts { font-size: var(--fs-1); margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
 .rs-alts label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.rs-alts-k { margin-top: var(--s1); color: var(--dim); }
+.rs-or-add { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s1); }
+.rs-or-add input[type="text"] { flex: 1; min-width: 140px; }
 .rs-param { font-size: var(--fs-1); margin-top: 6px; display: flex; align-items: center; gap: 8px; }
 /* Признаки якоря — селекторы: моноширинный, чтобы читались как код. */
 .rs-feat { font-family: var(--mono, ui-monospace, monospace); opacity: .75; }
@@ -835,31 +838,40 @@
     background: var(--panel2);
 }
 
-/* ------------------------------------------------------------ повтор по кругу
+/* ------------------------------------------------------------ блоки
 
-   Повтор — рамка, а не ещё одна строка: заголовок «↻ Повторять 10 мин»
-   сверху, шаги тела со сдвигом и линией слева, рамка закрывается под
-   последним шагом тела. Цвет — акцент на приглушённой подложке: повтор
-   меняет ход сценария, его должно быть видно, но не громче ошибок. */
-.rs.rs-loop {
-    background: var(--accent-dim);
-    border-left: 3px solid var(--accent-line);
+   Блок — рамка, а не ещё одна строка: заголовок («↻ Повторять 10 мин»,
+   «🎲 С шансом 15%», «🔎 Пока не найдёшь …») сверху, шаги внутри со сдвигом
+   и линией слева, рамка закрывается под последним шагом. У каждого вида свой
+   цвет (--blk): повтор — акцент, шанс — янтарь, поиск — голубой. Блок меняет
+   ход сценария, его должно быть видно, но не громче ошибок. */
+.rs-block-loop, .rs-in-loop { --blk: var(--accent-line); --blk-dim: var(--accent-dim); }
+.rs-block-chance, .rs-in-chance { --blk: var(--warn-line); --blk-dim: var(--warn-dim); }
+.rs-block-until, .rs-in-until { --blk: var(--busy-line); --blk-dim: var(--busy-dim); }
+
+.rs.rs-block {
+    background: var(--blk-dim);
+    border-left: 3px solid var(--blk);
     border-bottom-color: transparent;
 }
 
-.rs.rs-loop .rs-label { font-weight: 600; }
+.rs.rs-block .rs-label { font-weight: 600; }
 
-.rs.rs-in-loop {
-    margin-left: var(--s4);
-    border-left: 3px solid var(--accent-line);
-}
+.rs.rs-depth-1 { margin-left: var(--s4); border-left: 3px solid var(--blk); }
+.rs.rs-depth-2 { margin-left: calc(var(--s4) * 2); border-left: 3px solid var(--blk); }
+.rs.rs-depth-3 { margin-left: calc(var(--s4) * 3); border-left: 3px solid var(--blk); }
 
-.rs.rs-loop-end {
-    border-bottom: 1px solid var(--accent-line);
+/* Заголовок вложенного блока берёт цвет своего вида, а не внешнего. */
+.rs.rs-block.rs-block-loop { --blk: var(--accent-line); --blk-dim: var(--accent-dim); }
+.rs.rs-block.rs-block-chance { --blk: var(--warn-line); --blk-dim: var(--warn-dim); }
+.rs.rs-block.rs-block-until { --blk: var(--busy-line); --blk-dim: var(--busy-dim); }
+
+.rs.rs-block-end {
+    border-bottom: 1px solid var(--blk);
     margin-bottom: var(--s2);
 }
 
-.loop-ed {
+.blk-ed {
     display: grid;
     gap: var(--s2);
     margin-top: var(--s2);
@@ -868,7 +880,7 @@
     border-radius: var(--r2);
 }
 
-.loop-ed-row {
+.blk-ed-row {
     display: flex;
     align-items: center;
     gap: var(--s2);
@@ -876,30 +888,63 @@
     font-size: var(--fs-2);
 }
 
-.loop-ed-k {
+.blk-ed-k {
     min-width: 150px;
     color: var(--text2);
 }
 
-.loop-ed input[type="number"] { width: 72px; }
-.loop-ed .loop-ed-n { width: 88px; }
+.blk-ed-hint {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--fs-1);
+}
 
-.rs-loop-offer { margin-top: var(--s2); }
+.blk-ed input[type="number"] { width: 72px; }
+.blk-ed .blk-ed-n { width: 88px; }
+.blk-ed input[type="text"] { flex: 1; min-width: 160px; }
+.blk-ed select, .rs-or-add select { width: auto; min-width: 170px; }
 
-/* Схема: рамка вокруг заголовка и тела, стрелка «к началу круга» справа. */
-.gr-loop-box {
-    fill: var(--accent-dim);
-    stroke: var(--accent-line);
+.feat-x {
+    margin-left: var(--s1);
+    padding: 0 var(--s1);
+    min-height: 0;
+    background: transparent;
+    color: var(--dim);
+}
+
+.feat-x:hover { color: var(--bad); }
+
+.rs-block-offer {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    flex-wrap: wrap;
+    margin-top: var(--s2);
+}
+
+.selbar-k { color: var(--dim); font-size: var(--fs-2); }
+
+/* Схема: рамка вокруг заголовка и шагов, у повтора и поиска — стрелка
+   «к началу круга» справа. */
+.gr-block-box {
+    fill: color-mix(in srgb, var(--blk-c) 7%, transparent);
+    stroke: color-mix(in srgb, var(--blk-c) 45%, transparent);
     stroke-width: 1.5;
     stroke-dasharray: 5 4;
 }
 
-.gr-loop-back {
+.gr-block-back {
     fill: none;
-    stroke: var(--accent);
+    stroke: var(--blk-c);
     stroke-width: 2;
 }
 
-.gr-loop-arrow { fill: var(--accent); }
+.gr-block-arrow { fill: var(--blk-c); }
+
+.gr-block-loop { --blk-c: var(--accent); }
+.gr-block-chance { --blk-c: var(--warn); }
+.gr-block-until { --blk-c: var(--busy); }
 
 .gr-node.loop { border-color: var(--accent-line); }
+.gr-node.chance { border-color: var(--warn-line); }
+.gr-node.until { border-color: var(--busy-line); }

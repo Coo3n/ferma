@@ -384,7 +384,9 @@ function recLabel(step) {
         case 'screenshot':
             return 'Снимок экрана' + (a.name ? ` «${a.name}»` : '');
         case 'loop':
-            return loopLabel(step);
+        case 'chance':
+        case 'until':
+            return blockLabel(step);
         default:
             return step.kind;
     }
@@ -408,9 +410,9 @@ function recPush(step) {
        друг за другом, а не в конец сюжета. */
     const at = REC.insertAfter ? REC.steps.findIndex(s => s.id === REC.insertAfter) : -1;
     if (at >= 0) {
-        /* Запись внутри повтора дописывает его тело. */
+        /* Запись внутри блока дописывает его. */
         const prev = REC.steps[at];
-        step.inLoop = prev.kind === 'loop' ? prev.id : (prev.inLoop || null);
+        step.parent = blockIsHead(prev) ? prev.id : (prev.parent ?? null);
         REC.steps.splice(at + 1, 0, step);
         REC.insertAfter = step.id;
     } else {
@@ -527,8 +529,22 @@ function recAnchorFeatures(dump) {
 /* Поставить якорь, если экран сменился. Зовётся перед записью действия:
    якорь должен стоять ПЕРЕД первым действием на новом экране, иначе он
    проверяет экран уже после того, как по нему кликнули. */
+/* Авто-проверки экрана — по желанию, по умолчанию выключены: экраны
+   приложений меняются от обновления к обновлению, и проверка на каждом шаге
+   роняла сценарий там, где он прошёл бы. Нужная проверка ставится руками
+   («Проверка экрана»), там, где экран действительно важен. */
+const REC_AUTO_ANCHOR_KEY = 'farm.recorder.autoAnchor';
+
+function recAutoAnchorOn() {
+    return !!store.get(REC_AUTO_ANCHOR_KEY, false);
+}
+
+function recAutoAnchorSet(on) {
+    store.set(REC_AUTO_ANCHOR_KEY, on ? 1 : 0);
+}
+
 function recMaybeAnchor() {
-    if (!REC.dump) return;
+    if (!REC.dump || !recAutoAnchorOn()) return;
     const sig = recScreenSig(REC.dump);
     if (!recScreenChanged(sig)) {
         if (sig) REC.lastSig = sig;
@@ -776,7 +792,7 @@ function grLayout() {
 
     REC.steps.forEach(step => {
         const here = step.pos ? {x: step.pos[0], y: step.pos[1]}
-            : {x: GR_COL_X + (step.inLoop ? GR_LOOP_INDENT : 0), y};
+            : {x: GR_COL_X + blockDepth(step) * GR_BLOCK_INDENT, y};
         pos.set(step.id, here);
 
         let blockHeight = GR_ROW_H;
@@ -940,7 +956,7 @@ function grRender() {
         return html;
     }).join('');
     return `<div class="gr-canvas" style="width:${layout.width}px;height:${layout.height}px">
-      <svg class="gr-edges" width="${layout.width + 40}" height="${layout.height}">${grLoopFrames(layout)}${edges}</svg>
+      <svg class="gr-edges" width="${layout.width + 40}" height="${layout.height}">${grBlockFrames(layout)}${edges}</svg>
       ${nodes}
     </div>`;
 }
@@ -1045,6 +1061,8 @@ function grDragStart(ev, id) {
 const SCH_ICONS = {
     branch: ['branch', 'branch'],
     loop: ['loop', 'rotate'],
+    chance: ['chance', 'dice'],
+    until: ['until', 'search'],
     expect: ['anchor', 'crosshair'],
     launch_app: ['block', 'play'],
     stop_app: ['block', 'stop'],
@@ -1715,7 +1733,11 @@ function recNum(value) {
    на сервер и превращаются в ctx.click_any — на другой прошивке или локали
    основной селектор может не совпасть, цепочка спасает прогон. */
 function recFallbacks(step) {
-    if (step.kind !== 'click' || !step.alts || !step.selector) return [];
+    if (step.kind !== 'click' || !step.selector) return [];
+    /* step.or — выбор человека («или по id, или по тексту»), включая свои
+       варианты. Пока его нет, берём надёжные альтернативы из дампа. */
+    if (Array.isArray(step.or)) return step.or.filter(args => args !== step.selector.args).slice(0, REC_OR_MAX);
+    if (!step.alts) return [];
     return step.alts
         .filter(alt => alt.call === 'click' && !alt.fragile && alt.args !== step.selector.args)
         .map(alt => alt.args)
@@ -1735,7 +1757,7 @@ function recLayers(step) {
 
 function recCode(step, index) {
     const a = step.args;
-    if (step.kind === 'loop') return loopCode(step);
+    if (blockIsHead(step)) return blockCode(step);
     /* Зеркалит codegen._branch: единственный шаг, который занимает больше
        одной строки, — ветвление и есть несколько строк. */
     if (step.kind === 'branch') {
@@ -1825,6 +1847,7 @@ function recMark(step, open) {
 const REC_FEAT = {
     text: 'по тексту', textContains: 'по части текста', description: 'по подписи',
     descriptionContains: 'по части подписи', resourceId: 'по внутреннему имени',
+    resourceIdMatches: 'по внутреннему имени',
     className: 'по типу элемента', index: 'по номеру', instance: 'по номеру',
 };
 
@@ -1832,7 +1855,8 @@ function recFeatText(args) {
     const parts = [];
     String(args || '').replace(/(\w+)\s*=\s*(?:"([^"]*)"|(\S+?))(?=,|$)/g, (m, k, q, v) => {
         let val = q != null ? q : v;
-        if (k === 'resourceId') val = val.split('/').pop().replace(/_/g, ' ');
+        if (k === 'resourceIdMatches') val = val.replace(/^\.\*\//, '').replace(/\$$/, '').replace(/\\(.)/g, '$1');
+        if (k === 'resourceId' || k === 'resourceIdMatches') val = val.split('/').pop().replace(/_/g, ' ');
         if (k === 'className') val = val.split('.').pop();
         parts.push(`${REC_FEAT[k] || k} «${val}»`);
         return m;
@@ -1840,14 +1864,74 @@ function recFeatText(args) {
     return parts.join(' и ') || String(args);
 }
 
+const REC_OR_MAX = 3;   // = MAX_FALLBACKS в backend/farm/recorder/steps.py
+const REC_OR_KINDS = ['resourceId', 'text', 'textContains', 'description', 'descriptionContains'];
+
+function recOrKindName(k) {
+    return k === 'resourceId' ? t('rec.feat_id') : k === 'text' ? t('rec.feat_text')
+        : k === 'textContains' ? t('rec.feat_text_contains') : k === 'description' ? t('rec.feat_podpis')
+            : t('rec.feat_opisanie');
+}
+
+/* «Как искать»: основной способ (радио) и «или так» — запасные (галочки).
+   Шаг нажмёт первое, что найдёт: «или по id like_button, или по тексту
+   «Нравится»». Свой вариант дописывается руками — на другой прошивке у
+   кнопки бывает другой текст, а записать его с этого телефона нельзя. */
 function recAlts(step) {
-    if (step.kind !== 'click' || !step.alts || step.alts.length < 2) return '';
-    return '<div class="rs-alts">как искать:' + step.alts.map((alt, index) => `
-      <label><input type="radio" name="sel${step.id}" ${alt.args === step.selector.args ? 'checked' : ''}
+    if (step.kind !== 'click' || !step.selector) return '';
+    const main = step.selector.args;
+    const alts = step.alts || [];
+    const picked = recFallbacks(step);
+    const mark = alt => alt.matches == null ? '' : (alt.matches === 1 ? '✓' : '⚠' + alt.matches);
+    const radios = alts.length > 1 ? alts.map((alt, index) => `
+      <label><input type="radio" name="sel${step.id}" ${alt.args === main ? 'checked' : ''}
              onchange="recPickSelector(${step.id}, ${index})">
-        ${alt.matches == null ? '' : (alt.matches === 1 ? '✓' : '⚠' + alt.matches)}
-        <span title="${esc('ctx.' + alt.call + '(' + alt.args + ')')}">${esc(recFeatText(alt.args))}</span></label>`).join('')
-        + '</div>';
+        ${mark(alt)} <span title="${esc('ctx.' + alt.call + '(' + alt.args + ')')}">${esc(recFeatText(alt.args))}</span></label>`).join('') : `
+      <span class="rs-feat">${esc(recFeatText(main))}</span>`;
+    const others = [...new Set([...alts.filter(a => a.call === 'click' && !a.fragile).map(a => a.args), ...picked])]
+        .filter(args => args !== main);
+    const full = picked.length >= REC_OR_MAX;
+    const checks = others.map(args => {
+        const on = picked.includes(args);
+        return `<label><input type="checkbox" ${on ? 'checked' : ''} ${!on && full ? 'disabled' : ''}
+             onchange="recOrToggle(${step.id}, this.dataset.args, this.checked)" data-args="${esc(args)}">
+        <span title="${esc(args)}">${esc(recFeatText(args))}</span></label>`;
+    }).join('');
+    return `<div class="rs-alts">${esc(t('rec.kak_iskat_dvoetochie'))}${radios}
+      <span class="rs-alts-k">${esc(t('rec.ili_tak'))}</span>${checks}
+      ${full ? `<span class="dim">${esc(t('rec.ili_maks', {n: REC_OR_MAX}))}</span>` : `<div class="rs-or-add">
+        <select id="orKind${step.id}" aria-label="${esc(t('rec.kak_iskat'))}">${REC_OR_KINDS.map(k =>
+            `<option value="${k}">${esc(recOrKindName(k))}</option>`).join('')}</select>
+        <input type="text" id="orVal${step.id}" placeholder="${esc(t('rec.svoy_variant'))}"
+               onkeydown="if(event.key==='Enter')recOrAdd(${step.id})">
+        <button class="sm" onclick="recOrAdd(${step.id})">${esc(t('rec.dobavit'))}</button>
+      </div>`}
+    </div>`;
+}
+
+function recOrToggle(id, args, on) {
+    const step = recFind(id);
+    if (!step) return;
+    const cur = recFallbacks(step).filter(a => a !== args);
+    step.or = on ? [...cur, args].slice(0, REC_OR_MAX) : cur;
+    recRender();
+    recSave();
+}
+
+function recOrAdd(id) {
+    const step = recFind(id);
+    const kind = ($('orKind' + id) || {}).value;
+    const value = String(($('orVal' + id) || {}).value || '').trim();
+    if (!step || !value || !REC_OR_KINDS.includes(kind)) return;
+    /* Короткий id («like_button») без пакета не совпал бы с полным
+       «com.vk:id/like_button» — ищем по окончанию. */
+    const args = kind === 'resourceId' && !value.includes(':')
+        ? `resourceIdMatches=${JSON.stringify('.*/' + value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$')}`
+        : `${kind}=${JSON.stringify(value)}`;
+    if (args === step.selector.args) return;
+    step.or = [...recFallbacks(step).filter(a => a !== args), args].slice(0, REC_OR_MAX);
+    recRender();
+    recSave();
 }
 
 /* Имя экрана правится отдельно, а не через REC_VALUE_KEY: тот механизм несёт
@@ -1954,7 +2038,7 @@ function recThumb(step) {
 
 function recRow(step, index) {
     const open = REC.open === step.id;
-    return `<div class="rs ${open ? 'open' : ''} ${REC.sel && REC.sel.has(step.id) ? 'sel' : ''} ${loopRowClass(step)}"
+    return `<div class="rs ${open ? 'open' : ''} ${REC.sel && REC.sel.has(step.id) ? 'sel' : ''} ${blockRowClass(step)}"
        data-id="${step.id}"
        ondragstart="recDragStart(event, ${step.id})" ondragend="recDragEnd(event)"
        ondragover="recDragOver(event, ${step.id})" ondragleave="recDragLeave(event)"
@@ -1989,12 +2073,12 @@ function recRow(step, index) {
     ${open ? `<div class="rs-code">${esc(recCode(step, index))}</div>` : ''}
     ${recMark(step, open)}
     ${open ? recThumb(step) + recAlts(step) + recAnchorEditor(step)
-        + recBranchEditor(step) + recLoopEditor(step) + recValueEditor(step) + recFlexEditor(step) : ''}
+        + recBranchEditor(step) + recBlockEditor(step) + recValueEditor(step) + recFlexEditor(step) : ''}
   </div>`;
 }
 
 function recRender() {
-    recLoopsFix();
+    recBlocksFix();
     recSchemeSpine();
     recSchemeRefresh();
     const box = $('recSteps');
@@ -2023,13 +2107,13 @@ function recDelete(id) {
 function recMove(id, delta) {
     const index = REC.steps.findIndex(step => step.id === id);
     if (index < 0) return;
-    /* Повтор двигается целиком — заголовок вместе с телом (loopBlock). */
-    const block = loopBlock(REC.steps[index]);
+    /* Блок двигается целиком — заголовок вместе со всем внутри (blockOf). */
+    const block = blockOf(REC.steps[index]);
     const target = delta < 0 ? index - 1 : index + block.length;
     if (target < 0 || target >= REC.steps.length) return;
     REC.steps.splice(index, block.length);
     REC.steps.splice(delta < 0 ? target : target - block.length + 1, 0, ...block);
-    loopPlace(block[0], delta < 0);
+    blockPlace(block[0], delta < 0);
     recRender();
     recSave();
 }
@@ -2096,7 +2180,7 @@ function recDrop(ev, id) {
 
     const from = REC.steps.findIndex(step => step.id === REC.drag);
     if (from < 0) return;
-    const block = loopBlock(REC.steps[from]);   // повтор переезжает целиком
+    const block = blockOf(REC.steps[from]);   // блок переезжает целиком
     if (block.some(s => s.id === id)) return;
     REC.steps.splice(from, block.length);
     /* Цель ищем ПОСЛЕ изъятия: индексы за вырезанным шагом сдвинулись, и
@@ -2104,8 +2188,8 @@ function recDrop(ev, id) {
     const to = REC.steps.findIndex(s => s.id === id);
     const цель = REC.steps[to];
     REC.steps.splice(выше ? to : to + 1, 0, ...block);
-    /* Бросили под строку повтора — значит, в повтор. */
-    loopPlace(block[0], !выше && (цель.kind === 'loop' || !!цель.inLoop));
+    /* Бросили под строку блока — значит, в блок. */
+    blockPlace(block[0], !выше && (blockIsHead(цель) || цель.parent != null));
     REC.drag = null;
     recRender();
     recSave();
@@ -2367,7 +2451,8 @@ function recPayload(meta) {
             note: step.kind === 'click' ? step.note : '',
         };
         if (step.kind === 'expect') out.any = step.any || [];
-        if (step.kind === 'loop') out.args = loopPayloadArgs(step);
+        if (blockIsHead(step)) out.args = blockPayloadArgs(step);
+        if (step.kind === 'until') out.any = step.any || [];
         if (step.kind === 'branch') {
             out.arms = (step.arms || []).map(arm => ({
                 name: arm.name, any: arm.any || [], run: arm.run || '',
@@ -2657,7 +2742,7 @@ async function editScenario(key) {
     REC.nextId = 1;
     REC.params = рецепт.params || {};
     REC.steps = (рецепт.steps || []).map(шаг => recAdopt(шаг, рецепт.assets || {}));
-    recLoopsFromSpan();
+    recBlocksFromSpan();
     REC.open = null;
     REC.edit = {key: key, meta: рецепт.meta || {}};
     /* Ширина устройства записи: кропы приехали с него, и масштаб шаблона на

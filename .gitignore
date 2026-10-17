@@ -36,3 +36,6 @@ tags.json
 *.orig
 .DS_Store
 .pytest_cache/
+
+# сценарии — локальные, в git не идут (служебные _template/_redteam_probe/smoke уже отслеживаются и остаются)
+backend/scenarios/*

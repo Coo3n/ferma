@@ -24,7 +24,7 @@ const ctx = {esc, S: {view: 'device'}, REC, document: doc, window: {}, console,
     recLabel: s => s.kind + (s.args && s.args.value ? ':' + s.args.value : ''),
     recFallbacks: s => (s.alts || []).map(a => a.args).filter(a => a !== s.selector.args),
     recCode: s => 'ctx.' + s.kind + '()', recPrune() {}, disableWithReason() {},
-    recIcon: () => '', t: key => key, isActive: s => ['queued', 'running', 'held'].includes(s),
+    recIcon: () => '', t: key => key, blockIsHead: s => ['loop', 'chance', 'until'].includes(s && s.kind), isActive: s => ['queued', 'running', 'held'].includes(s),
     JOB_DECISIONS: [], recPayload: () => ({steps: []}), recMeta: () => ({}),
     recSubmit: async () => {}, recModeOff: () => {}, recTeachSubmit: async () => {}};
 ctx.window = ctx;

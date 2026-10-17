@@ -16,6 +16,12 @@ def preset_list():
     return presets.PRESETS
 
 
+@router.get("/schema")
+def recipe_schema():
+    """Какие шаги и поля понимает конструктор — для ИИ-помощника (docs/recipe-format.md)."""
+    return schema.schema()
+
+
 @router.get("/recipe/{key}")
 def recipe(key: str):
     """Шаги записанного сценария — чтобы открыть его в конструкторе на правку.
