@@ -111,6 +111,18 @@ function thumbLoad(img) {
     img.src = `/api/devices/${img.dataset.serial}/thumb?t=${Date.now()}`;
 }
 
+/* Последний показанный кадр каждого телефона. При перезагрузке страницы
+   плитка сразу ставит его (браузер отдаёт из кэша) — без него все 40 экранов
+   гасли бы до первого свежего screencap и загорались вразнобой. */
+const THUMB_LAST_KEY = 'fleet.lastThumbs';
+const thumbLast = (() => {
+    try { return JSON.parse(sessionStorage.getItem(THUMB_LAST_KEY)) || {}; }
+    catch { return {}; }
+})();
+window.addEventListener('pagehide', () => {
+    try { sessionStorage.setItem(THUMB_LAST_KEY, JSON.stringify(thumbLast)); } catch {}
+});
+
 /* Первый кадр грузим безусловно, не спрашивая про видимость.
 
    Страница, открытая в фоновой вкладке, стартует с document.hidden === true,
@@ -124,6 +136,7 @@ function thumbArm(img, serial) {
     img.onload = () => {
         img._errStreak = 0;
         img.classList.add('ready');
+        if (img.src.includes('/thumb?')) thumbLast[serial] = img.src;
         thumbSchedule(img, thumbPeriod() + Math.random() * THUMB_JITTER_MS);
     };
     img.onerror = () => {
@@ -134,6 +147,14 @@ function thumbArm(img, serial) {
         if (img._errStreak >= THUMB_ERROR_GRACE) img.classList.remove('ready');
         thumbSchedule(img, THUMB_BACKOFF_MS);
     };
+    const cached = thumbLast[serial];
+    if (cached) {
+        // Класс ставим до первой отрисовки — плитка не проходит через
+        // прозрачность и не мигает. Свежий кадр придёт по обычному таймеру.
+        img.classList.add('ready');
+        img.src = cached;
+        return;
+    }
     /* Первый кадр — с разбросом: 40 плиток при открытии фермы не должны
        дёрнуть screencap одной пачкой. */
     thumbSchedule(img, Math.random() * THUMB_JITTER_MS);

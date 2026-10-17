@@ -76,6 +76,10 @@ class Cancelled(Exception):
     """Задача отменена пользователем."""
 
 
+class Finished(Exception):
+    """Сценарий закончен досрочно шагом «закончить сценарий» — это успех."""
+
+
 class StepFailed(AssertionError):
     """Шаг сценария не выполнился — сценарий останавливается с артефактами.
 
@@ -1151,6 +1155,21 @@ class DeviceContext:
             self.log(f"с шансом {percent:g}%: выпало — выполняю")
         return вышло
 
+    def seen(self, features: list, timeout: float = 3) -> bool:
+        """«Если на экране»: `if ctx.seen([dict(text="Подписаться")]):`.
+        Ждёт любой из признаков до `timeout` секунд."""
+        features = list(features or [])
+        if not features:
+            raise ValueError("ctx.seen: не задано, что искать")
+        есть = self._wait_features(features, float(timeout))
+        что = ", ".join(str(next(iter(f.values()), "?")) for f in features)
+        self.log(f"на экране {'есть' if есть else 'нет'} «{что}»")
+        return есть
+
+    def finish(self, reason: str = "") -> None:
+        """Закончить сценарий успехом раньше конца (шаг «закончить сценарий»)."""
+        raise Finished(reason or "закончено шагом сценария")
+
     def until_found(self, features: list, tries: int = 20, on_fail: str = "skip"):
         """«Пока не найдёшь»: `for _ in ctx.until_found([dict(text="Подписаться")]):`.
 
@@ -1336,6 +1355,8 @@ class DeviceContext:
         try:
             self.params = scenarios.resolve_params(sc, params)
             sc.module.run(self)
+        except Finished as e:
+            self.log(f"блок «{key}» закончен: {e}")   # конец блока, не всего прогона
         except Cancelled:
             raise
         except StepFailed as e:

@@ -386,7 +386,16 @@ function recLabel(step) {
         case 'loop':
         case 'chance':
         case 'until':
+        case 'if_seen':
             return blockLabel(step);
+        case 'break':
+            return t('rec.vyyti_iz_povtora');
+        case 'finish':
+            return a.result === 'fail'
+                ? t('rec.zakonchit_oshibka', {why: a.reason || '—'})
+                : t('rec.zakonchit_uspeh');
+        case 'call':
+            return t('rec.zapustit_stsenariy', {name: recScenName(a.scenario)});
         default:
             return step.kind;
     }
@@ -1063,6 +1072,10 @@ const SCH_ICONS = {
     loop: ['loop', 'rotate'],
     chance: ['chance', 'dice'],
     until: ['until', 'search'],
+    if_seen: ['until', 'eye-off'],
+    break: ['block', 'stop'],
+    finish: ['block', 'check'],
+    call: ['block', 'layers'],
     expect: ['anchor', 'crosshair'],
     launch_app: ['block', 'play'],
     stop_app: ['block', 'stop'],
@@ -1644,13 +1657,102 @@ async function recLibOpen() {
         }
     }
     $('mTitle').textContent = 'Библиотека шагов';
-    $('mBody').innerHTML = '<div class="lib">' + REC.lib.map((preset, index) => `
+    $('mBody').innerHTML = recLogicHtml() + '<div class="lib">' + REC.lib.map((preset, index) => `
       <div class="li" onclick="recLibPick(${index})">
         <b>${esc(preset.title)}</b><span>${esc(preset.desc)}</span>
       </div>`).join('') + '</div>';
     $('mActs').innerHTML = '<span class="sp"></span>'
         + '<button class="sm" onclick="closeModal()">Закрыть</button>';
     openModal();
+}
+
+/* ------------------------------------------------------------ логика */
+
+/* Шаги, меняющие ход сценария, — не действия на телефоне, поэтому их не
+   записать с экрана. Встают туда же, куда встала бы запись: в конец или
+   после выбранного шага (recPush). */
+const REC_LOGIC = () => [
+    {key: 'if_seen', icon: 'eye-off', title: t('rec.l_esli'), desc: t('rec.l_esli_d')},
+    {key: 'if_not', icon: 'eye-off', title: t('rec.l_esli_net'), desc: t('rec.l_esli_net_d')},
+    {key: 'break', icon: 'stop', title: t('rec.vyyti_iz_povtora'), desc: t('rec.l_break_d')},
+    {key: 'finish', icon: 'check', title: t('rec.l_finish'), desc: t('rec.l_finish_d')},
+    {key: 'call', icon: 'layers', title: t('rec.l_call'), desc: t('rec.l_call_d')},
+];
+
+function recLogicHtml() {
+    return `<div class="lib-k">${esc(t('rec.logika'))}</div><div class="lib lib-logic">` + REC_LOGIC().map(item => `
+      <div class="li" onclick="recLogicPick('${item.key}')">
+        <b>${recIcon(item.icon)} ${esc(item.title)}</b><span>${esc(item.desc)}</span>
+      </div>`).join('') + `</div><div class="lib-k">${esc(t('rec.deystviya'))}</div>`;
+}
+
+function recScenName(key) {
+    const sc = (S.scenarios || []).find(x => x.key === key);
+    return sc ? sc.name : key;
+}
+
+function recLogicPick(key) {
+    if (key === 'if_seen' || key === 'if_not') {
+        /* Блоку нужен хотя бы один шаг внутри — пауза-заготовка, её
+           заменяют записью («записать после этого шага») или удаляют. */
+        const head = recPush({kind: 'if_seen', args: {negate: key === 'if_not', timeout: 3}, any: []});
+        const pause = recPush({kind: 'sleep', args: {seconds: 1}});
+        pause.parent = head.id;
+        head.parent = head.parent ?? null;
+        REC.open = head.id;
+        closeModal();
+        recRender();
+        recSave();
+        toast(t('rec.blok_dobavlen_esli'));
+        return;
+    }
+    if (key === 'break') {
+        recPush({kind: 'break', args: {}});
+        closeModal();
+        if (!recBreakInLoop(REC.steps[REC.steps.length - 1])) toast(t('rec.break_vne'), 'bad');
+        return;
+    }
+    if (key === 'finish') {
+        $('mTitle').textContent = t('rec.l_finish');
+        $('mBody').innerHTML = `<div class="row"><label>${esc(t('rec.kak'))}</label>
+            <select id="logFinRes" class="grow">
+              <option value="ok">${esc(t('rec.zakonchit_uspeh'))}</option>
+              <option value="fail">${esc(t('rec.kak_oshibku'))}</option></select></div>
+          <div class="row"><label>${esc(t('rec.prichina'))}</label>
+            <input type="text" id="logFinWhy" class="grow" placeholder="${esc(t('rec.prichina_primer'))}"></div>`;
+        $('mActs').innerHTML = `<span class="sp"></span><button class="sm" onclick="closeModal()">${esc(t('rec.otmena'))}</button>
+            <button class="sm primary" onclick="recLogicFinish()">${esc(t('rec.dobavit'))}</button>`;
+        return;
+    }
+    if (key === 'call') {
+        const свой = REC.edit ? REC.edit.key : null;
+        const own = (S.scenarios || []).filter(x => /^[a-z][a-z0-9_]{0,47}$/.test(x.key) && x.key !== свой && !x.error);
+        if (!own.length) {
+            toast(t('rec.net_stsenariev'), 'bad');
+            return;
+        }
+        $('mTitle').textContent = t('rec.l_call');
+        $('mBody').innerHTML = `<div class="lib">` + own.map(x => `
+          <div class="li" onclick="recLogicCall('${esc(x.key)}')"><b>${esc(x.name || x.key)}</b>
+            <span>${esc(x.description || x.key)}</span></div>`).join('') + '</div>';
+        $('mActs').innerHTML = `<span class="sp"></span><button class="sm" onclick="closeModal()">${esc(t('rec.otmena'))}</button>`;
+    }
+}
+
+function recLogicFinish() {
+    const result = $('logFinRes').value === 'fail' ? 'fail' : 'ok';
+    recPush({kind: 'finish', args: {result, reason: $('logFinWhy').value.trim()}});
+    closeModal();
+}
+
+function recLogicCall(key) {
+    recPush({kind: 'call', args: {scenario: key}});
+    closeModal();
+}
+
+function recBreakInLoop(step) {
+    const byId = blockById();
+    return blockChain(step, byId).some(id => ['loop', 'until'].includes(byId.get(id).kind));
 }
 
 function recLibPick(index) {
@@ -1812,6 +1914,14 @@ function recCode(step, index) {
     }
 
     switch (step.kind) {
+        case 'break':
+            return 'break';
+        case 'finish':
+            return a.result === 'fail'
+                ? `ctx.fail(${JSON.stringify(a.reason || 'сценарий остановлен шагом')})`
+                : `ctx.finish(${JSON.stringify(a.reason || '')})`;
+        case 'call':
+            return `ctx.run(${JSON.stringify(a.scenario)})`;
         case 'tap':
             return `ctx.tap(${recNum(a.x)}, ${recNum(a.y)})`;
         case 'long_tap':
@@ -2452,7 +2562,7 @@ function recPayload(meta) {
         };
         if (step.kind === 'expect') out.any = step.any || [];
         if (blockIsHead(step)) out.args = blockPayloadArgs(step);
-        if (step.kind === 'until') out.any = step.any || [];
+        if (step.kind === 'until' || step.kind === 'if_seen') out.any = step.any || [];
         if (step.kind === 'branch') {
             out.arms = (step.arms || []).map(arm => ({
                 name: arm.name, any: arm.any || [], run: arm.run || '',

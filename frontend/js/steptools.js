@@ -352,6 +352,7 @@ function recSelBar() {
       <button class="sm" onclick="recSelBlock('loop')" title="${esc(t('rec.blok_povtor_podskazka'))}">${recIcon('rotate')} ${esc(t('rec.blok_povtor'))}</button>
       <button class="sm" onclick="recSelBlock('chance')" title="${esc(t('rec.blok_shans_podskazka'))}">${recIcon('dice')} ${esc(t('rec.blok_shans'))}</button>
       <button class="sm" onclick="recSelBlock('until')" title="${esc(t('rec.blok_poka_podskazka'))}">${recIcon('search')} ${esc(t('rec.blok_poka'))}</button>
+      <button class="sm" onclick="recSelBlock('if_seen')" title="${esc(t('rec.blok_esli_podskazka'))}">${recIcon('eye-off')} ${esc(t('rec.blok_esli'))}</button>
     </div>
     <div class="selbar-grp">
       <button class="sm" onclick="recSelDup()">${recIcon('copy')} дублировать</button>

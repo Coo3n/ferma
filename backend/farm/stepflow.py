@@ -75,6 +75,19 @@ def _cut(stmts: list, keep, line_map: dict) -> tuple[list, bool]:
     return out, cut
 
 
+class _LooseBreak(ast.NodeTransformer):
+    """`break`, чей повтор при вырезании развернулся в один проход, — в `pass`:
+    иначе модуль не скомпилируется («break outside loop»)."""
+
+    def visit_For(self, node):
+        return node          # break внутри живого повтора — его собственный
+
+    visit_While = visit_For
+
+    def visit_Break(self, node):
+        return ast.copy_location(ast.Pass(), node)
+
+
 def module_from_step(sc, line_map: dict, start: int, stop: int | None = None):
     """Модуль сценария без шагов до `start` (индекс с нуля) и, если задан `stop`,
     без шагов начиная с него — так прогоняют один шаг: start=i, stop=i+1.
@@ -99,7 +112,7 @@ def module_from_step(sc, line_map: dict, start: int, stop: int | None = None):
     for node in tree.body:
         if isinstance(node, ast.FunctionDef) and node.name == "run":
             body, _ = _cut(node.body, keep, line_map)
-            node.body = body or [ast.Pass()]
+            node.body = [_LooseBreak().visit(st) for st in body] or [ast.Pass()]
             break
     else:
         raise ValueError("нет функции run(ctx)")

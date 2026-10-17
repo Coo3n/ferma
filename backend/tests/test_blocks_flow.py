@@ -154,3 +154,40 @@ def test_запуск_с_середины_повтора_с_вложенным_�
     stepflow.module_from_step(sc, lm, 2).run(rec)
     # шанс внутри повтора — один раз (тело повтора порезано), дальше как есть
     assert rec.calls == ["like", "swipe", "swipe", "home"]
+
+
+# ---------------------------------------------------------------- логика
+
+def test_если_на_экране_и_выход_из_повтора_собираются_в_код():
+    from farm.recorder import codegen, steps as st
+    шаги = st.normalize_steps([
+        {"kind": "loop", "args": {"span": 3, "times": 5}},
+        {"kind": "if_seen", "args": {"span": 1, "negate": True}, "any": ['text="Лента"']},
+        {"kind": "break"},
+        {"kind": "swipe", "args": {"x1": .5, "y1": .8, "x2": .5, "y2": .3}},
+        {"kind": "call", "args": {"scenario": "vk_login"}},
+        {"kind": "finish", "args": {"result": "fail", "reason": "бан"}},
+    ])
+    src = codegen.render({"name": "t"}, {}, шаги)
+    compile(src, "t", "exec")
+    assert 'if not ctx.seen([dict(text="Лента")], timeout=3):' in src
+    assert "            break" in src
+    assert 'ctx.run("vk_login")' in src
+    assert 'ctx.fail("бан")' in src
+
+
+def test_выход_из_повтора_вне_повтора_отвергается():
+    import pytest
+    from farm.recorder import steps as st
+    with pytest.raises(st.StepError):
+        st.normalize_steps([{"kind": "chance", "args": {"span": 1, "percent": 50}},
+                            {"kind": "break"}])
+
+
+def test_проверка_шага_внутри_повтора_с_выходом_компилируется(tmp_path):
+    import ast
+    from farm import stepflow
+    tree = ast.parse("def run(ctx):\n    for _ in ctx.loop(times=2):\n        break\n")
+    fn = tree.body[0]
+    fn.body = [stepflow._LooseBreak().visit(st) for st in fn.body[0].body]
+    compile(ast.fix_missing_locations(tree), "t", "exec")

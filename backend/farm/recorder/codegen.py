@@ -123,7 +123,15 @@ def _until(step: dict) -> str:
     return f'for _ in ctx.until_found([{цель}], {", ".join(хвост)}):'
 
 
-BLOCK_HEADERS = {"loop": _loop, "chance": _chance, "until": _until}
+def _if_seen(step: dict) -> str:
+    """«Если на экране» / «если нет»: тело — следующие span шагов."""
+    args = step["args"]
+    цель = ", ".join(f"dict({a})" for a in step["any"])
+    вызов = f'ctx.seen([{цель}], timeout={_num(args.get("timeout", 3))})'
+    return f'if {"not " if args.get("negate") else ""}{вызов}:'
+
+
+BLOCK_HEADERS = {"loop": _loop, "chance": _chance, "until": _until, "if_seen": _if_seen}
 
 
 def _call(step: dict):
@@ -135,6 +143,14 @@ def _call(step: dict):
     if kind in BLOCK_HEADERS:
         return BLOCK_HEADERS[kind](step)
 
+    if kind == "break":
+        return "break"
+    if kind == "finish":
+        if args.get("result") == "fail":
+            return f'ctx.fail({literal(args.get("reason") or "сценарий остановлен шагом")})'
+        return f'ctx.finish({literal(args.get("reason") or "")})'
+    if kind == "call":
+        return f'ctx.run({literal(args["scenario"])})'
     if kind == "click":
         selector = step["selector"]
         chain = [selector["args"], *(selector.get("fallbacks") or [])]

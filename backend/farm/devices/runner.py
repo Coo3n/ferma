@@ -23,7 +23,7 @@ from pathlib import Path
 
 from .. import config, control, deviations as dv, obstacle, scenarios, stepflow
 from ..explain import explain
-from ..context import (Cancelled, DeviceContext, HOLD_DECISIONS, HOLD_DROP, HOLD_GO, HOLD_SKIP,
+from ..context import (Cancelled, Finished, DeviceContext, HOLD_DECISIONS, HOLD_DROP, HOLD_GO, HOLD_SKIP,
                        HOLD_RETRY, HOLD_WORDS, StepFailed, normalize_target)
 from ..recorder import codegen as recorder_codegen, save as recorder_save, steps as recorder_steps
 from .registry import registry
@@ -553,12 +553,15 @@ def _execute(job: Job) -> None:
             job.add_line(f"запуск с шага {job.start_step + 1}: предыдущие пропущены, "
                          f"экран должен быть в нужном состоянии")
         ctx.step_mark = lambda st: _mark_step(job, st)
-        if line_map:
-            with stepflow.StepTracer(module.run.__code__, line_map,
-                                     lambda i: _open_step(job, i, labels)):
+        try:
+            if line_map:
+                with stepflow.StepTracer(module.run.__code__, line_map,
+                                         lambda i: _open_step(job, i, labels)):
+                    module.run(ctx)
+            else:
                 module.run(ctx)
-        else:
-            module.run(ctx)
+        except Finished as e:
+            job.add_line(f"сценарий закончен досрочно: {e}")
         job.status = PASSED
         job.add_line(f"готово за {job.duration:.1f} с")
 

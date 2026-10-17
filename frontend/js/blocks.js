@@ -3,6 +3,7 @@
      ↻ Повторять 10 мин          — крутить шаги внутри (ctx.loop)
      🎲 С шансом 15%             — выполнить шаги внутри иногда (ctx.chance)
      🔎 Пока не найдёшь «…»      — крутить шаги, пока цель не появится (ctx.until_found)
+     👁 Если на экране «…»       — выполнить шаги, только если цель есть / нет (ctx.seen)
 
    Сценарий — плоский список шагов, поэтому блок — тоже шаг (заголовок), а
    шаги внутри помнят свой блок: step.parent = id заголовка. Блоки
@@ -20,6 +21,7 @@ const BLOCK_KINDS = {
     loop: {icon: 'rotate', defaults: () => ({times: 10, pause_min: 1, pause_max: 3, watch: true})},
     chance: {icon: 'dice', defaults: () => ({percent: 15})},
     until: {icon: 'search', defaults: () => ({tries: 20, on_fail: 'skip'})},
+    if_seen: {icon: 'eye-off', defaults: () => ({negate: false, timeout: 3})},
 };
 const UNTIL_ON_FAIL = ['skip', 'fail', 'ask'];
 const UNTIL_FEATS = ['textContains', 'text', 'resourceId', 'descriptionContains'];
@@ -35,6 +37,7 @@ function untilOnFailName(v) {
 }
 
 function blockAddedHint(kind) {
+    if (kind === 'if_seen') return t('rec.blok_dobavlen_esli');
     return kind === 'chance' ? t('rec.blok_dobavlen_shans')
         : kind === 'until' ? t('rec.blok_dobavlen_poka') : t('rec.blok_dobavlen_povtor');
 }
@@ -152,6 +155,9 @@ function blockPayloadArgs(step) {
     } else if (step.kind === 'until') {
         out.tries = Math.max(1, Math.round(Number(a.tries) || 20));
         out.on_fail = UNTIL_ON_FAIL.includes(a.on_fail) ? a.on_fail : 'skip';
+    } else if (step.kind === 'if_seen') {
+        out.negate = !!a.negate;
+        out.timeout = Math.min(60, Math.max(0, Number(a.timeout ?? 3)));
     }
     return out;
 }
@@ -169,6 +175,10 @@ function blockTarget(step) {
 function blockLabel(step) {
     if (step.kind === 'loop') return t('rec.povtoryat', {mera: blockLoopMeasure(step.args)});
     if (step.kind === 'chance') return t('rec.s_shansom', {p: recNum(step.args.percent)});
+    if (step.kind === 'if_seen') {
+        return step.args.negate ? t('rec.esli_net', {chto: blockTarget(step)})
+            : t('rec.esli_est', {chto: blockTarget(step)});
+    }
     return t('rec.poka_ne_naydesh', {chto: blockTarget(step)});
 }
 
@@ -176,6 +186,10 @@ function blockLabel(step) {
 function blockCode(step) {
     const a = blockPayloadArgs(step);
     if (step.kind === 'chance') return `if ctx.chance(${recNum(a.percent)}):`;
+    if (step.kind === 'if_seen') {
+        const цель = (step.any || []).map(x => `dict(${x})`).join(', ');
+        return `if ${a.negate ? 'not ' : ''}ctx.seen([${цель}], timeout=${recNum(a.timeout)}):`;
+    }
     if (step.kind === 'until') {
         const цель = (step.any || []).map(x => `dict(${x})`).join(', ');
         const fail = a.on_fail !== 'skip' ? `, on_fail=${JSON.stringify(a.on_fail)}` : '';
@@ -214,10 +228,12 @@ function recBlockEditor(step) {
       <button class="sm ghost" onclick="recBlockWrap('loop', [${step.id}])">${recIcon('rotate')}${esc(t('rec.blok_povtor'))}</button>
       <button class="sm ghost" onclick="recBlockWrap('chance', [${step.id}])">${recIcon('dice')}${esc(t('rec.blok_shans'))}</button>
       <button class="sm ghost" onclick="recBlockWrap('until', [${step.id}])">${recIcon('search')}${esc(t('rec.blok_poka'))}</button>
+      <button class="sm ghost" onclick="recBlockWrap('if_seen', [${step.id}])">${recIcon('eye-off')}${esc(t('rec.blok_esli'))}</button>
     </div>`;
     }
     const body = step.kind === 'loop' ? blockLoopEditor(step)
-        : step.kind === 'chance' ? blockChanceEditor(step) : blockUntilEditor(step);
+        : step.kind === 'chance' ? blockChanceEditor(step)
+        : step.kind === 'if_seen' ? blockIfSeenEditor(step) : blockUntilEditor(step);
     return `<div class="blk-ed">${body}
       <div class="blk-ed-row">
         <span class="dim">${esc(t('rec.v_bloke_shagov', {n: blockInside(step).length}))}</span>
@@ -271,9 +287,8 @@ function blockChanceEditor(step) {
       <p class="blk-ed-hint">${esc(t('rec.shans_podskazka', {p: recNum(p)}))}</p>`;
 }
 
-function blockUntilEditor(step) {
-    const a = step.args;
-    const after = blockNextClick(step);
+/* «Что ищем»: признаки цели — общие у «пока не найдёшь» и «если на экране». */
+function blockFeatsEditor(step, after) {
     const feats = (step.any || []).map((args, i) => `<span class="rs-feat" title="${esc(args)}">${esc(recFeatText(args))}
         <button class="feat-x" aria-label="${esc(t('rec.ubrat'))}" onclick="recUntilDrop(${step.id}, ${i})">×</button></span>`).join('');
     return `<div class="blk-ed-row">
@@ -287,9 +302,14 @@ function blockUntilEditor(step) {
         <input type="text" id="untilVal${step.id}" placeholder="${esc(t('rec.naprimer_podpisatsya'))}"
                onkeydown="if(event.key==='Enter')recUntilAdd(${step.id})">
         <button class="sm" onclick="recUntilAdd(${step.id})">${esc(t('rec.dobavit'))}</button>
-        ${after ? `<button class="sm ghost" onclick="recUntilFromNext(${step.id})"
+        ${after ? `<button class="sm ghost" onclick="recUntilFromStep(${step.id}, ${after.id})"
             title="${esc(recLabel(after))}">${esc(t('rec.vzyat_iz_shaga', {n: REC.steps.indexOf(after) + 1}))}</button>` : ''}
-      </div>
+      </div>`;
+}
+
+function blockUntilEditor(step) {
+    const a = step.args;
+    return `${blockFeatsEditor(step, blockNextClick(step))}
       <div class="blk-ed-row">
         <span class="blk-ed-k">${esc(t('rec.ne_bolshe'))}</span>
         <input type="number" class="blk-ed-n" min="1" max="200" value="${a.tries ?? 20}" aria-label="${esc(t('rec.ne_bolshe'))}"
@@ -301,6 +321,51 @@ function blockUntilEditor(step) {
         <select aria-label="${esc(t('rec.esli_ne_nashel'))}" onchange="recBlockSet(${step.id}, 'on_fail', this.value)">${
             UNTIL_ON_FAIL.map(v => `<option value="${v}" ${a.on_fail === v ? 'selected' : ''}>${esc(untilOnFailName(v))}</option>`).join('')}</select>
       </div>`;
+}
+
+/* «Если на экране»: есть / нет, сколько ждать. Пара блоков «есть» + «нет»
+   с одной целью — это «иначе»; кнопка ставит вторую половину сразу. */
+function blockIfSeenEditor(step) {
+    const a = step.args;
+    const chip = (neg, text) => `<button class="chip ${!!a.negate === neg ? 'on' : ''}" aria-pressed="${!!a.negate === neg}"
+        onclick="recBlockSet(${step.id}, 'negate', ${neg})">${esc(text)}</button>`;
+    return `<div class="blk-ed-row">
+        <span class="blk-ed-k">${esc(t('rec.uslovie'))}</span>
+        <div class="chips" role="group">${chip(false, t('rec.uslovie_est'))}${chip(true, t('rec.uslovie_net'))}</div>
+      </div>
+      ${blockFeatsEditor(step, blockFirstClick(step))}
+      <div class="blk-ed-row">
+        <span class="blk-ed-k">${esc(t('rec.zhdat'))}</span>
+        <input type="number" class="blk-ed-n" min="0" max="60" step="1" value="${recNum(a.timeout ?? 3)}"
+               aria-label="${esc(t('rec.zhdat'))}" onchange="recBlockSet(${step.id}, 'timeout', this.value)">
+        <span>${esc(t('rec.sek'))}</span>
+        <span class="sp"></span>
+        <button class="sm ghost" onclick="recIfSeenElse(${step.id})"
+                title="${esc(t('rec.inache_podskazka'))}">${esc(t('rec.dobavit_inache'))}</button>
+      </div>
+      <p class="blk-ed-hint">${esc(t('rec.esli_podskazka'))}</p>`;
+}
+
+/* Первый клик внутри блока — обычно цель: «если есть „Закрыть“ — нажать». */
+function blockFirstClick(head) {
+    return blockInside(head).find(s => s.kind === 'click' && s.selector) || null;
+}
+
+/* «Иначе»: такой же блок с обратным условием сразу за этим. */
+function recIfSeenElse(id) {
+    const head = recFind(id);
+    if (!head || head.kind !== 'if_seen') return;
+    const at = REC.steps.indexOf(head) + blockOf(head).length;
+    const other = {id: REC.nextId++, kind: 'if_seen', parent: head.parent ?? null,
+        args: {negate: !head.args.negate, timeout: head.args.timeout ?? 3},
+        any: [...(head.any || [])], param: null, note: '', warn: ''};
+    const pause = {id: REC.nextId++, kind: 'sleep', args: {seconds: 1}, parent: other.id,
+        param: null, note: '', warn: ''};
+    REC.steps.splice(at, 0, other, pause);
+    REC.open = other.id;
+    recRender();
+    recSave();
+    toast(t('rec.inache_dobavleno'));
 }
 
 /* Шаг-клик сразу за блоком «пока не найдёшь» — обычно это и есть цель:
@@ -315,10 +380,10 @@ function blockClickFeatures(step) {
     return [...new Set(all)].slice(0, 3);
 }
 
-function recUntilFromNext(id) {
+function recUntilFromStep(id, stepId) {
     const head = recFind(id);
-    const after = head && blockNextClick(head);
-    if (!after) return;
+    const after = recFind(stepId);
+    if (!head || !after || !after.selector) return;
     head.any = blockClickFeatures(after);
     recRender();
     recSave();
@@ -360,6 +425,10 @@ function recBlockSet(id, field, value) {
         else a.times = Math.round(n);
     } else if (field === 'watch') {
         a.watch = !!value;
+    } else if (field === 'negate') {
+        a.negate = !!value;
+    } else if (field === 'timeout') {
+        a.timeout = Math.min(60, Math.max(0, Number(value) || 0));
     } else if (field === 'on_fail') {
         a.on_fail = UNTIL_ON_FAIL.includes(value) ? value : 'skip';
     } else if (field === 'percent') {
@@ -407,6 +476,9 @@ function recBlockWrap(kind, ids) {
     if (kind === 'until') {
         const after = REC.steps[to + 1];
         head.any = after && after.kind === 'click' && after.selector ? blockClickFeatures(after) : [];
+    } else if (kind === 'if_seen') {
+        const click = range.find(s => s.kind === 'click' && s.selector);
+        head.any = click ? blockClickFeatures(click) : [];
     }
     top.forEach(s => { s.parent = head.id; });
     REC.steps.splice(from, 0, head);
@@ -494,7 +566,7 @@ function grBlockFrames(layout) {
         const y2 = Math.max(...boxes.map(b => b.y)) + GR_NODE_H + pad;
         parts.push(`<rect class="gr-block-box gr-block-${head.kind}" x="${x1}" y="${y1}"
             width="${x2 - x1}" height="${y2 - y1}" rx="12"/>`);
-        if (head.kind === 'chance') return;
+        if (head.kind === 'chance' || head.kind === 'if_seen') return;
         const last = layout.pos.get(block[block.length - 1].id);
         const first = layout.pos.get(block[1].id);
         /* Из нижней части последнего шага в верхнюю часть первого: при

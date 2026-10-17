@@ -848,6 +848,7 @@
 .rs-block-loop, .rs-in-loop { --blk: var(--accent-line); --blk-dim: var(--accent-dim); }
 .rs-block-chance, .rs-in-chance { --blk: var(--warn-line); --blk-dim: var(--warn-dim); }
 .rs-block-until, .rs-in-until { --blk: var(--busy-line); --blk-dim: var(--busy-dim); }
+.rs-block-if_seen, .rs-in-if_seen { --blk: var(--line-hover); --blk-dim: var(--panel2); }
 
 .rs.rs-block {
     background: var(--blk-dim);
@@ -865,6 +866,7 @@
 .rs.rs-block.rs-block-loop { --blk: var(--accent-line); --blk-dim: var(--accent-dim); }
 .rs.rs-block.rs-block-chance { --blk: var(--warn-line); --blk-dim: var(--warn-dim); }
 .rs.rs-block.rs-block-until { --blk: var(--busy-line); --blk-dim: var(--busy-dim); }
+.rs.rs-block.rs-block-if_seen { --blk: var(--line-hover); --blk-dim: var(--panel2); }
 
 .rs.rs-block-end {
     border-bottom: 1px solid var(--blk);
@@ -944,7 +946,13 @@
 .gr-block-loop { --blk-c: var(--accent); }
 .gr-block-chance { --blk-c: var(--warn); }
 .gr-block-until { --blk-c: var(--busy); }
+.gr-block-if_seen { --blk-c: var(--line-hover); }
 
 .gr-node.loop { border-color: var(--accent-line); }
 .gr-node.chance { border-color: var(--warn-line); }
 .gr-node.until { border-color: var(--busy-line); }
+
+/* Раздел «Логика» в библиотеке шагов: подзаголовки разделов и значок у
+   названия — логика не действие на телефоне, её видно по иконке. */
+.lib-k { color: var(--dim); font-size: var(--fs-2); margin: var(--s2) 0 var(--s1); }
+.lib-logic .li b { display: inline-flex; align-items: center; gap: var(--s1); }

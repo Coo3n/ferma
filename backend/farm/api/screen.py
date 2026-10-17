@@ -56,7 +56,10 @@ def thumb(serial: str):
     try:
         return StreamingResponse(iter([streaming.thumbnail(serial)]),
                                  media_type="image/jpeg",
-                                 headers={"Cache-Control": "no-store"})
+                                 # URL кадра уникален (?t=), так что кэш не
+                                 # подсунет старое — зато после перезагрузки
+                                 # страницы последний кадр берётся из кэша.
+                                 headers={"Cache-Control": "private, max-age=300"})
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, str(e))
 

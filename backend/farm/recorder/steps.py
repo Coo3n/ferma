@@ -40,19 +40,32 @@ ARGS = {
     # on_fail — что делать, если так и не нашли: skip (идти дальше),
     # fail (остановить сценарий), ask (спросить человека).
     "until": (("span",), ("tries", "on_fail")),
+    # «Если на экране»: следующие span шагов выполняются, только если цель
+    # (any) видна — или, с negate, если её НЕТ. timeout — сколько секунд ждать
+    # её появления. Пара «если есть» + «если нет» даёт «иначе».
+    "if_seen": (("span",), ("negate", "timeout")),
+    # Выйти из ближайшего повтора / «пока не найдёшь». Только внутри них.
+    "break": ((), ()),
+    # Закончить сценарий: result ok — как успех, fail — как ошибку с reason.
+    "finish": ((), ("result", "reason")),
+    # Выполнить другой сохранённый сценарий как шаг (ctx.run).
+    "call": (("scenario",), ()),
 }
 
 # Блоки — шаги-рамки: тело — следующие span шагов. Вкладываются друг в друга
 # не глубже BLOCK_DEPTH_MAX: «повтор → с шансом → пока не найдёшь» читается,
 # четвёртый уровень — уже нет.
-BLOCKS = {"loop", "chance", "until"}
+BLOCKS = {"loop", "chance", "until", "if_seen"}
+LOOPS = {"loop", "until"}   # из них выходит break
+FINISH_RESULTS = ("ok", "fail")
+IF_SEEN_TIMEOUT_MAX = 60
 BLOCK_DEPTH_MAX = 3
 UNTIL_TRIES_MAX = 200
 UNTIL_ON_FAIL = ("skip", "fail", "ask")
 
 NUMERIC = {"x", "y", "x1", "y1", "x2", "y2", "duration", "seconds", "timeout",
            "span", "times", "minutes", "pause_min", "pause_max", "percent", "tries"}
-BOOLEAN = {"clear", "watch"}
+BOOLEAN = {"clear", "watch", "negate"}
 
 # Потолки повтора: сутки и десять тысяч кругов — дальше это уже не сценарий,
 # а забытый на ночь цикл, который держит телефон.
@@ -80,6 +93,8 @@ _LABELS = {
     "shell": "Команда shell", "sleep": "Пауза", "screenshot": "Скриншот",
     "expect": "Якорь экрана", "branch": "Развилка", "loop": "Повтор",
     "chance": "С шансом", "until": "Пока не найдёшь",
+    "if_seen": "Если на экране", "break": "Выйти из повтора",
+    "finish": "Закончить сценарий", "call": "Сценарий",
 }
 
 
@@ -102,9 +117,15 @@ def label_of(step: dict) -> str:
                 else f'{_minutes_text(args.get("minutes"))} мин')
     elif kind == "chance":
         tail = f'{_minutes_text(args.get("percent"))}%'
-    elif kind == "until":
+    elif kind in ("until", "if_seen"):
         m = re.search(r'="([^"]{1,40})"', ((step.get("any") or [""])[0]))
         tail = m.group(1) if m else ""
+        if kind == "if_seen" and args.get("negate"):
+            base = "Если нет на экране"
+    elif kind == "call":
+        tail = args.get("scenario", "")
+    elif kind == "finish":
+        tail = "с ошибкой" if args.get("result") == "fail" else "успешно"
     elif kind == "click":
         m = re.search(r'(?:text|description|resourceId)\w*="([^"]{1,40})"',
                       ((step.get("selector") or {}).get("args") or ""))
@@ -227,9 +248,11 @@ def _anchor(kind: str, raw):
             raise StepError("шагу expect нужен хотя бы один признак экрана")
         if kind == "until":
             raise StepError("«пока не найдёшь»: укажите, что искать на экране")
+        if kind == "if_seen":
+            raise StepError("«если на экране»: укажите, что искать")
         return None
-    if kind not in ("expect", "until"):
-        raise StepError(f"поле any допустимо только у expect и until, не у {kind}")
+    if kind not in ("expect", "until", "if_seen"):
+        raise StepError(f"поле any допустимо только у expect, until и if_seen, не у {kind}")
     return _features(raw, "any")
 
 
@@ -432,6 +455,12 @@ def normalize_step(raw) -> dict:
         _check_chance(step["args"])
     elif kind == "until":
         _check_until(step["args"])
+    elif kind == "if_seen":
+        _check_if_seen(step["args"])
+    elif kind == "finish":
+        _check_finish(step["args"])
+    elif kind == "call":
+        _check_call(step["args"])
     if step["args"].get("account"):
         step["param"] = None   # аккаунт и параметр — два источника одного значения
     return step
@@ -503,13 +532,39 @@ def _check_until(args: dict) -> None:
     args["on_fail"] = on_fail
 
 
+def _check_if_seen(args: dict) -> None:
+    _span(args, "«если на экране»")
+    timeout = args.get("timeout", 3)
+    if not 0 <= timeout <= IF_SEEN_TIMEOUT_MAX:
+        raise StepError(f"«если на экране»: ждать от 0 до {IF_SEEN_TIMEOUT_MAX} с")
+    args["timeout"] = timeout
+    args["negate"] = bool(args.get("negate"))
+
+
+def _check_finish(args: dict) -> None:
+    result = args.get("result") or "ok"
+    if result not in FINISH_RESULTS:
+        raise StepError("«закончить сценарий»: ok или fail")
+    args["result"] = result
+    args["reason"] = _text(args.get("reason"))
+
+
+def _check_call(args: dict) -> None:
+    if not RUN_RE.match(args["scenario"]):
+        raise StepError("сценарий: латиница в нижнем регистре, цифры и _, начиная с буквы")
+
+
 def check_blocks(steps: list) -> None:
     """Тело каждого блока целиком внутри сценария и внутри своего родителя;
     вложенность не глубже BLOCK_DEPTH_MAX."""
     ends = []   # концы открытых блоков, внешний первым
+    kinds = []  # их виды — break ищет среди них повтор
     for i, step in enumerate(steps):
         while ends and i > ends[-1]:
             ends.pop()
+            kinds.pop()
+        if step["kind"] == "break" and not LOOPS & set(kinds):
+            raise StepError(f"шаг {i + 1}: «выйти из повтора» стоит вне повтора")
         if step["kind"] not in BLOCKS:
             continue
         end = i + step["args"]["span"]
@@ -520,6 +575,7 @@ def check_blocks(steps: list) -> None:
         if len(ends) >= BLOCK_DEPTH_MAX:
             raise StepError(f"шаг {i + 1}: блоки вложены глубже {BLOCK_DEPTH_MAX} уровней")
         ends.append(end)
+        kinds.append(step["kind"])
 
 
 check_loops = check_blocks   # прежнее имя: повторы были первыми блоками
@@ -592,11 +648,12 @@ def schema() -> dict:
         "flexible": sorted(FLEXIBLE),
         "account_fields": sorted(ACCOUNT_FIELDS),
         "until_on_fail": list(UNTIL_ON_FAIL),
+        "finish_results": list(FINISH_RESULTS),
         "limits": {
             "block_depth": BLOCK_DEPTH_MAX, "until_tries": UNTIL_TRIES_MAX,
             "loop_times": LOOP_TIMES_MAX, "loop_minutes": LOOP_MINUTES_MAX,
             "loop_pause": LOOP_PAUSE_MAX, "fallbacks": MAX_FALLBACKS,
             "features": ANY_MAX, "arms": ARMS_MAX, "retries": RETRIES_MAX,
-            "texts": TEXTS_MAX,
+            "texts": TEXTS_MAX, "if_seen_timeout": IF_SEEN_TIMEOUT_MAX,
         },
     }

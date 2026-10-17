@@ -115,11 +115,6 @@ def resolve(ctx, sel=None, text=None, img=None, at=None, timeout: float = 10.0):
         # устройств. Спим не дольше, чем осталось до таймаута, иначе короткие
         # ожидания растягивались бы до длины паузы.
         time.sleep(min(LOOP_PAUSE, max(0.0, deadline - time.time())))
-        # Без цели вида sel единственный ограничитель темпа — сама
-        # длительность dump_hierarchy: 10-30 полных дампов за провалившийся
-        # шаг на каждом из 20 устройств. Пауза капается остатком до
-        # дедлайна, чтобы короткие timeout в тестах не начали идти дольше.
-        time.sleep(min(0.3, max(0.0, deadline - time.time())))
 
     if text and ocr_mod.backend():
         hit = _by_ocr(ctx, text)
