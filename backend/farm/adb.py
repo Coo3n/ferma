@@ -12,9 +12,14 @@ from . import config
 
 log = logging.getLogger("farm.adb")
 
+# .deps/ — куда run.sh / run.bat сами скачивают platform-tools, если adb нет.
+_DEPS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                     ".deps", "platform-tools")
+
 _ADB_CANDIDATES = [
     os.getenv("ADB_PATH", ""),
     "adb",
+    os.path.join(_DEPS, "adb.exe" if os.name == "nt" else "adb"),
     "/opt/homebrew/bin/adb",
     "/usr/local/bin/adb",
     os.path.expanduser("~/Library/Android/sdk/platform-tools/adb"),

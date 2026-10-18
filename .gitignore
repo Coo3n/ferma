@@ -46,3 +46,6 @@ backend/scenarios/*
 
 # файлы обмена коммитами (git bundle) — не в git
 *.bundle
+
+# сами скачанные run.sh/run.bat инструменты (adb, scrcpy)
+.deps/

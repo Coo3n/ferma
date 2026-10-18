@@ -22,20 +22,13 @@
 
 ## Быстрый старт
 
-```bash
-brew install --cask android-platform-tools   # adb
-brew install scrcpy                          # необязательно: плавное окно телефона
-./run.sh                                     # http://127.0.0.1:8777
-```
+**Mac / Linux:** `./run.sh`  **Windows:** двойной клик по `run.bat` (в PowerShell — `.\run.bat`).
 
-**Windows:** поставьте Python 3.10+ (галочка «Add python.exe to PATH») и
-[Platform-Tools](https://developer.android.com/tools/releases/platform-tools)
-(папку с `adb.exe` — в PATH), затем двойной клик по `run.bat` или в терминале:
-
-```powershell
-cd путь\к\ferma
-.\run.bat
-```
+Скрипт сам поставит то, чего не хватает, и только один раз: Python 3.10+
+(Homebrew на Mac, winget или python.org на Windows), adb и scrcpy (в папку
+`.deps`), зависимости (в `.venv`, заново — только если поменялся
+`backend/requirements.txt`). Уже установленное повторно не качается.
+Ферма откроется на http://127.0.0.1:8777.
 
 Первый запуск создаст `.venv` и поставит зависимости. На телефоне:
 **Настройки → О телефоне → 7 раз «Номер сборки»**, затем **Для разработчиков →
