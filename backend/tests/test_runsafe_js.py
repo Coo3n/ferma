@@ -11,7 +11,7 @@ const fs = require('fs'), vm = require('vm'), assert = require('assert');
 const ctx = {window: {}, t: (k, v) => k + (v ? ' ' + JSON.stringify(v) : ''), esc: s => String(s)};
 vm.createContext(ctx);
 for (const f of process.argv.slice(1)) vm.runInContext(fs.readFileSync(f, 'utf8'), ctx);
-vm.runInContext('this.h={rdTrialPlan,rdTrialStage,rerunFailedPlan,jobWhereStopped}', ctx);
+vm.runInContext('window.jobWhereStopped = jobWhereStopped; this.h={rdTrialPlan,rdTrialView,rdTrialBarHtml,rdTrialPending,rerunFailedPlan,jobWhereStopped}', ctx);
 const h = ctx.h;
 const plain = v => JSON.parse(JSON.stringify(v));
 
@@ -26,9 +26,33 @@ assert.deepStrictEqual(plain(h.rdTrialPlan(['a', 'b'], [])), {first: 'a', rest: 
 assert.deepStrictEqual(plain(h.rdTrialPlan(['a', 'b'], [{serial: 'a', busy_job: 1}, {serial: 'b', busy_job: 2}])),
     {first: 'a', rest: ['b']});
 
-for (const [st, stage] of [['passed', 'ok'], ['failed', 'fail'], ['cancelled', 'fail'],
-        ['held', 'held'], ['queued', 'run'], ['running', 'run'], ['cancelling', 'run']])
-    assert.strictEqual(h.rdTrialStage(st), stage, st);
+// полоса пробы — по состоянию с сервера
+const tr = (state, extra) => Object.assign({state, job: 'j1', serial: 'a', device_name: 'Phone 3',
+    job_status: 'running', rest: 9, started: 0, skipped: 0, error: ''}, extra || {});
+let v = h.rdTrialView(tr('running'), {id: 'j1', status: 'running', step_index: 1, step_total: 5});
+assert.strictEqual(v.title, 'run.proba_na {"name":"Phone 3"}');
+assert.strictEqual(v.now, 'run.proba_shag {"n":2,"total":5}');
+assert.deepStrictEqual(plain(v.acts), ['drop']);
+assert.strictEqual(h.rdTrialView(tr('running', {job_status: 'held'}), null).tone, 'warn');
+v = h.rdTrialView(tr('failed', {job_status: 'failed'}), {id: 'j1', status: 'failed', step_index: 2, error_info: {title: 'нет кнопки'}});
+assert.strictEqual(v.tone, 'bad');
+assert.strictEqual(v.title, 'run.proba_ne_proshla_bar {"name":"Phone 3","n":9}');
+assert.deepStrictEqual(plain(v.acts), ['release', 'drop']);
+assert.ok(v.now.includes('нет кнопки'));
+v = h.rdTrialView(tr('started', {job_status: 'passed', started: 7, skipped: 2}), null);
+assert.strictEqual(v.title, 'run.proba_proshla_bar {"name":"Phone 3","n":7}');
+assert.deepStrictEqual(plain(v.acts), []);
+assert.deepStrictEqual(plain(v.note), ['run.propuscheny_ne_v_seti {"n":2}']);
+assert.strictEqual(h.rdTrialView(null), null);
+for (const [st, pending] of [['running', true], ['failed', true], ['started', false],
+        ['forced', false], ['dropped', false]])
+    assert.strictEqual(h.rdTrialPending(tr(st)), pending, st);
+assert.strictEqual(h.rdTrialPending(undefined), false);
+// кнопки — только там, где решение ещё нужно
+const bar = h.rdTrialBarHtml([{id: 'j1', batch: 'b1', status: 'failed', trial: tr('failed')}]);
+assert.ok(bar.includes("rdTrialRelease('b1'") && bar.includes("rdTrialDrop('b1'"));
+assert.ok(!h.rdTrialBarHtml([{id: 'j1', batch: 'b1', status: 'passed', trial: tr('started')}]).includes('<button'));
+assert.strictEqual(h.rdTrialBarHtml([{id: 'j1', batch: 'b1', status: 'passed'}]), '');
 
 // перезапуск: только упавшие, телефон один раз, те же параметры
 assert.strictEqual(h.rerunFailedPlan([{status: 'passed', serial: 'a'}]), null);
@@ -58,34 +82,3 @@ def test_runsafe_helpers():
                          capture_output=True, text=True)
     assert res.returncode == 0, res.stderr
 
-
-RACE = r"""
-const fs = require('fs'), vm = require('vm'), assert = require('assert');
-const posts = [];
-let release;
-const gate = new Promise(r => { release = r; });
-const ctx = {window: {}, t: k => k, esc: s => String(s), toast: () => {},
-    S: {devices: [{serial: 'a', online: true}, {serial: 'b', online: true}], hidden: new Set(), view: 'fleet'},
-    api: async () => { await gate; return [{id: 'j1', status: 'passed'}]; },
-    post: async (url, body) => { posts.push(body); return {}; },
-    setInterval: () => 1, clearInterval: () => {}};
-vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(process.argv[1], 'utf8'), ctx);
-vm.runInContext(`RD_TRIALS.set('b1', {batch: 'b1', job: 'j1', first: 'a', rest: ['b'],
-    scenario: 'vk', params: {}, repeat: 1, stage: 'run'});`, ctx);
-(async () => {
-    // два тика разом — сеть медленнее интервала опроса
-    const one = vm.runInContext('rdTrialTick()', ctx);
-    const two = vm.runInContext('rdTrialTick()', ctx);
-    release();
-    await Promise.all([one, two]);
-    assert.strictEqual(posts.length, 1, 'остальные запущены ' + posts.length + ' раз');
-})().catch(e => { console.error(e); process.exit(1); });
-"""
-
-
-def test_пробный_не_запускает_остальных_дважды():
-    node = require_node()
-    res = subprocess.run([node, "-e", RACE, str(JS / "rundialog.js")],
-                         capture_output=True, text=True)
-    assert res.returncode == 0, res.stderr

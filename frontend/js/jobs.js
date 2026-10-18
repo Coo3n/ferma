@@ -127,7 +127,8 @@ function rerunFailedPlan(jobs) {
 function rerunFailedButton(batch, jobs) {
     const plan = rerunFailedPlan(jobs);
     /* Пока решается пробный запуск, у полосы проверки свои кнопки. */
-    if (!batch || !plan || (window.rdTrialPending && rdTrialPending(batch))) return '';
+    const trial = (jobs || []).map(j => j.trial).find(Boolean);
+    if (!batch || !plan || (window.rdTrialPending && rdTrialPending(trial))) return '';
     return `<button class="sm" onclick="event.stopPropagation();rerunFailed('${esc(batch)}')">
       <svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg>${esc(t('jobs.perezapustit_upavshie', {n: plan.serials.length}))}</button>`;
 }
@@ -163,6 +164,7 @@ async function pollJobs() {
     }
     S.jobs = list;
     if (window.syncInteractive) syncInteractive();
+    if (window.rdTrialNotice) rdTrialNotice(list);
     const shown = S.runBatch ? list.filter(j => j.batch === S.runBatch) : list;
     /* Пустой журнал: справа нечего «выбирать слева», а кнопки чистки и
        отмены работать не с чем — объясняем, а не молчим. */
@@ -172,7 +174,7 @@ async function pollJobs() {
     renderBatchBar(shown);
     setHTML($('jobList'), shown.length
         ? (S.runBatch ? shown.map(jobCard).join('')
-            : (window.rdTrialBarsHtml ? rdTrialBarsHtml() : '') + runGroupsHtml(shown))
+            : runGroupsHtml(shown))
         : emptyBig({
             art: 'job',
             title: 'Запусков пока не было',
@@ -205,7 +207,9 @@ function runGroupsHtml(jobs) {
         groups.push(g);
         if (j.batch) byBatch.set(j.batch, g);
     }
-    return groups.map(g => g.jobs.length < 2 ? jobCard(g.jobs[0]) : runGroupHtml(g)).join('');
+    /* Запуск с пробой — группа даже из одной задачи: пока идёт проба,
+       остальные телефоны ещё без задач, а полоса пробы должна быть видна. */
+    return groups.map(g => g.jobs.length < 2 && !g.jobs[0].trial ? jobCard(g.jobs[0]) : runGroupHtml(g)).join('');
 }
 
 function runGroupHtml(g) {
@@ -215,7 +219,9 @@ function runGroupHtml(g) {
     const held = g.jobs.filter(j => j.status === 'held').length;
     const live = g.jobs.filter(j => isActive(j.status)).length;
     const open = RUNS_OPEN.has(g.batch) || g.jobs.some(j => j.id === S.job);
-    const phones = new Set(g.jobs.map(j => j.serial)).size;
+    const trial = g.jobs[0].trial;
+    /* Пока остальные ждут пробы, «на 1 телефоне» врало бы о размере запуска. */
+    const phones = Math.max(new Set(g.jobs.map(j => j.serial)).size, trial ? trial.rest + 1 : 0);
     const st = held ? 'held' : live ? 'running' : fail ? 'failed' : 'passed';
     return `<section class="rgroup rg-${st}${open ? ' open' : ''}">
     <button class="rg-head" aria-expanded="${open}" onclick="toggleRunGroup('${esc(g.batch)}')">
@@ -228,6 +234,7 @@ function runGroupHtml(g) {
       </span>
       <span class="bb-track" aria-hidden="true"><i class="ok" style="width:${done / n * 100}%"></i><i class="bad" style="width:${fail / n * 100}%"></i></span>
     </button>
+    ${window.rdTrialBarHtml ? rdTrialBarHtml(g.jobs) : ''}
     ${open ? `<div class="rg-body">${g.jobs.map(jobCard).join('')}
       <div class="rg-acts">${rerunFailedButton(g.batch, g.jobs)}
       <button class="sm ghost" onclick="showRuns('${esc(g.batch)}')">Только этот запуск</button></div></div>` : ''}
@@ -258,7 +265,8 @@ function renderBatchBar(jobs) {
     const done = jobs.filter(j => j.status === 'passed').length;
     const fail = jobs.filter(j => j.status === 'failed').length;
     const live = jobs.filter(j => isActive(j.status)).length;
-    const phones = new Set(jobs.map(j => j.serial)).size;
+    const trial = jobs[0].trial;
+    const phones = Math.max(new Set(jobs.map(j => j.serial)).size, trial ? trial.rest + 1 : 0);
     bar.hidden = false;
     setHTML(bar, `<span class="bb-title"><b>${esc(jobs[0].scenario_name)}</b> на ${phones} тел.</span>
       <span class="bb-n ok"><b>${done}</b> готово</span>
@@ -268,7 +276,7 @@ function renderBatchBar(jobs) {
       <span class="sp"></span>
       ${rerunFailedButton(S.runBatch, jobs)}
       <button class="sm" onclick="showRuns()">Показать все запуски</button>
-      ${window.rdTrialBarHtml ? rdTrialBarHtml(S.runBatch) : ''}`);
+      ${window.rdTrialBarHtml ? rdTrialBarHtml(jobs) : ''}`);
 }
 
 /* «Починить шаг» у упавшей задачи — та же кнопка, что на карточке

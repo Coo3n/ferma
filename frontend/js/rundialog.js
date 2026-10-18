@@ -249,7 +249,11 @@ function rdRenderCheck() {
 
    Сорок телефонов с неработающим сценарием — сорок сбоев и, бывает, сорок
    подозрительных действий подряд. Поэтому при запуске на нескольких сначала
-   один телефон: прошёл — остальные запускаются сами, упал — ждём решения. */
+   один телефон: прошёл — остальные запускаются сами, упал — ждём решения.
+
+   План живёт на сервере (/api/run с trial_serial): раньше он был только в
+   этой вкладке, и F5 во время проверки молча оставлял остальных без запуска.
+   Ход пробы приходит в каждой задаче запуска полем `trial`. */
 
 function rdTrialOn() {
     const box = $('rdTrial');
@@ -274,136 +278,103 @@ function rdTrialPlan(serials, devices) {
     return {first, rest: serials.filter(s => s !== first)};
 }
 
-/* Стадия проверки по статусу её задачи. */
-function rdTrialStage(status) {
-    if (status === 'passed') return 'ok';
-    if (status === 'failed' || status === 'cancelled') return 'fail';
-    if (status === 'held') return 'held';
-    return 'run';
-}
-
-/* Проверки живут вне окна: окно закрывается сразу, ход виден в полосе
-   запуска на «Запусках». batch -> {batch, job, first, rest, scenario, name,
-   params, repeat, stage, last}. После перезагрузки страницы не помнятся —
-   остальные тогда просто не запустятся. */
-const RD_TRIALS = new Map();
-const RD_TRIAL_POLL_MS = 2000;
-
-function rdTrialArm() {
-    if (!RD.trialTimer) RD.trialTimer = setInterval(rdTrialTick, RD_TRIAL_POLL_MS);
-}
-
-const rdTrialLive = tr => tr.stage === 'run' || tr.stage === 'held';
-
-async function rdTrialTick() {
-    /* Медленная сеть: тик дольше интервала, и два тика разом оба видели
-       «прошла» — остальные телефоны запускались дважды. */
-    if (RD.trialTicking) return;
-    const live = [...RD_TRIALS.values()].filter(rdTrialLive);
-    if (!live.length) {
-        clearInterval(RD.trialTimer);
-        RD.trialTimer = null;
-        return;
-    }
-    RD.trialTicking = true;
-    try {
-        await rdTrialCheck(live);
-    } finally {
-        RD.trialTicking = false;
-    }
-    if (S.view === 'jobs') pollJobs();
-}
-
-async function rdTrialCheck(live) {
-    for (const tr of live) {
-        let job;
-        try {
-            const list = await api(`/api/jobs?limit=20&batch=${encodeURIComponent(tr.batch)}`);
-            job = list.find(j => j.id === tr.job);
-        } catch (e) {
-            continue;
-        }
-        /* Пока ждали ответа, человек мог нажать «Не запускать остальные». */
-        if (RD_TRIALS.get(tr.batch) !== tr || !rdTrialLive(tr)) continue;
-        if (!job) {   // удалили из журнала — проверять больше нечего
-            RD_TRIALS.delete(tr.batch);
-            continue;
-        }
-        tr.last = job;
-        const stage = rdTrialStage(job.status);
-        if (stage === tr.stage) continue;
-        tr.stage = stage;
-        const who = rdName(tr.first);
-        if (stage === 'ok') await rdTrialRest(tr.batch, true);
-        else if (stage === 'held') toast(t('run.proba_zhdyot', {name: who}), '', {label: t('run.pokazat'), onClick: () => showRuns(tr.batch)});
-        else if (stage === 'fail') toast(t('run.proba_ne_proshla', {name: who, n: tr.rest.length}), 'bad',
-            {label: t('run.pokazat'), onClick: () => showRuns(tr.batch)});
-    }
-}
-
 function rdName(serial) {
     return (S.devices.find(d => d.serial === serial) || {name: serial}).name;
 }
 
-/* Остальные телефоны — в тот же запуск (batch), что и пробный: одна строка
-   в «Запусках». Пробному досылаем недостающие повторы. */
-async function rdTrialRest(batch, auto) {
-    const tr = RD_TRIALS.get(batch);
-    if (!tr || tr.stage === 'going') return;
-    tr.stage = 'going';
-    if (S.view === 'jobs') pollJobs();
-    const online = new Set(rdOnline(S.devices));
-    const rest = tr.rest.filter(s => online.has(s));
-    const base = {scenario: tr.scenario, params: tr.params, batch};
+/* Ещё не решено, что с остальными: у полосы свои кнопки, «Перезапустить
+   упавшие» рядом с ними только путает. */
+function rdTrialPending(trial) {
+    return !!trial && (trial.state === 'running' || trial.state === 'failed');
+}
+
+/* Что показать в полосе пробы — чистая функция от trial и пробной задачи.
+   tone: '' идёт, 'warn' ждёт человека, 'bad' не прошла, 'ok' решено. */
+function rdTrialView(trial, job) {
+    if (!trial) return null;
+    const name = trial.device_name || trial.serial;
+    const n = trial.rest;
+    const note = [];
+    if (trial.skipped) note.push(t('run.propuscheny_ne_v_seti', {n: trial.skipped}));
+    if (trial.error) note.push(t('run.ostalnye_oshibka', {err: trial.error}));
+    if (trial.state === 'failed') {
+        const where = job && window.jobWhereStopped ? jobWhereStopped(job) : '';
+        return {tone: 'bad', title: t('run.proba_ne_proshla_bar', {name, n}),
+            now: where || (trial.job_status === 'cancelled' ? t('run.proba_otmenena') : ''),
+            note, acts: ['release', 'drop']};
+    }
+    if (trial.state === 'started')
+        return {tone: 'ok', title: t('run.proba_proshla_bar', {name, n: trial.started}), now: '', note, acts: []};
+    if (trial.state === 'forced')
+        return {tone: 'ok', title: t('run.zapuscheno_na_ostalnyh', {n: trial.started}), now: '', note, acts: []};
+    if (trial.state === 'dropped')
+        return {tone: 'ok', title: t('run.ostalnye_ne_zapuskali', {n}), now: '', note, acts: []};
+    const st = trial.job_status || (job && job.status);
+    const now = st === 'held' ? t('run.proba_zhdyot_bar')
+        : job && job.step_total && job.step_index >= 0
+            ? t('run.proba_shag', {n: job.step_index + 1, total: job.step_total}) : t('run.proba_idyot');
+    note.unshift(t('run.esli_proydyot', {n}));
+    return {tone: st === 'held' ? 'warn' : '', title: t('run.proba_na', {name}), now, note, acts: ['drop']};
+}
+
+/* Полоса пробы: в группе запуска и в полосе «только этот запуск» (jobs.js).
+   jobs — задачи одного запуска; trial одинаков у каждой из них. */
+function rdTrialBarHtml(jobs) {
+    const any = (jobs || []).find(j => j.trial);
+    if (!any) return '';
+    const trial = any.trial;
+    const view = rdTrialView(trial, jobs.find(j => j.id === trial.job));
+    const batch = esc(any.batch);
+    const btn = {
+        release: `<button class="sm" onclick="event.stopPropagation();rdTrialRelease('${batch}', this)">${esc(t('run.vse_ravno_zapustit'))}</button>`,
+        drop: `<button class="sm ghost" onclick="event.stopPropagation();rdTrialDrop('${batch}', this)">${esc(view.tone === 'bad' ? t('run.otmenit') : t('run.ne_zapuskat_ostalnye'))}</button>`,
+    };
+    return `<div class="rd-trialbar${view.tone ? ' ' + view.tone : ''}" role="${view.tone === 'bad' ? 'alert' : 'status'}">
+      <b>${esc(view.title)}</b>
+      ${view.now ? `<span>${esc(view.now)}</span>` : ''}
+      ${view.note.map(x => `<span class="dim">${esc(x)}</span>`).join('')}
+      ${view.acts.length ? `<span class="rd-trialacts">${view.acts.map(a => btn[a]).join('')}</span>` : ''}</div>`;
+}
+
+/* Кнопка гаснет до ответа: второй клик дал бы 409, а не второй запуск, но
+   выглядел бы как «первый не сработал». */
+async function rdTrialAct(batch, btn, what) {
+    if (btn) btn.disabled = true;
     try {
-        if (rest.length) await post('/api/run', {...base, serials: rest, repeat: tr.repeat});
-        if (tr.repeat > 1) await post('/api/run', {...base, serials: [tr.first], repeat: tr.repeat - 1});
-        toast(auto ? t('run.proba_proshla', {n: rest.length}) : t('run.zapuscheno_na_ostalnyh', {n: rest.length}), 'ok');
+        const res = await post(`/api/run/trial/${encodeURIComponent(batch)}/${what}`);
+        const tr = res.trial || {};
+        if (what === 'release') toast(t('run.zapuscheno_na_ostalnyh', {n: tr.started || 0}), 'ok');
+        else toast(t('run.ostalnye_ne_zapuskali', {n: tr.rest || 0}));
     } catch (e) {
         toast(e.message, 'bad');
     }
-    /* Второй раз не запускаем даже после ошибки: часть телефонов уже могла
-       получить задачу, а двойной запуск хуже недозапуска. */
-    RD_TRIALS.delete(batch);
-    if (S.view === 'jobs') pollJobs();
+    pollJobs();
 }
 
-function rdTrialDrop(batch) {
-    if (!RD_TRIALS.delete(batch)) return;
-    toast(t('run.ostalnye_ne_zapuskali'));
-    if (S.view === 'jobs') pollJobs();
-}
+const rdTrialRelease = (batch, btn) => rdTrialAct(batch, btn, 'release');
+const rdTrialDrop = (batch, btn) => rdTrialAct(batch, btn, 'cancel');
 
-/* Полоса проверки: в «Запусках» над списком (jobs.js). */
-function rdTrialBarHtml(batch) {
-    const tr = RD_TRIALS.get(batch);
-    if (!tr) return '';
-    const job = tr.last;
-    if (tr.stage === 'fail') {
-        const where = job && window.jobWhereStopped ? jobWhereStopped(job) : '';
-        return `<div class="rd-trialbar bad" role="alert">
-      <b>${esc(t('run.proba_ne_proshla_bar', {name: rdName(tr.first)}))}</b>
-      ${where ? `<span>${esc(where)}</span>` : ''}
-      <span class="dim">${esc(t('run.ostalnye_zhdut', {n: tr.rest.length}))}</span>
-      <span class="sp"></span>
-      <button class="sm" onclick="rdTrialRest('${esc(batch)}', false)">${esc(t('run.vse_ravno_zapustit'))}</button>
-      <button class="sm ghost" onclick="rdTrialDrop('${esc(batch)}')">${esc(t('run.otmenit'))}</button></div>`;
+/* Сообщить о повороте пробы, где бы человек ни был: журнал опрашивается и
+   вне «Запусков». Первое появление запуска молчит — после F5 это старая
+   новость, а не поворот. */
+const RD_TRIAL_SEEN = new Map();
+
+function rdTrialNotice(jobs) {
+    for (const j of jobs || []) {
+        const tr = j.trial;
+        if (!tr || j.id !== tr.job) continue;
+        const key = tr.state + '/' + tr.job_status;
+        const was = RD_TRIAL_SEEN.get(j.batch);
+        RD_TRIAL_SEEN.set(j.batch, key);
+        if (was === undefined || was === key) continue;
+        const name = tr.device_name || tr.serial;
+        const show = {label: t('run.pokazat'), onClick: () => showRuns(j.batch)};
+        if (tr.state === 'started') toast(t('run.proba_proshla', {n: tr.started}), 'ok', show);
+        else if (tr.state === 'failed' && !was.startsWith('failed/'))
+            toast(t('run.proba_ne_proshla', {name, n: tr.rest}), 'bad', show);
+        else if (tr.state === 'running' && tr.job_status === 'held')
+            toast(t('run.proba_zhdyot', {name}), '', show);
     }
-    const now = tr.stage === 'going' ? t('run.zapuskayu_ostalnye')
-        : tr.stage === 'held' ? t('run.proba_zhdyot_bar')
-        : job && job.step_total && job.step_index >= 0
-            ? t('run.proba_shag', {n: job.step_index + 1, total: job.step_total}) : t('run.proba_idyot');
-    return `<div class="rd-trialbar" role="status">
-      <b>${esc(t('run.proba_na', {name: rdName(tr.first)}))}</b>
-      <span>${esc(now)}</span>
-      <span class="dim">${esc(t('run.esli_proydyot', {n: tr.rest.length}))}</span>
-      <span class="sp"></span>
-      ${tr.stage === 'going' ? '' : `<button class="sm ghost" onclick="rdTrialDrop('${esc(batch)}')">${esc(t('run.ne_zapuskat_ostalnye'))}</button>`}</div>`;
-}
-
-/* Полосы всех идущих проверок — над общим списком запусков. */
-function rdTrialBarsHtml() {
-    return [...RD_TRIALS.keys()].map(rdTrialBarHtml).join('');
 }
 
 async function rdAutobind(platform) {
@@ -436,15 +407,13 @@ async function rdGo() {
     const repeat = Number($('rdRepeat').value) || 1;
     const trial = rdTrialOn() ? rdTrialPlan(serials, S.devices) : null;
     try {
+        /* С пробой сервер сам запустит остальных, когда она пройдёт. */
         const res = await post('/api/run', {
-            scenario: sc.key, serials: trial ? [trial.first] : serials, params,
-            repeat: trial ? 1 : repeat,
+            scenario: sc.key, serials, params, repeat,
+            ...(trial ? {trial_serial: trial.first} : {}),
         });
         closeModal();
         if (trial) {
-            RD_TRIALS.set(res.batch, {...trial, batch: res.batch, job: res.jobs[0].id,
-                scenario: sc.key, params, repeat, stage: 'run', last: res.jobs[0]});
-            rdTrialArm();
             toast(t('run.proba_poshla', {name: rdName(trial.first), n: trial.rest.length}), 'ok');
         } else {
             toast(`${sc.name}: запущено на ${serials.length} тел.`, 'ok');
@@ -532,5 +501,5 @@ async function rdGroupsGo(ev) {
 
 window.openRunDialog = openRunDialog;
 window.rdTrialBarHtml = rdTrialBarHtml;
-window.rdTrialBarsHtml = rdTrialBarsHtml;
-window.rdTrialPending = batch => RD_TRIALS.has(batch);
+window.rdTrialPending = rdTrialPending;
+window.rdTrialNotice = rdTrialNotice;

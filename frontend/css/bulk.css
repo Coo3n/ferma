@@ -603,6 +603,22 @@ button.armed {
     color: var(--bad);
 }
 
+/* Ждёт человека — как «ждёт» в счётчиках; решено — спокойная зелёная метка. */
+.rd-trialbar.warn {
+    border-left-color: var(--warn);
+}
+
+.rd-trialbar.ok {
+    border-left-color: var(--ok);
+}
+
+/* Кнопки решения — вместе и справа; в узкой колонке переносятся парой. */
+.rd-trialacts {
+    display: flex;
+    gap: var(--s2);
+    margin-left: auto;
+}
+
 .rd-trialbar .dim {
     color: var(--dim);
 }

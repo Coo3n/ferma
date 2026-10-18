@@ -90,7 +90,7 @@ def get_job(job_id: str):
     job = runner.get(job_id)
     if job is None:
         raise HTTPException(404, "задача не найдена")
-    return job.to_dict(with_log=True)
+    return runner.job_dict(job, with_log=True)
 
 
 @router.post("/{job_id}/cancel")

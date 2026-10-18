@@ -106,6 +106,8 @@ def run_scenario(payload: dict = Body(...)):
     if not serials:
         raise HTTPException(400, "не выбрано ни одного устройства")
     batch = _batch_of(payload)
+    if (payload.get("trial") or payload.get("trial_serial")) and len(set(serials)) > 1:
+        return _run_trial(key, serials, payload, batch)
     try:
         jobs = runner.submit(key, serials, payload.get("params"),
                              int(payload.get("repeat", 1)),
@@ -118,6 +120,45 @@ def run_scenario(payload: dict = Body(...)):
         raise HTTPException(400, str(e))
     return {"ok": True, "jobs": [j.to_dict() for j in jobs],
             "batch": jobs[0].batch if jobs else ""}
+
+
+def _run_trial(key: str, serials: list, payload: dict, batch: str | None) -> dict:
+    """Сначала один телефон, остальные сервер запустит сам, если проба пройдёт.
+
+    Проверка шагов (start_step/stop_step/speed) — дело конструктора и с
+    пробой не смешивается: там всегда один телефон.
+    """
+    if payload.get("start_step") or payload.get("stop_step") is not None:
+        raise HTTPException(400, "проверка на одном — только для обычного запуска")
+    trial_serial = payload.get("trial_serial")
+    if trial_serial is not None and not isinstance(trial_serial, str):
+        raise HTTPException(400, "неверный пробный телефон")
+    try:
+        jobs, trial = runner.submit_trial(key, serials, payload.get("params"),
+                                          int(payload.get("repeat", 1)),
+                                          trial_serial=trial_serial, batch=batch)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, "jobs": [runner.job_dict(j) for j in jobs], "batch": trial.batch,
+            "trial": trial.to_dict(jobs[0])}
+
+
+@router.post("/api/run/trial/{batch}/release")
+def trial_release(batch: str):
+    """«Всё равно запустить на остальных» после непрошедшей пробы."""
+    trial = runner.trial_release(batch)
+    if trial is None:
+        raise HTTPException(409, "остальные уже запущены или проба ещё идёт")
+    return {"ok": True, "trial": trial.to_dict(runner.get(trial.job_id))}
+
+
+@router.post("/api/run/trial/{batch}/cancel")
+def trial_cancel(batch: str):
+    """Остальных не запускать. Идущая проба доигрывает — её отменяют как задачу."""
+    trial = runner.trial_drop(batch)
+    if trial is None:
+        raise HTTPException(409, "решение по остальным уже принято")
+    return {"ok": True, "trial": trial.to_dict(runner.get(trial.job_id))}
 
 
 @router.post("/api/run/preflight")
