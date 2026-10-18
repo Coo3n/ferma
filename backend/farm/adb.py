@@ -18,6 +18,10 @@ _ADB_CANDIDATES = [
     "/opt/homebrew/bin/adb",
     "/usr/local/bin/adb",
     os.path.expanduser("~/Library/Android/sdk/platform-tools/adb"),
+    # Windows: Android Studio ставит SDK сюда, platform-tools — отдельной папкой
+    os.path.join(os.getenv("LOCALAPPDATA", ""), "Android", "Sdk", "platform-tools", "adb.exe")
+    if os.getenv("LOCALAPPDATA") else "",
+    r"C:\platform-tools\adb.exe",
 ]
 
 

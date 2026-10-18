@@ -28,6 +28,15 @@ brew install scrcpy                          # необязательно: пл�
 ./run.sh                                     # http://127.0.0.1:8777
 ```
 
+**Windows:** поставьте Python 3.10+ (галочка «Add python.exe to PATH») и
+[Platform-Tools](https://developer.android.com/tools/releases/platform-tools)
+(папку с `adb.exe` — в PATH), затем двойной клик по `run.bat` или в терминале:
+
+```powershell
+cd путь\к\ferma
+.\run.bat
+```
+
 Первый запуск создаст `.venv` и поставит зависимости. На телефоне:
 **Настройки → О телефоне → 7 раз «Номер сборки»**, затем **Для разработчиков →
 Отладка по USB**, при подключении — «Разрешить».
