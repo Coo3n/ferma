@@ -320,7 +320,8 @@ function tileUpdate(el, device, ghost) {
     const batt = el.querySelector('.batt');
     /* Полоса заряда — только когда заряд садится: процент уже написан
        цифрой, а серая полоса на каждой плитке выглядела мёртвым индикатором. */
-    if (device.battery == null || device.battery > BATTERY_MID) {
+    /* Офлайн — заряд последний известный, а не нынешний: полоса врала бы. */
+    if (!device.online || device.battery == null || device.battery > BATTERY_MID) {
         batt.hidden = true;
     } else {
         batt.hidden = false;

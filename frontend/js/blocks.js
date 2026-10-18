@@ -125,6 +125,26 @@ function recBlocksFix() {
     }
 }
 
+/* Перестановка (стрелки, перетаскивание) может загнать блок с вложенными в
+   ещё один блок — глубже BLOCK_DEPTH_MAX. Сервер такой сценарий не примет,
+   а узнал бы человек об этом только при сохранении. Поэтому перестановку,
+   после которой стало слишком глубоко, откатываем сразу и говорим почему. */
+function blockSnap() {
+    return REC.steps.map(s => [s, s.parent ?? null]);
+}
+
+function blockUndoIfTooDeep(snap) {
+    const byId = blockById();
+    const ok = REC.steps.every(s => blockChain(s, byId).length + (blockIsHead(s) ? 1 : 0) <= BLOCK_DEPTH_MAX);
+    if (ok) return false;
+    REC.steps = snap.map(([s, parent]) => {
+        s.parent = parent;
+        return s;
+    });
+    toast(t('rec.slishkom_gluboko', {n: BLOCK_DEPTH_MAX}), 'bad');
+    return true;
+}
+
 /* Рецепт с сервера: span → ссылки на блоки. */
 function recBlocksFromSpan() {
     const open = [];   // [id, индекс последнего шага блока]
@@ -610,7 +630,7 @@ window.recDup = function (id) {
 /* ------------------------------------------------------------------ схема */
 
 const GR_BLOCK_INDENT = 26;   // каждый уровень вложенности — сдвиг вправо
-const GR_BLOCK_PAD = 10;
+const GR_BLOCK_PAD = 11;   // две соседние рамки + зазор помещаются в промежуток карточек (26px)
 
 /* Рамки блоков на схеме: прямоугольник вокруг заголовка и шагов внутри; у
    повтора и «пока не найдёшь» — стрелка «назад, к началу круга» справа:
@@ -622,7 +642,7 @@ function grBlockFrames(layout) {
         const depth = blockDepth(head);
         const boxes = block.map(s => layout.pos.get(s.id)).filter(Boolean);
         if (!boxes.length) return;
-        const pad = GR_BLOCK_PAD - depth * 3;
+        const pad = GR_BLOCK_PAD - depth * 4;   // вложенная рамка заметно внутри внешней, края не сливаются
         const x1 = Math.min(...boxes.map(b => b.x)) - pad;
         const y1 = Math.min(...boxes.map(b => b.y)) - pad;
         const x2 = Math.max(...boxes.map(b => b.x)) + layout.nodeW + pad;

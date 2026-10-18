@@ -43,3 +43,6 @@ tags.json
 backend/scenarios/*
 
 .claude/worktrees/
+
+# файлы обмена коммитами (git bundle) — не в git
+*.bundle

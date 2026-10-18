@@ -952,3 +952,6 @@ button.rd-ph.on {
 .rd-ph b { font-weight: 600; }
 .rd-ph small { color: var(--dim); font-size: var(--fs-1); }
 .rd-ph i { font-style: normal; color: var(--busy); font-size: var(--fs-1); }
+
+/* Текущий телефон в списке выбора — чтобы было видно, с какого переключаемся. */
+.phone-pick button.on { background: var(--accent-dim); }

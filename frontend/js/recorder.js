@@ -2710,8 +2710,7 @@ function recRow(step, index) {
                 onclick="event.stopPropagation();recRowMenu(event, ${step.id})">⋯</button>
       </span>
     </div>
-    ${recMark(step, open)}
-    ${open ? recStepBody(step, index) : ''}
+    <div class="rs-body">${recMark(step, open)}${open ? recStepBody(step, index) : ''}</div>
   </div>`;
 }
 
@@ -2843,9 +2842,11 @@ function recMove(id, delta) {
     const block = blockOf(REC.steps[index]);
     const target = delta < 0 ? index - 1 : index + block.length;
     if (target < 0 || target >= REC.steps.length) return;
+    const snap = blockSnap();
     REC.steps.splice(index, block.length);
     REC.steps.splice(delta < 0 ? target : target - block.length + 1, 0, ...block);
     blockPlace(block[0], delta < 0);
+    if (blockUndoIfTooDeep(snap)) return recRender();
     recRender();
     recSave();
 }
@@ -2933,6 +2934,7 @@ function recDrop(ev, id) {
     const block = recDragBlock(REC.drag);
     if (block.some(s => s.id === id)) return;
     const blockIds = new Set(block.map(s => s.id));
+    const snap = blockSnap();
     REC.steps = REC.steps.filter(s => !blockIds.has(s.id));
     /* Цель ищем ПОСЛЕ изъятия: индексы за вырезанным шагом сдвинулись, и
        поиск до splice ставил бы шаг на позицию мимо на единицу. */
@@ -2947,6 +2949,7 @@ function recDrop(ev, id) {
     const корень = block[0].parent ?? null;
     for (const s of block) if (!blockIds.has(s.parent)) s.parent = корень;
     REC.drag = null;
+    if (blockUndoIfTooDeep(snap)) return recRender();
     recRender();
     recSave();
 }

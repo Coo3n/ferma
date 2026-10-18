@@ -265,6 +265,15 @@
                             <span data-t="device.ferma">Ферма</span>
                         </button>
                         <strong class="crumb-name" id="scrTitle" data-t="device.ekran">Экран</strong>
+                        <!-- Сменить телефон, не уходя со страницы: запись и правку
+                             сценария удобно смотреть на другом экране. -->
+                        <button class="sm ghost icon-only" id="btnSwitchPhone" onclick="switchPhone()"
+                                title="Сменить телефон" aria-label="Сменить телефон"
+                                data-t-title="device.smenit_telefon" data-t-aria-label="device.smenit_telefon">
+                            <svg class="ic" aria-hidden="true">
+                                <use href="#i-down"/>
+                            </svg>
+                        </button>
                         <button class="sm ghost" id="btnToPult" onclick="pultBack()"
                                 title="Вернуться к пульту телефона" aria-label="К пульту" data-t-title="device.vernutsya_k_pultu_telefona" data-t-aria-label="device.k_pultu">
                             <svg class="ic" aria-hidden="true">

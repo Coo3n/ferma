@@ -267,7 +267,15 @@ function toast(message, kind, action) {
         };
         el.appendChild(link);
     }
-    $('toast').appendChild(el);
+    const box = $('toast');
+    /* Тот же текст уже на экране — не дублируем (двойной клик, повтор
+       опроса). Больше трёх сразу не держим: стопка из пяти закрывала
+       кнопки телефона, а читают всё равно последний. */
+    for (const old of box.children) {
+        if (old.firstChild && old.firstChild.nodeValue === el.firstChild.nodeValue) old.remove();
+    }
+    box.appendChild(el);
+    while (box.children.length > 3) box.firstElementChild.remove();
     /* Длинные тосты (развёрнутые подсказки при первом клике по «Якорю»/
        «Развилке» — см. recFirstHint в recorder.js) читаются дольше пары
        слов — время на экране растёт с длиной текста, а не фиксировано. */

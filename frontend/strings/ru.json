@@ -399,5 +399,7 @@
   "rec.element_ne_raspoznan": "этот элемент не распознаётся — укажите другой или впишите текст",
   "rec.tsel_vybrana": "цель: {chto}",
   "rec.ili_tekstom": "или текстом",
-  "rec.ne_zadano_v_zagolovke": "… — укажите, что искать"
+  "rec.ne_zadano_v_zagolovke": "… — укажите, что искать",
+  "device.smenit_telefon": "Сменить телефон",
+  "device.kakoy_telefon": "Какой телефон показать?"
 }

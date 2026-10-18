@@ -196,18 +196,18 @@ function syncDeviceNav() {
    «Создать записью» и «Изменить» были серыми — человек шёл на ферму,
    открывал телефон и возвращался. Теперь телефон выбирается прямо здесь;
    если свободный в сети один — без вопросов. */
-function pickPhone(title, then) {
-    if (S.active) {
+function pickPhone(title, then, force) {
+    if (S.active && !force) {
         const cur = S.devices.find(d => d.serial === S.active);
         if (cur && cur.online) return then(S.active);
     }
     const free = S.devices.filter(d => d.online && d.enabled !== false && !S.hidden.has(d.serial));
     if (!free.length) return toast('нет телефонов в сети', 'bad');
     const idle = free.filter(d => !d.busy_job);
-    if (idle.length === 1) return then(idle[0].serial);
+    if (idle.length === 1 && !force) return then(idle[0].serial);
     $('mTitle').textContent = title;
     $('mBody').innerHTML = `<div class="phone-pick">${free.map(d => `
-      <button onclick="closeModal();pickPhoneGo('${esc(d.serial)}')" ${d.busy_job ? 'title="Идёт сценарий — запись помешает"' : ''}>
+      <button class="${d.serial === S.active ? 'on' : ''}" onclick="closeModal();pickPhoneGo('${esc(d.serial)}')" ${d.busy_job ? 'title="Идёт сценарий — запись помешает"' : ''}>
         <span class="dot ${d.busy_job ? 'busy' : 'on'}"></span>
         <b>${esc(d.name)}</b><span>${esc([d.group, d.busy_job ? 'занят' : ''].filter(Boolean).join(' · '))}</span>
       </button>`).join('')}</div>`;
@@ -222,6 +222,20 @@ function pickPhoneGo(serial) {
     const then = PICK_PHONE.then;
     PICK_PHONE.then = null;
     if (then) then(serial);
+}
+
+/* «Сменить телефон» на странице телефона: конструктор со всеми шагами
+   остаётся, меняется только экран. Идущая запись встаёт на паузу — иначе
+   следующее нажатие записалось бы по разметке чужого экрана. */
+function switchPhone() {
+    pickPhone(t('device.kakoy_telefon'), serial => {
+        if (serial === S.active) return;
+        if (window.REC) {
+            if (REC.on && window.recPause) recPause();
+            REC.dump = null;
+        }
+        setActive(serial);
+    }, true);
 }
 
 function setActive(serial) {
