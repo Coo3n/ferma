@@ -76,7 +76,9 @@ function syncDeviceHeldBar() {
     /* Уже показываем, как быть на этом экране, — второй раз ту же кнопку не
        предлагаем: после «Сохранить» запуск продолжится сам. */
     const учим = job && window.REC && REC.teach && REC.teach.resume === job.id;
-    box.innerHTML = job && !учим ? decisionBar(job, {onDevice: true}) : '';
+    /* Зовётся с каждым опросом задач: innerHTML заново грузил миниатюру
+       снимка в полосе, и она мигала пустой рамкой раз в 2 с. */
+    setHTML(box, job && !учим ? decisionBar(job, {onDevice: true}) : '');
 }
 
 function syncInteractive() {

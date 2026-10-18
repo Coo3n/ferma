@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#161817">
     <title>Android Farm</title>
+    <!-- Шрифт качается сразу, а не когда CSS доберётся до первого текста:
+         иначе страница появлялась системным шрифтом и через миг
+         перескакивала на Golos — строки меняли ширину. -->
+    <link rel="preload" href="fonts/golos-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="fonts/golos-latin.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="design/tokens.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
@@ -888,6 +893,7 @@
      из модуля не попадают в глобальную область. Порядок значим:
      core.js первым, app.js последним. -->
 <script src="js/i18n.js"></script>
+<script src="js/uikeep.js"></script>
 <script src="js/core.js"></script>
 <script src="js/devices.js"></script>
 <script src="js/fleet.js"></script>

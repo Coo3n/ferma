@@ -80,9 +80,22 @@ function jobCard(job) {
          onclick="pickJob('${job.id}')">
     <span class="badge b-${job.status}">${jobStatusWord(job.status)}</span>${jobDegradedBadge(job)}
     <span class="nm">${esc(job.scenario_name)} · ${esc(job.device_name)}${window.jobProgressHtml ? jobProgressHtml(job) : ''}</span>
-    <span style="color:var(--dim)">${job.duration ? job.duration + ' с' : ''}</span>
+    <span class="jdur" data-job="${esc(job.id)}" style="color:var(--dim)"></span>
     ${remove}${jobWhyHtml(job)}
   </div>`;
+}
+
+/* Длительность идущего запуска растёт каждый опрос. Будь она в разметке,
+   setHTML пересоздавал бы весь список раз в 2 с, пока хоть что-то идёт:
+   «■» под курсором подменялся между нажатием и отпусканием (клик терялся),
+   фокус с карточки слетал. Поэтому в разметке пустой .jdur, а число
+   вписывается на месте — как возраст в «Проблемах». */
+function refreshJobDurations(list) {
+    const byId = new Map((list || []).map(j => [j.id, j.duration]));
+    document.querySelectorAll('#jobList .jdur[data-job]').forEach(node => {
+        const sec = byId.get(node.dataset.job);
+        setText(node, sec ? sec + ' с' : '');
+    });
 }
 
 /* «Где встал» — прямо в строке упавшего телефона: в запуске на сорок без
@@ -166,6 +179,7 @@ async function pollJobs() {
             text: 'Запустите сценарий на телефонах — здесь будет журнал.',
             action: {label: 'К сценариям', icon: 'right', onClick: "showView('scen')"},
         }));
+    refreshJobDurations(shown);
     /* Правая колонка на первом открытии раздела: resetJobView() зовут
        только при удалении и отмене, а объяснить, что здесь будет, надо и
        до первого клика по задаче. */
@@ -441,18 +455,18 @@ function renderArtifacts(job) {
 
     if (job.artifacts && job.artifacts.length) {
         box.style.display = 'flex';
-        box.innerHTML = job.artifacts.map(name =>
+        setHTML(box, job.artifacts.map(name =>
                 `<a href="/api/jobs/${job.id}/artifacts/${encodeURIComponent(name)}"
           target="_blank">${esc(name)}</a>`).join('')
             + teachLink(job)
             + (running ? cancelLink(job, 'остановить') : '')
-            + (отменяется ? cancellingNote() : '');
+            + (отменяется ? cancellingNote() : ''));
         return;
     }
 
     box.style.display = (running || отменяется) ? 'flex' : 'none';
-    box.innerHTML = running ? cancelLink(job, 'остановить запуск')
-        : отменяется ? cancellingNote() : '';
+    setHTML(box, running ? cancelLink(job, 'остановить запуск')
+        : отменяется ? cancellingNote() : '');
 }
 
 /* Живой экран задачи не пересоздаётся на каждый опрос (раз в POLL_JOBS_MS) —
@@ -508,14 +522,18 @@ async function refreshJobLog() {
     $('jobLogEmpty').innerHTML = '';
     pre.hidden = false;
     const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < AUTOSCROLL_SLACK;
-    pre.textContent = (job.log || []).join('\n') || '(пусто)';
+    /* Тот же журнал не переписываем: выделенная мышью строка слетала бы
+       каждые 2 с. */
+    setText(pre, (job.log || []).join('\n') || '(пусто)');
     if (atBottom) pre.scrollTop = pre.scrollHeight;
 
     const held = $('jobHeld');
-    if (held) held.innerHTML = decisionBar(job);
+    /* setHTML, а не innerHTML: в полосе миниатюра снимка — переписанная
+       каждый опрос, она заново грузилась и мигала пустой рамкой. */
+    setHTML(held, decisionBar(job));
     setHTML($('jobRepair'), jobRepairHtml(job));
     const stepsBox = $('jobSteps');
-    if (stepsBox && window.jobStepsHtml) stepsBox.innerHTML = jobStepsHtml(job);
+    if (stepsBox && window.jobStepsHtml) setHTML(stepsBox, jobStepsHtml(job));
     renderArtifacts(job);
 }
 
@@ -527,12 +545,12 @@ function resetJobView() {
         $('jobLive').innerHTML = '';
     }
     jobLiveFor = null;
-    if ($('jobHeld')) $('jobHeld').innerHTML = '';
+    setHTML($('jobHeld'), '');
     $('jobLog').textContent = '';
     $('jobLog').hidden = true;
     $('jobLogEmpty').innerHTML = jobLogEmptyHtml();
     $('jobArts').style.display = 'none';
-    $('jobArts').innerHTML = '';
+    setHTML($('jobArts'), '');
 }
 
 /* 409 здесь не ошибка интерфейса, а опоздание: пока человек читал, истёк

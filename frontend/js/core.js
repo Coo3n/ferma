@@ -158,7 +158,10 @@ function emptyBig({art, title, text, steps, action}) {
 function setHTML(node, html) {
     if (!node || node._html === html) return;
     node._html = html;
-    node.innerHTML = html;
+    /* Данные правда сменились — узлы новые, но фокус и раскрытые <details>
+       возвращаем на место (uikeep.js). */
+    if (window.keepUi) keepUi(node, () => { node.innerHTML = html; });
+    else node.innerHTML = html;
 }
 
 /* Пишем в узел, только если текст правда изменился.

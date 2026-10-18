@@ -1419,7 +1419,8 @@ async function recSchemeSideLoad() {
         console.warn('список автозакрытий недоступен:', e.message);
         return;
     }
-    side.innerHTML = schSide(карта);
+    /* Зовётся после каждого шага записи — тот же список не пересобираем. */
+    setHTML(side, schSide(карта));
 }
 
 /* Пакет берём из шага запуска приложения: отводы хранятся по пакетам, и
@@ -2283,7 +2284,14 @@ function recRender() {
         return;
     }
     box.classList.toggle('has-sel', !!(REC.sel && REC.sel.size));
-    box.innerHTML = recSelBar() + REC.steps.map(recRow).join('');
+    /* Список пересобирается и без участия человека — например, когда
+       селектор записанного нажатия приехал с опозданием. Раскрытое «ещё» у
+       шага и фокус в поле при этом не должны пропадать (uikeep.js). Без
+       пропуска одинаковой разметки: поле с отвергнутым вводом обязано
+       вернуться к сохранённому значению. */
+    const html = recSelBar() + REC.steps.map(recRow).join('');
+    if (window.keepUi) keepUi(box, () => { box.innerHTML = html; });
+    else box.innerHTML = html;
 }
 
 /* ------------------------------------------------------------------ правка */

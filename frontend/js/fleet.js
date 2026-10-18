@@ -107,8 +107,21 @@ function thumbTick(img) {
     thumbLoad(img);
 }
 
+/* Кадр грузим в стороне и ставим, только когда он приехал. Сбой загрузки
+   прямо в <img> ломает картинку — старый кадр пропадает, и плитка стояла
+   пустой до следующей попытки (15 с), хотя THUMB_ERROR_GRACE обещал
+   переждать одиночную заминку. Удачный кадр отдаётся из кэша
+   (max-age), поэтому подстановка мгновенная и сама зовёт img.onload. */
 function thumbLoad(img) {
-    img.src = `/api/devices/${img.dataset.serial}/thumb?t=${Date.now()}`;
+    const url = `/api/devices/${img.dataset.serial}/thumb?t=${Date.now()}`;
+    const next = new Image();
+    next.onload = () => {
+        if (img.isConnected && img.onload) img.src = url;
+    };
+    next.onerror = () => {
+        if (img.isConnected && img.onerror) img.onerror();
+    };
+    next.src = url;
 }
 
 /* Последний показанный кадр каждого телефона. При перезагрузке страницы
@@ -274,7 +287,7 @@ function tileUpdate(el, device, ghost) {
     const edit = el.querySelector('.js-edit');
     edit.title = ghost ? 'Вернуть в список' : 'Переименовать';
     edit.setAttribute('aria-label', edit.title + ': ' + device.name);
-    edit.querySelector('use').setAttribute('href', ghost ? '#i-undo' : '#i-pencil');
+    setHref(edit.querySelector('use'), ghost ? '#i-undo' : '#i-pencil');
     el.querySelector('.js-info').setAttribute('aria-label', 'Подробнее: ' + device.name);
 
     el.querySelector('.dot').className = 'dot ' + status;
@@ -358,11 +371,16 @@ function tileUpdate(el, device, ghost) {
         setText(shot.querySelector('.noshot span'), unauth ? 'не авторизовано' : 'офлайн');
         // Погасший экран и запертый — разные беды: у первой ждут, у второй
         // идут подтверждать ключ на телефоне.
-        shot.querySelector('.noshot use')
-            .setAttribute('href', unauth ? '#i-unlock' : '#i-moon');
+        setHref(shot.querySelector('.noshot use'), unauth ? '#i-unlock' : '#i-moon');
     }
     el.setAttribute('aria-label',
         `${device.name}, ${statusWord(device)}. Открыть рабочее место`);
+}
+
+/* Тот же href у <use> не переписываем: Chrome на любую запись атрибута
+   пересобирает клон иконки, и на перерисовке фермы значки подмигивали. */
+function setHref(use, href) {
+    if (use && use.getAttribute('href') !== href) use.setAttribute('href', href);
 }
 
 function statusWord(device) {
@@ -681,6 +699,9 @@ function renderHiddenBar(count) {
     if (!zone) return;
     if (!count) {
         zone.innerHTML = '';
+        /* Иначе тот же счётчик, вернувшись, упёрся бы в старую подпись и
+           кнопка «Показать скрытые» не появилась бы вовсе. */
+        delete zone.dataset.label;
         return;
     }
     const label = `${S.showHidden ? 'Скрыть' : 'Показать'} скрытые телефоны (${count})`;

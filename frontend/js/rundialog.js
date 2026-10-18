@@ -203,7 +203,7 @@ async function rdPreflight() {
         RD.check = check;
     } catch (e) {
         RD.check = null;
-        $('rdCheck').innerHTML = `<div class="rd-err">${esc(e.message)}</div>`;
+        setHTML($('rdCheck'), `<div class="rd-err">${esc(e.message)}</div>`);
         return disableWithReason($('rdGo'), true, e.message);
     }
     rdRenderCheck();
@@ -223,7 +223,9 @@ function rdRenderCheck() {
     const missing = [...new Set(problems.filter(([, d]) => d.status === 'no_account').map(([, d]) => d.platform))];
     const name = s => (S.devices.find(d => d.serial === s) || {name: s}).name;
 
-    $('rdCheck').innerHTML = !Object.keys(devices).length
+    /* setHTML: смена параметра не схлопывает раскрытый список «требуют
+       внимания» и не пересобирает сводку, если она не изменилась. */
+    setHTML($('rdCheck'), !Object.keys(devices).length
         ? '<div class="rd-empty">некого запускать — выберите телефоны</div>'
         : `<div class="rd-counts">${parts.join('<span class="rd-sep">·</span>')}</div>
       ${sc && sc.needs_accounts && sc.needs_accounts.length
@@ -234,7 +236,7 @@ function rdRenderCheck() {
           <summary>${problems.length} требуют внимания</summary>
           <ul>${problems.map(([s, d]) => `<li><span class="rd-c rd-c--${RD_STATUS[d.status][1]}">●</span>
             ${esc(name(s))} — ${RD_STATUS[d.status][0]}${d.platform ? ' ' + (PLATFORM_NAMES[d.platform] || d.platform) : ''}
-            ${RD_RUNNABLE.has(d.status) ? '' : '<small>(пропустим)</small>'}</li>`).join('')}</ul></details>` : ''}`;
+            ${RD_RUNNABLE.has(d.status) ? '' : '<small>(пропустим)</small>'}</li>`).join('')}</ul></details>` : ''}`);
 
     const k = rdRunnable().length;
     const go = $('rdGo');

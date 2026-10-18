@@ -109,8 +109,8 @@ async function pollStatus() {
         /* Шапка молчит, пока всё штатно: «сколько в сети» уже на карточках
            фермы, итоги ok/сбой — в «Задачах» и «Отклонениях». Здесь только то,
            что нужно знать с любой страницы: идёт работа или что-то сломалось. */
-        $('stStatus').innerHTML = status.scrcpy
-            ? '' : '<span style="color:var(--warn)" title="Установите scrcpy на компьютер фермы">кнопка «В окне» не работает</span>';
+        setHTML($('stStatus'), status.scrcpy
+            ? '' : '<span style="color:var(--warn)" title="Установите scrcpy на компьютер фермы">кнопка «В окне» не работает</span>');
 
         const jobs = status.jobs || {};
         const held = jobs.held || 0;
@@ -119,11 +119,11 @@ async function pollStatus() {
            проверки отмены, — значок в полёте её обязан учитывать. */
         const active = (jobs.queued || 0) + (jobs.running || 0) + held
             + (jobs.cancelling || 0);
-        $('stJobs').innerHTML = active
+        setHTML($('stJobs'), active
             ? `работает <b>${jobs.running || 0}</b>`
               + (jobs.queued ? ` · в очереди <b>${jobs.queued}</b>` : '')
               + (held ? ` · <b style="color:var(--warn)">ждёт ${held}</b>` : '')
-            : '';
+            : '');
 
         // Значок на «Задачах»: сколько работ в полёте прямо сейчас.
         const badge = $('navJobs');
@@ -137,7 +137,7 @@ async function pollStatus() {
         setText(dvnBadge, deviated);
         document.querySelectorAll('[data-dvn-count]').forEach(el => setText(el, deviated || ''));
     } catch (e) {
-        $('stStatus').innerHTML = '<span style="color:var(--bad)">сервер недоступен</span>';
+        setHTML($('stStatus'), '<span style="color:var(--bad)">сервер недоступен</span>');
     }
 }
 

@@ -82,11 +82,20 @@ function renderSchedules() {
         return;
     }
     setHTML(box, `<div class="sch-cards">${SCH.items.map(schCardHtml).join('')}</div>`);
+    schRefreshWhen();
+}
+
+function schRefreshWhen() {
+    document.querySelectorAll('#schList .sch-when[data-at]').forEach(node =>
+        setText(node, schWhen(Number(node.dataset.at))));
 }
 
 function schCardHtml(s) {
     const open = SCH.open.has(s.id);
-    const next = s.enabled ? (s.next_at ? schWhen(s.next_at) : 'некого запускать') : 'выключена';
+    /* «через 12 мин» меняется сам по себе — в разметке только момент, текст
+       вписывает schRefreshWhen(). Иначе список пересобирался бы каждый опрос
+       и сбрасывал взведённое «Удалить» и фокус. */
+    const next = s.enabled ? (s.next_at ? '' : 'некого запускать') : 'выключена';
     const runs = s.runs_per_day === 1 ? '1 раз' : `${s.runs_per_day} раза`;
     return `<article class="sch-card${s.enabled ? '' : ' off'}" data-id="${esc(s.id)}">
       <div class="sch-head">
@@ -98,7 +107,7 @@ function schCardHtml(s) {
           <span class="dim">${esc(s.scenario_name)}${s.scenario_missing ? ' <em class="sch-bad">— сценарий удалён</em>' : ''}</span>
         </div>
         <div class="sch-next${s.enabled && s.next_at ? '' : ' dim'}">
-          <span class="dim">Следующий запуск</span><b>${next}</b></div>
+          <span class="dim">Следующий запуск</span><b${s.enabled && s.next_at ? ` class="sch-when" data-at="${esc(s.next_at)}"` : ''}>${next}</b></div>
       </div>
       <div class="sch-facts">
         <span>${schTargetText(s.target)}</span>

@@ -981,7 +981,7 @@ function stRunRenderStatus() {
     if (!box) return;
     const run = REC.run;
     if (!run) {
-        box.innerHTML = '';
+        setHTML(box, '');
         return;
     }
     const job = run.job;
@@ -1004,9 +1004,11 @@ function stRunRenderStatus() {
     } else {
         head = stRunResult(job);
     }
-    box.innerHTML = `${stale}<div class="runprog ${run.active ? 'on' : job.status}">
+    /* Опрос каждые 700 мс: без сравнения «остановить» пересоздавалась под
+       курсором, и нажатие, попавшее между mousedown и mouseup, терялось. */
+    setHTML(box, `${stale}<div class="runprog ${run.active ? 'on' : job.status}">
       <div class="runprog-bar"><i style="width:${pct}%"></i></div>
-      <div class="runprog-row">${head}</div>${stRunChips(run)}</div>`;
+      <div class="runprog-row">${head}</div>${stRunChips(run)}</div>`);
 }
 
 /* Ленты шагов: видно весь ход одним взглядом, клик — к шагу. */
