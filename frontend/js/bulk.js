@@ -52,25 +52,195 @@ function bulkBusyCount() {
     return [...S.selected].filter(s => (S.devices.find(x => x.serial === s) || {}).busy_job).length;
 }
 
-function bulkReport(what, res) {
-    if (res.queued && !res.done && !res.failed) {
-        toast(`${what}: запланировано на ${res.queued} тел. · ${JITTER_MODES[BULK.mode].label}`, 'ok');
-    } else if (res.failed) {
-        const first = Object.entries(res.results).find(([, r]) => !r.ok);
-        toast(`${what}: ${res.done} ок, ${res.failed} с ошибкой — ${first[1].error}`, 'bad');
-    } else {
-        toast(`${what}: готово на ${res.done}`, 'ok');
+/* ------------------------------------------------- итог по телефонам
+
+   Раньше итог был тостом «36 ок, 2 с ошибкой — device offline»: исчезал,
+   говорил по-английски и не называл телефоны. Теперь итог — панель в окне
+   «Действия» (или своё маленькое окно): сколько готово, кто не смог и
+   почему словами, и «Повторить на 2» — то же действие только на них.
+   Пока действие идёт, кнопки окна выключены: второй раз его не запустить. */
+
+const BULK_RUN = window.BULK_RUN = {busy: false, last: null, timer: 0};
+
+function bulkTel(n) {
+    return declOfNum(n, [t('bulk.tel_1'), t('bulk.tel_2'), t('bulk.tel_5')]);
+}
+
+/* Коды причин приходят с фермы (bulk.py: failure) — здесь только слова. */
+const BULK_REASONS = {
+    offline: () => t('bulk.prichina_offline'),
+    not_found: () => t('bulk.prichina_not_found'),
+    unauthorized: () => t('bulk.prichina_unauthorized'),
+    timeout: () => t('bulk.prichina_timeout'),
+    no_space: () => t('bulk.prichina_no_space'),
+    old_android: () => t('bulk.prichina_old_android'),
+    downgrade: () => t('bulk.prichina_downgrade'),
+    signature: () => t('bulk.prichina_signature'),
+    abi: () => t('bulk.prichina_abi'),
+    blocked: () => t('bulk.prichina_blocked'),
+    bad_apk: () => t('bulk.prichina_bad_apk'),
+    install_other: () => t('bulk.prichina_install_other'),
+    no_access: () => t('bulk.prichina_no_access'),
+    stopped: () => t('bulk.prichina_stopped'),
+};
+
+function bulkReason(r) {
+    const word = BULK_REASONS[r.reason];
+    if (word) return word();
+    // Ошибка самой фермы уже по-русски — её и показываем; adb — нет.
+    if (r.error && /[а-яё]/i.test(r.error) && !/\badb\b/i.test(r.error)) return r.error;
+    return t('bulk.prichina_other');
+}
+
+function bulkFailed(res) {
+    return Object.entries((res && res.results) || {}).filter(([, r]) => !r.ok);
+}
+
+/* Тост — только короткий итог; подробности в панели. Без панели (один
+   телефон, синхронный режим) называем первый сбой. */
+function bulkReport(what, res, withPanel) {
+    const failed = bulkFailed(res);
+    if (res.queued && !res.done && !failed.length) {
+        return toast(t('bulk.zaplanirovano', {what, n: res.queued, jitter: JITTER_MODES[BULK.mode].label}), 'ok');
     }
+    if (!failed.length) return toast(t('bulk.toast_ok', {what, n: res.done}), 'ok');
+    let text = t('bulk.toast_fail', {what, done: res.done, failed: failed.length});
+    if (!withPanel) text += ` — ${deviceLabel(failed[0][0])}: ${bulkReason(failed[0][1])}`;
+    /* Окно закрыли, пока шло, — итог можно открыть из тоста. */
+    const more = withPanel === false && failed.length > 1 && BULK_RUN.last && BULK_RUN.last.res === res;
+    toast(text, 'bad', more ? {label: t('bulk.podrobnee'), onClick: bulkResultModal} : undefined);
+}
+
+/* Одна дорога для всех массовых действий: call(serials) — сам запрос,
+   progress(n) — строка «устанавливаю на 37 телефонов…». Тот же call
+   повторяет действие на упавших. */
+async function bulkRun(what, serials, call, progress) {
+    if (BULK_RUN.busy) {
+        toast(t('bulk.uzhe_idet'), 'bad');
+        return null;
+    }
+    const last = BULK_RUN.last = {
+        what, serials, call, res: null, error: '', started: Date.now(),
+        progress: progress || (n => t('bulk.vypolnyayu', {what, n, tel: bulkTel(n)})),
+    };
+    BULK_RUN.busy = true;
+    /* Окно «Действия» открыто — итог в нём; иначе на несколько телефонов
+       своё маленькое окно. Один телефон (пульт) — хватит тоста. */
+    if (!bulkBox() && serials.length > 1) bulkResultModal();
+    last.focus = document.activeElement;   // кнопку выключим — фокус вернём после
+    bulkPaint();
+    BULK_RUN.timer = setInterval(bulkTick, 1000);
+    try {
+        last.res = await call(serials);
+    } catch (e) {
+        last.error = e.message;
+    } finally {
+        clearInterval(BULK_RUN.timer);
+        BULK_RUN.busy = false;
+    }
+    const panel = bulkPaint();
+    if (last.error) toast(t('bulk.oshibka', {what, err: last.error}), 'bad');
+    else bulkReport(what, last.res, panel);
+    return last.res;
+}
+
+function bulkResultModal() {
+    const last = BULK_RUN.last;
+    if (!last) return;
+    $('mTitle').textContent = last.what;
+    $('mBody').innerHTML = '<div class="bulk-result" id="bulkResult" hidden></div>';
+    $('mActs').innerHTML = `<span class="sp"></span><button onclick="closeModal()">${esc(t('bulk.zakryt'))}</button>`;
+    openModal();
+    if (!BULK_RUN.busy) bulkPaint();
+}
+
+function bulkElapsed() {
+    const sec = Math.floor((Date.now() - BULK_RUN.last.started) / 1000);
+    return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+}
+
+/* Раз в секунду — только счётчик времени: строку состояния не
+   переписываем, иначе экранный диктор читал бы её заново каждую секунду. */
+function bulkTick() {
+    const el = document.querySelector('#bulkResult .bulk-elapsed');
+    if (el) el.textContent = bulkElapsed();
+}
+
+/* Кнопки окна выключены, пока действие идёт: двойной запуск установки на
+   40 телефонов — это 80 установок и вдвое дольше. */
+function bulkLock() {
+    document.querySelectorAll('#mBody .bulk-grid button, #bulkPanel button').forEach(b =>
+        disableWithReason(b, BULK_RUN.busy, t('bulk.uzhe_idet')));
+}
+
+/* Панель итога — только в открытом окне: закрытое окно хранит старую
+   разметку, и итог ушёл бы в невидимый узел. */
+function bulkBox() {
+    return $('modal').classList.contains('on') ? $('bulkResult') : null;
+}
+
+/* Нарисовать состояние в панели, если она на экране. true — панель есть. */
+function bulkPaint() {
+    bulkLock();
+    const box = bulkBox();
+    const last = BULK_RUN.last;
+    if (!box || !last) return false;
+    box.hidden = false;
+    if (BULK_RUN.busy) {
+        box.dataset.st = 'busy';
+        box.innerHTML = `<div class="bulk-progress"><i aria-hidden="true"></i>
+            <b role="status">${esc(last.progress(last.serials.length))}</b>
+            <span class="bulk-elapsed tnum" aria-hidden="true">${bulkElapsed()}</span></div>`;
+        box.scrollIntoView({block: 'nearest'});
+        return true;
+    }
+    const retry = n => `<button class="sm primary" onclick="bulkRetry()" title="${esc(t('bulk.povtorit_podskazka'))}">${
+        esc(t('bulk.povtorit', {n}))}</button>`;
+    if (last.error) {
+        box.dataset.st = 'bad';
+        box.innerHTML = `<div class="bulk-res-head"><b>${esc(last.what)}</b>
+            <span role="status">${esc(t('bulk.ne_vyshlo_sovsem', {err: last.error}))}</span>
+            <span class="sp"></span>${retry(last.serials.length)}</div>`;
+    } else {
+        const results = last.res.results || {};
+        const failed = bulkFailed(last.res)
+            .map(([s, r]) => ({name: deviceLabel(s), why: bulkReason(r), raw: r.code || r.error || ''}))
+            .sort((a, b) => a.why.localeCompare(b.why, 'ru') || a.name.localeCompare(b.name, 'ru', {numeric: true}));
+        const ok = Object.keys(results).filter(s => results[s].ok).map(deviceLabel)
+            .sort((a, b) => a.localeCompare(b, 'ru', {numeric: true}));
+        const total = Object.keys(results).length || last.serials.length;
+        box.dataset.st = failed.length ? 'bad' : 'ok';
+        box.innerHTML = `<div class="bulk-res-head"><b>${esc(last.what)}</b>
+            <span role="status">${esc(t('bulk.gotovo_iz', {done: total - failed.length, total}))}</span>
+            <span class="sp"></span>${failed.length ? retry(failed.length) : ''}</div>
+          ${failed.length ? `<ul class="bulk-fails" aria-label="${esc(t('bulk.ne_vyshlo'))}">${failed.map(f => `
+            <li title="${esc(f.raw)}"><b>${esc(f.name)}</b><span>${esc(f.why)}</span></li>`).join('')}</ul>` : ''}
+          ${ok.length && failed.length ? `<details class="bulk-oks"><summary>${esc(t('bulk.gde_gotovo', {n: ok.length}))}</summary>
+            <p>${ok.map(esc).join(', ')}</p></details>` : ''}`;
+        const again = box.querySelector('button');
+        if (again) again.focus({preventScroll: true});
+        else if (last.focus && last.focus.isConnected && !last.focus.disabled) last.focus.focus({preventScroll: true});
+    }
+    box.scrollIntoView({block: 'nearest'});
+    return true;
+}
+
+/* То же действие — только на тех, где не вышло. Занятых запуском за это
+   время не трогаем, как и bulkTargets. */
+function bulkRetry() {
+    const last = BULK_RUN.last;
+    if (!last || BULK_RUN.busy) return;
+    const failed = last.error ? last.serials : bulkFailed(last.res).map(([s]) => s);
+    const serials = failed.filter(s => !(S.devices.find(d => d.serial === s) || {}).busy_job);
+    if (!serials.length) return toast(t('bulk.vse_zanyaty'), 'bad');
+    bulkRun(last.what, serials, last.call, last.progress);
 }
 
 async function bulkAction(action, what) {
     const serials = bulkTargets();
     if (!serials.length) return toast('выберите телефоны в сети', 'bad');
-    try {
-        bulkReport(what, await post('/api/bulk/action', {serials, action, jitter: bulkJitter()}));
-    } catch (e) {
-        toast(e.message, 'bad');
-    }
+    const jitter = bulkJitter();
+    return bulkRun(what, serials, list => post('/api/bulk/action', {serials: list, action, jitter}));
 }
 
 /* ---------------------------------------------------------- синхронно */
@@ -141,6 +311,7 @@ function bulkMenu() {
         data-tile="${more || ''}"><svg class="ic"><use href="#i-${icon}"/></svg>
         <b>${title}</b><span>${sub}</span></button>`;
     $('mBody').innerHTML = `
+    <div class="bulk-result" id="bulkResult" hidden></div>
     <div class="bulk-sect">Управление</div>
     <div class="bulk-grid">
       ${tile('startSync();closeModal()', 'crosshair', 'Управлять синхронно', 'клик на одном — повтор на всех')}
@@ -171,6 +342,7 @@ function bulkMenu() {
       <span class="sp"></span><button onclick="closeModal()">Закрыть</button>`;
     $('modal').querySelector('.sheet').classList.add('wide');
     openModal();
+    if (BULK_RUN.busy) bulkPaint();   // окно открыли заново, пока действие идёт
 }
 
 /* Галерея текущих экранов выбранных телефонов. Снимок не трогает телефон,
@@ -237,6 +409,7 @@ function bulkPanel(kind) {
     const first = box.querySelector('input, select');
     if (first) first.focus();
     if (kind === 'app') bulkLoadApps();
+    bulkLock();
 }
 
 function bulkSendText() {
@@ -362,50 +535,40 @@ async function bulkSetGroup() {
 async function bulkReboot(ev) {
     const n = bulkTargets().length;
     if (!armConfirm(ev.currentTarget, `Перезагрузить ${n} ${declOfNum(n, ['телефон', 'телефона', 'телефонов'])}?`)) return;
-    try {
-        bulkReport('Перезагрузка', await post('/api/bulk/reboot', {serials: bulkTargets()}));
-    } catch (e) {
-        toast(e.message, 'bad');
-    }
+    bulkRun('Перезагрузка', bulkTargets(), list => post('/api/bulk/reboot', {serials: list}));
 }
 
 function bulkFilePick(kind) {
     const input = $('bulkFile');
     input.accept = kind === 'install' ? '.apk' : '';
-    input.onchange = () => input.files[0] && bulkUpload(kind, input.files[0]);
+    input.onchange = () => input.files[0] && bulkUpload(bulkTargets(), input.files[0]);
     input.click();
 }
 
-async function bulkUpload(kind, file) {
-    const serials = bulkTargets().join(',');
-    const what = kind === 'install' ? 'Установка' : 'Файл';
-    toast(`${what}: загружаю ${file.name}…`);
-    try {
-        const res = await api(`/api/bulk/${kind}?serials=${encodeURIComponent(serials)}`
-            + `&name=${encodeURIComponent(file.name)}`, {method: 'POST', body: file});
-        bulkReport(what, res);
-    } catch (e) {
-        toast(e.message, 'bad');
-    }
+/* Файл с компьютера на телефоны: APK ставится, остальное — в «Загрузки».
+   Установка на 40 телефонов идёт минутами — строка «устанавливаю на 37
+   телефонов…» со счётчиком времени висит в окне до итога. */
+async function bulkUpload(serials, file) {
+    if (!serials.length) return toast('телефоны заняты или не в сети', 'bad');
+    const apk = /\.apk$/i.test(file.name);
+    const what = `${apk ? 'Установка' : 'Файл'} ${file.name}`;
+    const progress = n => (apk
+        ? t('bulk.ustanavlivayu', {file: file.name, n, tel: bulkTel(n)})
+        : t('bulk.otpravlyayu', {file: file.name, n, tel: bulkTel(n)}));
+    const res = await bulkRun(what, serials, list => api(`/api/bulk/${apk ? 'install' : 'push'}`
+        + `?serials=${encodeURIComponent(list.join(','))}&name=${encodeURIComponent(file.name)}`,
+    {method: 'POST', body: file}), progress);
+    /* Новое приложение должно появиться в пульте без перезагрузки. */
+    if (res && apk && window.PULT) serials.forEach(s => { delete PULT.apps[s]; if (PULT.appsFor === s) PULT.appsFor = ''; });
+    return res;
 }
 
-/* Файлы с компьютера на телефоны: APK ставится, остальное — в «Загрузки».
-   Одна дорога для пульта и для плиток фермы. */
+/* Одна дорога для пульта и для плиток фермы; файлы — по очереди. */
 async function uploadFiles(serials, files) {
     if (!serials.length) return toast('телефоны заняты или не в сети', 'bad');
     for (const file of files) {
-        const apk = /\.apk$/i.test(file.name);
-        const what = `${apk ? 'Установка' : 'Файл'} ${file.name}`;
-        toast(`${what}: загружаю на ${serials.length} тел.…`);
-        try {
-            bulkReport(what, await api(`/api/bulk/${apk ? 'install' : 'push'}`
-                + `?serials=${encodeURIComponent(serials.join(','))}&name=${encodeURIComponent(file.name)}`,
-                {method: 'POST', body: file}));
-            /* Новое приложение должно появиться в пульте без перезагрузки. */
-            if (apk && window.PULT) serials.forEach(s => { delete PULT.apps[s]; if (PULT.appsFor === s) PULT.appsFor = ''; });
-        } catch (e) {
-            toast(e.message, 'bad');
-        }
+        if (BULK_RUN.busy) return toast(t('bulk.uzhe_idet'), 'bad');
+        await bulkUpload(serials, file);
     }
 }
 

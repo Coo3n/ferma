@@ -203,7 +203,8 @@ function tileCreate(serial) {
     const el = document.createElement('article');
     el.className = 'tile';
     el.dataset.serial = serial;
-    el.tabIndex = 0;
+    el.tabIndex = -1;   // остановку Tab раздаёт fleetRove — одна на всю сетку
+    el.setAttribute('aria-keyshortcuts', 'Enter Space I F2 Escape');
     el.innerHTML = `
     <div class="shot">
       <div class="phone">
@@ -213,10 +214,10 @@ function tileCreate(serial) {
         </div>
       </div>
       <span class="flag" hidden></span>
-      <button class="pick" aria-pressed="false"><svg class="ic"><use href="#i-check"/></svg></button>
+      <button class="pick" tabindex="-1" aria-pressed="false"><svg class="ic"><use href="#i-check"/></svg></button>
       <div class="acts">
-        <button class="js-info" title="Подробнее"><svg class="ic"><use href="#i-info"/></svg></button>
-        <button class="js-edit"><svg class="ic"><use href="#i-pencil"/></svg></button>
+        <button class="js-info" tabindex="-1" title="Подробнее"><svg class="ic"><use href="#i-info"/></svg></button>
+        <button class="js-edit" tabindex="-1"><svg class="ic"><use href="#i-pencil"/></svg></button>
       </div>
       <span class="open"><svg class="ic"><use href="#i-expand"/></svg>Открыть</span>
     </div>
@@ -238,16 +239,7 @@ function tileCreate(serial) {
         if (ev.shiftKey && FLEET.anchor) return selectRange(FLEET.anchor, serial);
         openDevice(serial);
     });
-    el.addEventListener('keydown', ev => {
-        if (ev.key === 'Enter') {
-            ev.preventDefault();
-            openDevice(serial);
-        } else if (ev.key === ' ') {   // пробел — выбрать, как у флажка
-            ev.preventDefault();
-            toggleSel(serial, !S.selected.has(serial));
-            renderFleet();
-        }
-    });
+    /* Клавиши плитки — в fleetKeys, одним обработчиком на сетку. */
     el.querySelector('.pick').addEventListener('click', ev => {
         ev.stopPropagation();
         if (ev.shiftKey && FLEET.anchor) return selectRange(FLEET.anchor, serial);
@@ -261,10 +253,14 @@ function tileCreate(serial) {
     });
     el.querySelector('.js-edit').addEventListener('click', ev => {
         ev.stopPropagation();
-        if (S.hidden.has(serial)) unhideDevice(serial);
-        else renameDevice(serial);
+        tileEdit(serial);
     });
     return el;
+}
+
+function tileEdit(serial) {
+    if (S.hidden.has(serial)) unhideDevice(serial);
+    else renameDevice(serial);
 }
 
 /* Точечное обновление: трогаем только то, что изменилось. Сравнение с
@@ -487,6 +483,11 @@ function renderFleet() {
     if (!box) return;
     if (!S.devicesLoaded) return;   // ждём первый ответ фермы — см. pollDevices
 
+    /* Фокус внутри сетки переживает опрос: перестановка плитки
+       (insertBefore) и пропажа телефона роняют фокус на body, и человек
+       со стрелками терял место каждые 2.5 с. */
+    const hadFocus = box.contains(document.activeElement) ? document.activeElement : null;
+
     const found = S.devices.filter(d => matchesQuery(d) && passesFilter(d));
     const visible = found.filter(d => !S.hidden.has(d.serial));
     const hidden = found.filter(d => S.hidden.has(d.serial));
@@ -523,6 +524,12 @@ function renderFleet() {
         // и плитка не должна прыгать мимо своего места.
         if (box.children[index] !== el) box.insertBefore(el, box.children[index] || null);
     });
+
+    const rove = fleetRove();
+    if (hadFocus && document.activeElement !== hadFocus) {
+        const back = hadFocus.isConnected ? hadFocus : rove;
+        if (back) back.focus({preventScroll: true});
+    }
 
     renderFleetStats();
     setText($('fleetShown'), shown.length ? `${shown.length}` : '');
@@ -846,6 +853,106 @@ function marqueeRect(a, b) {
         setTimeout(() => { MARQUEE.justDone = false; }, 0);
     });
 })();
+
+/* ------------------------------------------------------------ клавиатура
+
+   Сетка — одна остановка Tab, а не четыре на плитку (плитка, галочка,
+   «подробнее», «переименовать»): на 40 телефонах до панели запуска было
+   173 нажатия. Внутри сетки фокус ходит стрелками — tabindex=0 только у
+   текущей плитки, у остальных и у кнопок в плитках -1. Кнопки остаются
+   для мыши, с клавиатуры то же делают клавиши: пробел — выбрать, Enter —
+   открыть, i — подробнее, F2 — имя, Esc — снять выбор. */
+
+/* Раздать остановку Tab: текущей плитке (последней, где был фокус), а
+   если её больше нет — соседке на том же месте. Возвращает эту плитку. */
+function fleetRove(serial) {
+    const tiles = shownTiles();
+    if (!tiles.length) return null;
+    let el = FLEET.tiles.get(serial || FLEET.focus);
+    if (!el || !el.isConnected) el = tiles[Math.min(FLEET.focusIndex || 0, tiles.length - 1)];
+    FLEET.focus = el.dataset.serial;
+    FLEET.focusIndex = tiles.indexOf(el);
+    tiles.forEach(tile => {
+        const v = tile === el ? 0 : -1;
+        if (tile.tabIndex !== v) tile.tabIndex = v;
+    });
+    return el;
+}
+
+/* Сколько плиток в ряду — у самой сетки: auto-fill меняет число колонок
+   с шириной окна и размером плиток L/M/S. */
+function fleetCols(box) {
+    return Math.max(1, getComputedStyle(box).gridTemplateColumns.split(' ').filter(Boolean).length);
+}
+
+/* Куда шагнуть со стрелкой. Вниз с предпоследнего ряда, где под плиткой
+   пусто, — на последнюю плитку: иначе до неё стрелками не дойти. */
+function fleetStep(key, i, count, cols) {
+    switch (key) {
+        case 'ArrowRight': return Math.min(count - 1, i + 1);
+        case 'ArrowLeft': return Math.max(0, i - 1);
+        case 'ArrowDown':
+            if (i + cols < count) return i + cols;
+            return Math.floor(i / cols) < Math.floor((count - 1) / cols) ? count - 1 : i;
+        case 'ArrowUp': return i - cols >= 0 ? i - cols : i;
+        case 'Home': return 0;
+        case 'End': return count - 1;
+        default: return null;
+    }
+}
+
+(function fleetKeys() {
+    const box = $('fleet');
+    if (!box) return;
+
+    box.addEventListener('focusin', ev => {
+        const tile = ev.target.closest('.tile[data-serial]');
+        if (tile) fleetRove(tile.dataset.serial);
+    });
+
+    box.addEventListener('keydown', ev => {
+        const tile = ev.target.closest('.tile[data-serial]');
+        if (!tile || ev.target !== tile || ev.altKey || ev.metaKey || ev.ctrlKey) return;
+        const serial = tile.dataset.serial;
+        if (ev.key === 'Enter') {
+            ev.preventDefault();
+            return openDevice(serial);
+        }
+        if (ev.key === ' ') {   // пробел — выбрать, как у флажка
+            ev.preventDefault();
+            toggleSel(serial, !S.selected.has(serial));
+            FLEET.anchor = serial;
+            return renderFleet();
+        }
+        // По коду клавиши, а не по букве: в русской раскладке «i» — это «ш».
+        if (ev.code === 'KeyI' && !ev.shiftKey) {
+            ev.preventDefault();
+            return deviceInfo(serial);
+        }
+        if (ev.key === 'F2') {
+            ev.preventDefault();
+            return tileEdit(serial);
+        }
+        const tiles = shownTiles();
+        const to = fleetStep(ev.key, tiles.indexOf(tile), tiles.length, fleetCols(box));
+        if (to == null) return;
+        ev.preventDefault();
+        tiles[to].focus({preventScroll: true});
+        tiles[to].scrollIntoView({block: 'nearest'});
+    });
+})();
+
+/* Esc на ферме снимает выбор — с плитки и с любого места раздела, кроме
+   полей ввода (там Esc очищает поиск). Окно ловит Esc раньше (core.js). */
+document.addEventListener('keydown', ev => {
+    if (ev.key !== 'Escape' || S.view !== 'fleet' || !S.selected.size) return;
+    if ($('modal').classList.contains('on')) return;
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(ev.target.tagName)) return;
+    ev.preventDefault();
+    S.selected.clear();
+    S.devSig = '';
+    renderFleet();
+});
 
 /* ------------------------------------------------------------- навигация */
 
