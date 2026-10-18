@@ -389,6 +389,16 @@
                              панели, и без «вписать» её концы уходили за край. -->
                         <span class="recbar-sep" aria-hidden="true"></span>
 
+                        <!-- Список — для правки, схема — чтобы увидеть сюжет целиком:
+                             блоки рамками, повторы стрелкой, развилки ветками. -->
+                        <div class="chips" id="recViewToggle" role="group">
+                            <button class="chip on" data-view="list" aria-pressed="true"
+                                    onclick="recSetView('list')" data-t="device.spisok">Список
+                            </button>
+                            <button class="chip" data-view="scheme" aria-pressed="false"
+                                    onclick="recSetView('scheme')" data-t="device.shema">Схема
+                            </button>
+                        </div>
 
                         <span class="sp"></span>
 

@@ -169,7 +169,7 @@ function blockLoopMeasure(a) {
 
 function blockTarget(step) {
     const first = (step.any || [])[0];
-    return first ? recFeatText(first) : t('rec.ne_zadano');
+    return first ? recFeatText(first) : t('rec.ne_zadano_v_zagolovke');
 }
 
 function blockLabel(step) {
@@ -297,15 +297,78 @@ function blockFeatsEditor(step, after) {
       </div>
       <div class="blk-ed-row">
         <span class="blk-ed-k"></span>
+        <button class="sm ${REC.blockPick === step.id || !(step.any || []).length ? 'primary' : ''}" onclick="recBlockPickToggle(${step.id})"
+                title="${esc(t('rec.ukazat_na_ekrane_podskazka'))}">${recIcon('crosshair')}${esc(REC.blockPick === step.id ? t('rec.otmena') : t('rec.ukazat_na_ekrane'))}</button>
+        ${after ? `<button class="sm ghost" onclick="recUntilFromStep(${step.id}, ${after.id})"
+            title="${esc(recLabel(after))}">${esc(t('rec.vzyat_iz_shaga', {n: REC.steps.indexOf(after) + 1}))}</button>` : ''}
+      </div>
+      <div class="blk-ed-row">
+        <span class="blk-ed-k dim">${esc(t('rec.ili_tekstom'))}</span>
         <select id="untilKind${step.id}" aria-label="${esc(t('rec.kak_iskat'))}">${UNTIL_FEATS.map(k =>
             `<option value="${k}">${esc(untilFeatName(k))}</option>`).join('')}</select>
         <input type="text" id="untilVal${step.id}" placeholder="${esc(t('rec.naprimer_podpisatsya'))}"
                onkeydown="if(event.key==='Enter')recUntilAdd(${step.id})">
-        <button class="sm" onclick="recUntilAdd(${step.id})">${esc(t('rec.dobavit'))}</button>
-        ${after ? `<button class="sm ghost" onclick="recUntilFromStep(${step.id}, ${after.id})"
-            title="${esc(recLabel(after))}">${esc(t('rec.vzyat_iz_shaga', {n: REC.steps.indexOf(after) + 1}))}</button>` : ''}
+        <button class="sm ghost" onclick="recUntilAdd(${step.id})">${esc(t('rec.dobavit'))}</button>
       </div>`;
 }
+
+/* «Указать на экране» для цели блока: следующее нажатие по зеркалу не уходит
+   на телефон, а выбирает элемент — как запись клика, только получается не
+   шаг, а «что ищем». Работает и без записи: экран разбирается заново. Повторное
+   нажатие кнопки или Esc — отмена. */
+function recBlockPickToggle(id) {
+    REC.blockPick = REC.blockPick === id ? null : id;
+    document.body.classList.toggle('rec-picking', REC.blockPick != null);
+    if (REC.blockPick != null) toast(t('rec.nazhmite_na_ekrane_tsel'));
+    recRender();
+}
+
+/* Признаки элемента для поиска: текст, подпись, id — без требования
+   единственности (блоку важно «есть ли такое на экране», а не «какое из»).
+   Меняющийся текст (счётчики, время) не годится: на прогоне он другой. */
+function blockNodeFeatures(nodes, hit) {
+    const out = [];
+    for (const n of [hit, nodes[hit.target]]) {
+        if (!n) continue;
+        if (n.text && !n.textDynamic) out.push('text=' + JSON.stringify(n.text));
+        if (n.description && !n.descriptionDynamic) out.push('description=' + JSON.stringify(n.description));
+        if (n.resourceId) out.push('resourceId=' + JSON.stringify(n.resourceId));
+    }
+    return [...new Set(out)];
+}
+
+/* Перехват нажатия по зеркалу (screen.js, act). true — нажатие забрано. */
+async function recBlockPickTap(payload) {
+    if (REC.blockPick == null || !payload || payload.type !== 'tap') return false;
+    const head = recFind(REC.blockPick);
+    recBlockPickToggle(REC.blockPick);   // выбор одноразовый
+    if (!head) return true;
+    let dump = REC.dump;
+    try {
+        dump = await api(`/api/devices/${S.active}/inspect`);
+    } catch (e) {
+        if (!dump) {
+            toast(t('rec.ekran_ne_razobran'), 'bad');
+            return true;
+        }
+    }
+    const hit = recHit(payload.x, payload.y, dump);
+    const feats = hit ? blockNodeFeatures(dump.nodes || [], hit) : [];
+    if (!feats.length) {
+        toast(t('rec.element_ne_raspoznan'), 'bad');
+        return true;
+    }
+    head.any = [...new Set([...feats, ...(head.any || [])])].slice(0, 3);
+    REC.open = head.id;
+    recRender();
+    recSave();
+    toast(t('rec.tsel_vybrana', {chto: recFeatText(feats[0])}));
+    return true;
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && window.REC && REC.blockPick != null) recBlockPickToggle(REC.blockPick);
+});
 
 function blockUntilEditor(step) {
     const a = step.args;
