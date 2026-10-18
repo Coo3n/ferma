@@ -39,3 +39,5 @@ tags.json
 
 # сценарии — локальные, в git не идут (служебные _template/_redteam_probe/smoke уже отслеживаются и остаются)
 backend/scenarios/*
+
+.claude/worktrees/
