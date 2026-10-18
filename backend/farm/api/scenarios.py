@@ -1,6 +1,7 @@
 """Сценарии: список, исходник, запуск."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, Body, HTTPException, Query
@@ -12,6 +13,20 @@ from ..recorder import save as saver
 from .detours import scan_obstacles
 
 router = APIRouter()
+
+# Метка запуска приходит из браузера только у пробного запуска: остальные
+# телефоны добавляются в тот же запуск, что и пробный, — одна строка в
+# «Запусках», а не две. Формат — как у runner.submit (uuid hex).
+_BATCH_RE = re.compile(r"[0-9a-f]{6,32}")
+
+
+def _batch_of(payload: dict) -> str | None:
+    batch = payload.get("batch")
+    if batch in (None, ""):
+        return None
+    if not isinstance(batch, str) or not _BATCH_RE.fullmatch(batch):
+        raise HTTPException(400, "неверная метка запуска")
+    return batch
 
 
 def _structure(key: str) -> tuple[int | None, int | None]:
@@ -88,13 +103,15 @@ def run_scenario(payload: dict = Body(...)):
         raise HTTPException(400, "не указан сценарий")
     if not serials:
         raise HTTPException(400, "не выбрано ни одного устройства")
+    batch = _batch_of(payload)
     try:
         jobs = runner.submit(key, serials, payload.get("params"),
                              int(payload.get("repeat", 1)),
                              start_step=int(payload.get("start_step") or 0),
                              stop_step=(int(payload["stop_step"])
                                         if payload.get("stop_step") is not None else None),
-                             speed=float(payload.get("speed") or 1.0))
+                             speed=float(payload.get("speed") or 1.0),
+                             batch=batch)
     except (ValueError, TypeError) as e:
         raise HTTPException(400, str(e))
     return {"ok": True, "jobs": [j.to_dict() for j in jobs],

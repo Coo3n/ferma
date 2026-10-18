@@ -451,6 +451,35 @@ button.armed {
     width: 90px;
 }
 
+/* «Сначала проверить на одном телефоне» — галочка с пояснением, кто первый. */
+.rd-trial {
+    display: flex;
+    gap: var(--s2);
+    align-items: flex-start;
+    margin-top: var(--s3);
+    font-size: var(--fs-3);
+    cursor: pointer;
+}
+
+.rd-trial[hidden] {
+    display: none;
+}
+
+.rd-trial input {
+    width: auto;
+    margin-top: 3px;
+}
+
+.rd-trial b {
+    font-weight: 600;
+}
+
+.rd-trial small {
+    display: block;
+    color: var(--dim);
+    font-size: var(--fs-2);
+}
+
 .rd-check {
     margin-top: var(--s4);
     padding: var(--s3);
@@ -546,6 +575,41 @@ button.armed {
 
 .batchbar[hidden] {
     display: none;
+}
+
+/* Полоса пробного запуска: над списком и внутри полосы запуска. */
+.rd-trialbar {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s2) var(--s3);
+    padding: var(--s2) var(--s4);
+    border-left: 3px solid var(--busy);
+    background: var(--panel2);
+    font-size: var(--fs-2);
+}
+
+.batchbar .rd-trialbar {
+    padding: var(--s2) var(--s3);
+}
+
+.rd-trialbar.bad {
+    border-left-color: var(--bad);
+    background: var(--bad-dim);
+}
+
+.rd-trialbar.bad b {
+    color: var(--bad);
+}
+
+.rd-trialbar .dim {
+    color: var(--dim);
+}
+
+.rd-trialbar button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
 .bb-n.ok { color: var(--ok); }
