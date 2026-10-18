@@ -115,3 +115,22 @@ def test_отсутствующий_шаблон_даёт_None():
     from PIL import Image
     _, crop = экран_и_кроп()
     assert template.find(png(Image.new("RGB", (400, 800), "white")), crop) is None
+
+
+@pytest.mark.skipif(not template.available(), reason="opencv не установлен")
+def test_три_одинаковые_иконки_берётся_ближайшая_к_месту_записи():
+    """Лайки в ленте одинаковы: лучший балл — случайность, решает место записи."""
+    from PIL import Image, ImageDraw
+    screen = Image.new("RGB", (400, 800), "white")
+    draw = ImageDraw.Draw(screen)
+    for y in (100, 400, 700):
+        draw.ellipse((40, y - 20, 80, y + 20), fill="black")
+        draw.rectangle((55, y - 8, 65, y + 8), fill="white")
+    crop = screen.crop((30, 370, 90, 430))
+    hit = template.find(png(screen), png(crop), near=(0.15, 0.85), with_count=True)
+    assert hit is not None
+    cx, cy, score, count = hit
+    assert count == 3
+    assert abs(cy - 700 / 800) < 0.02 and abs(cx - 60 / 400) < 0.02
+    # без места — по-старому: лучший балл, три числа
+    assert len(template.find(png(screen), png(crop))) == 3

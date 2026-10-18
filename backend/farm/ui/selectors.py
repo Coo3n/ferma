@@ -101,6 +101,36 @@ def text_stem(value: str) -> str:
     return _TAIL_RE.sub("", value)
 
 
+# Подпись, которая на следующем прогоне почти наверняка будет другой: время,
+# счётчик лайков, «5 мин назад», @ник. Селектор по ней уникален сегодня и
+# мёртв завтра. Не выбрасываем (иногда ничего другого нет) — понижаем и
+# помечаем `dynamic`, чтобы панель сказала об этом человеку.
+_DYNAMIC_RES = (
+    re.compile(r"\d{1,2}:\d{2}"),                                   # 12:45
+    re.compile(r"^[@#]\w"),                                          # @ник, #тег
+    re.compile(r"\d\s*(k|m|к|м|тыс|млн|млрд)\.?$", re.I),             # 15K, 1,2 тыс.
+    re.compile(r"\b(назад|ago)\b", re.I),                            # 5 мин назад
+    re.compile(r"^(вчера|сегодня|только что|yesterday|today|now)$", re.I),
+    re.compile(r"^\d+\s*(с|сек|мин|ч|д|дн|нед|мес|г|s|m|h|d|w)\.?$", re.I),  # 2 ч
+    re.compile(r"^\d{1,2}\s+[а-яa-z]{3,}\.?$", re.I),                 # 18 окт
+)
+
+
+def is_dynamic(value: str) -> bool:
+    """Подпись меняется сама: время, дата, счётчик, ник. Чистая функция."""
+    value = (value or "").strip()
+    if not value:
+        return False
+    if any(r.search(value) for r in _DYNAMIC_RES):
+        return True
+    digits = sum(c.isdigit() for c in value)
+    if not digits:
+        return False
+    # Почти одни цифры («125», «+7 912…») или счётчик хвостом («Корзина (3)»).
+    letters = sum(c.isalpha() for c in value)
+    return letters < 2 or text_stem(value) != value
+
+
 def _single(nodes: list[Node], node: Node) -> list[dict]:
     out = []
     for key in PRIORITY:
@@ -112,6 +142,7 @@ def _single(nodes: list[Node], node: Node) -> list[dict]:
             "args": f"{key}={_literal(value)}",
             "matches": sum(1 for n in nodes if _attr(n, key) == value),
             "fragile": False,
+            "dynamic": key != "resourceId" and is_dynamic(value),
         })
     stem = text_stem(node.text)
     if len(stem) >= 2 and stem != node.text:
@@ -120,22 +151,57 @@ def _single(nodes: list[Node], node: Node) -> list[dict]:
             "args": f"textContains={_literal(stem)}",
             "matches": sum(1 for n in nodes if stem in n.text),
             "fragile": False,
+            "dynamic": is_dynamic(stem),
+        })
+    return out
+
+
+def _nth(nodes: list[Node], node: Node) -> list[dict]:
+    """«Нужен вот этот»: номер среди узлов с тем же устойчивым признаком.
+
+    Лайки в ленте: id и подпись у всех одинаковые, `d(resourceId=…)` нажмёт
+    первый. `instance` в uiautomator2 — номер среди совпавших в порядке
+    обхода дерева, тот же порядок, что у дампа. Хрупко (лента сдвинется —
+    номер укажет на другой пост), но точнее className+instance, где номер
+    считается среди всех ImageView экрана.
+    """
+    out = []
+    for key in PRIORITY:
+        value = _attr(node, key)
+        if not value or (key != "resourceId" and is_dynamic(value)):
+            continue
+        same = [n.id for n in nodes if _attr(n, key) == value]
+        if len(same) < 2 or node.id not in same:
+            continue
+        k = same.index(node.id)
+        out.append({
+            "call": "click",
+            "args": f"{key}={_literal(value)}, instance={k}",
+            "matches": 1,
+            "fragile": True,
+            "dynamic": False,
+            "nth": [k + 1, len(same)],
         })
     return out
 
 
 def _combined(nodes: list[Node], node: Node) -> list[dict]:
-    out = []
+    out = _nth(nodes, node)
     for key in PRIORITY:
         value = _attr(node, key)
         if not value:
             continue
+        matches = sum(1 for n in nodes if _attr(n, key) == value and n.cls == node.cls)
+        # Тип элемента тот же у всех похожих — сочетание ничего не сужает и
+        # только загромождает список выбора.
+        if matches != 1:
+            continue
         out.append({
             "call": "click",
             "args": f"{key}={_literal(value)}, className={_literal(node.cls)}",
-            "matches": sum(1 for n in nodes
-                           if _attr(n, key) == value and n.cls == node.cls),
+            "matches": matches,
             "fragile": True,
+            "dynamic": key != "resourceId" and is_dynamic(value),
         })
     out.append(_instance(nodes, node))
     return out
@@ -148,13 +214,15 @@ def _instance(nodes: list[Node], node: Node) -> dict:
         "args": f"className={_literal(node.cls)}, instance={same_class.index(node.id)}",
         "matches": 1,
         "fragile": True,
+        "dynamic": False,
     }
 
 
 def _by_coordinates(node: Node) -> list[dict]:
     cx = round((node.bounds[0] + node.bounds[2]) / 2, 3)
     cy = round((node.bounds[1] + node.bounds[3]) / 2, 3)
-    return [{"call": "tap", "args": f"{cx}, {cy}", "matches": 1, "fragile": True}]
+    return [{"call": "tap", "args": f"{cx}, {cy}", "matches": 1, "fragile": True,
+             "dynamic": False}]
 
 
 def _mark_oversized(candidates: list[dict], node: Node) -> list[dict]:
@@ -177,7 +245,12 @@ def _mark_oversized(candidates: list[dict], node: Node) -> list[dict]:
     # Пометить мало — надо и переранжировать: to_payload зовёт эту функцию уже
     # после сортировки внутри build_selectors, и без повторного порядка
     # негодный кандидат остался бы наверху.
-    candidates.sort(key=lambda c: (c["oversized"], c["matches"] != 1, c["fragile"]))
+    # Порядок: годный размер → один такой на экране → подпись не меняется
+    # сама → не хрупкий. Внутри равных — как построены: resourceId раньше
+    # подписи, номер по id раньше номера по типу, координаты последними.
+    candidates.sort(key=lambda c: (c["oversized"], c["matches"] != 1,
+                                   c.get("dynamic", False), c["fragile"],
+                                   c["call"] == "tap"))
     return candidates
 
 
@@ -188,8 +261,10 @@ def build_selectors(nodes: list[Node], node: Node) -> list[dict]:
     сравнении строк, как это делает uiautomator2.
     """
     out = _single(nodes, node)
-    if out and not any(s["matches"] == 1 for s in out) and node.cls:
-        out += _combined(nodes, node)
+    # Уникальная, но меняющаяся подпись («125») — не повод не предложить
+    # устойчивый номер среди одинаковых.
+    if out and not any(s["matches"] == 1 and not s["dynamic"] for s in out):
+        out += _combined(nodes, node) if node.cls else _nth(nodes, node)
     if not out:
         # Узел без единой подписи: className+instance хрупок (порядок узлов
         # на другом экране другой), но всё же селектор, а не слепой тап.
@@ -217,6 +292,8 @@ def to_payload(nodes: list[Node]) -> list[dict]:
             "description": node.description,
             "class": node.cls,
             "clickable": node.clickable,
+            "textDynamic": is_dynamic(node.text),
+            "descriptionDynamic": is_dynamic(node.description),
             "target": target.id,
             "lift": lift,
             "selectors": _mark_oversized(build_selectors(nodes, sel_node), target),
