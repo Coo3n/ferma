@@ -296,7 +296,9 @@ class Registry:
                 if serial not in seen and d.state != "offline":
                     log.warning("устройство пропало: %s", serial)
                     d.state = "offline"
-                    d.busy_job = None
+                    # busy_job не трогаем: задача ещё идёт (или падает) и
+                    # сама освободит телефон в finally runner'а. Сброс здесь
+                    # делал вернувшийся телефон «свободным» посреди задачи.
                     d.forget_health()
                     pool.drop(serial)
 

@@ -12,8 +12,8 @@ if ! command -v "$PY" >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! "$PY" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)'; then
-  echo "Нужен Python 3.9+. Установите: brew install python" >&2
+if ! "$PY" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)'; then
+  echo "Нужен Python 3.10+. Установите: brew install python" >&2
   exit 1
 fi
 

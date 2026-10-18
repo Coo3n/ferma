@@ -1272,11 +1272,6 @@ function recSetView(name) {
        что не влияют, читаются как сломанные. */
     const zoom = $('recZoom');
     if (zoom) zoom.hidden = name !== 'scheme';
-    document.querySelectorAll('#recViewToggle .chip[data-view]').forEach(chip => {
-        const on = chip.dataset.view === name;
-        chip.classList.toggle('on', on);
-        chip.setAttribute('aria-pressed', on ? 'true' : 'false');
-    });
     /* Пока схема была скрыта, её могли перерисовать (правка в списке) —
        тогда ширина карточек посчиталась от нулевого холста и осталась
        минимальной: ResizeObserver этого не видит, ширина-то не менялась. */
