@@ -55,6 +55,24 @@ def import_accounts(text: str = Body(...), platform: str = Body(...)):
             "duplicates": report["duplicates"], "bad_lines": report["bad_lines"]}
 
 
+def _ids(ids) -> list[str]:
+    if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+        raise HTTPException(400, "нужен список ids")
+    return ids
+
+
+@router.post("/delete")
+def delete_accounts(ids: list = Body(..., embed=True)):
+    """Удалить выбранные одним запросом."""
+    return {"ok": True, "deleted": accounts.delete_many(_ids(ids))}
+
+
+@router.post("/unbind")
+def unbind_accounts(ids: list = Body(..., embed=True)):
+    """Отвязать выбранные от телефонов одним запросом."""
+    return {"ok": True, "unbound": accounts.unbind_many(_ids(ids))}
+
+
 @router.post("/autobind")
 def autobind(platform: str = Body(...), serials: list[str] | None = Body(None)):
     """Без serials — раздаём всем телефонам фермы."""

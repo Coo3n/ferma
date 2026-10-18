@@ -855,8 +855,8 @@
                 <svg class="ic" aria-hidden="true">
                     <use href="#i-search"/>
                 </svg>
-                <input type="text" id="accSearch" placeholder="логин, телефон, заметка"
-                       aria-label="Поиск по аккаунтам" oninput="accFilter()" data-t-placeholder="accounts.login_telefon_zametka" data-t-aria-label="accounts.poisk_po_akkauntam">
+                <input type="text" id="accSearch" placeholder="логин, прокси, телефон"
+                       aria-label="Поиск по аккаунтам" oninput="accFilter()" data-t-placeholder="accounts.login_proksi_telefon" data-t-aria-label="accounts.poisk_po_akkauntam">
             </div>
             <select id="accPlatform" class="sm" aria-label="Платформа" onchange="accFilter()" data-t-aria-label="accounts.platforma"></select>
             <span class="sect-n" id="accSummary"></span>
@@ -881,6 +881,9 @@
                 Добавить
             </button>
         </div>
+        <!-- чипы статуса и панель выбора рисует accounts.js -->
+        <div class="acc-filters" id="accFilters" hidden></div>
+        <div class="acc-selbar" id="accSelBar" hidden></div>
         <div class="scroll grow" id="accList"></div>
     </section>
 <script>
