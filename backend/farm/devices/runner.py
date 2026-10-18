@@ -159,7 +159,8 @@ def hold_repairable(scenario_key: str, step_index: int) -> bool:
     step = steps[step_index]
     if not isinstance(step, dict) or step.get("kind") != "click" or not step.get("selector"):
         return False
-    return bool(step.get("texts") or step.get("crop") or step.get("point"))
+    return bool(step.get("texts") or step.get("crop") or step.get("point")
+                or step.get("point_rel"))
 
 
 def _open_step(job: Job, index: int, labels: list) -> None:

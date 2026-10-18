@@ -160,6 +160,10 @@ def _call(step: dict):
         point_rel = step.get("point_rel")
         # Место поиска — хвостом к любому из трёх вызовов, ко всей цепочке.
         место = [f"{f}=dict({step[f]})" for f in ("within", "near") if step.get(f)]
+        # «Листать, пока не найдётся» — последним хвостом, тоже к любому вызову.
+        if step.get("scroll"):
+            sc = step["scroll"]
+            место.append(f"scroll_until=({literal(sc['dir'])}, {int(sc['max'])})")
         if texts or crop or point or point_rel:
             parts = ["sel=[" + ", ".join(f"dict({a})" for a in chain) + "]"]
             if texts:

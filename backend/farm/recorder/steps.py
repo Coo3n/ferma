@@ -423,6 +423,35 @@ def _point_rel(raw, step: dict) -> list | None:
     return [round(x, 4), round(y, 4)]
 
 
+# «Листать, пока не найдётся»: по выбору оператора, по умолчанию выключено.
+SCROLL_DIRS = ("down", "up")
+SCROLL_MAX = 10   # = farm.context.SCROLL_MAX
+
+
+def _scroll(kind: str, raw) -> dict | None:
+    """{dir: down|up, max: 1..10} — если цели не видно, листать и искать снова."""
+    if raw in (None, {}, ""):
+        return None
+    if kind != "click":
+        raise StepError(f"поле scroll («листать, пока не найдётся») допустимо только у click, "
+                        f"не у {kind}")
+    if not isinstance(raw, dict) or set(raw) != {"dir", "max"}:
+        raise StepError('scroll — {"dir": "down" или "up", "max": сколько раз}')
+    if raw["dir"] not in SCROLL_DIRS:
+        raise StepError("scroll: направление down (вниз) или up (вверх)")
+    n = raw["max"]
+    плохо = f"scroll: сколько раз — целое от 1 до {SCROLL_MAX}"
+    if isinstance(n, bool) or isinstance(n, float):
+        raise StepError(плохо)
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        raise StepError(плохо)
+    if str(raw["max"]).strip() != str(n) or not 1 <= n <= SCROLL_MAX:
+        raise StepError(плохо)
+    return {"dir": raw["dir"], "max": n}
+
+
 def _param(kind: str, raw) -> str | None:
     if raw in (None, ""):
         return None
@@ -526,6 +555,9 @@ def normalize_step(raw) -> dict:
     point_rel = _point_rel(raw.get("point_rel"), step)
     if point_rel:
         step["point_rel"] = point_rel
+    scroll = _scroll(kind, raw.get("scroll"))
+    if scroll:
+        step["scroll"] = scroll
     _check_account(kind, step["args"])
     if kind == "loop":
         _check_loop(step["args"])
@@ -736,6 +768,10 @@ def schema() -> dict:
                         "keys": list(_scope_keys()), "max_one": True,
                         "point_rel": "точка от места: у within доли рамки 0..1, "
                                      "у near смещение от центра ориентира -1..1"},
+        # Необязательное поле click: листать, пока цель не найдётся.
+        "click_scroll": {"dir": list(SCROLL_DIRS), "max": SCROLL_MAX,
+                         "about": "не видно на экране — листать в эту сторону и искать "
+                                  "снова, не больше max раз; без поля не листает"},
         "until_on_fail": list(UNTIL_ON_FAIL),
         "finish_results": list(FINISH_RESULTS),
         "limits": {

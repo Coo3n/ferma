@@ -42,6 +42,12 @@ ESCAPE_STEPS = (
 # таймаута после нажатия «отменить».
 FIND_SLICE = 1.0
 LOOP_PAUSE_SCOPED = 0.5   # пауза между дампами при поиске «внутри»/«рядом с»
+# «Листать, пока не найдётся» (поле scroll шага click): не больше SCROLL_MAX
+# листаний, после каждого цель ищется не дольше SCROLL_LOOK секунд — экран
+# после свайпа уже дорисован (_settle), ждать полный таймаут шага незачем.
+SCROLL_MAX = 10
+SCROLL_LOOK = 2.0
+SCROLL_WORD = {"down": "вниз", "up": "вверх"}
 
 ESCAPE_ROUNDS = 2
 ESCAPE_PROBE = 0.4      # сек на поиск кнопки выхода
@@ -101,6 +107,60 @@ def _takes(fn, name: str) -> bool:
     except (TypeError, ValueError):
         return False
     return any(p.name == name or p.kind == p.VAR_KEYWORD for p in ps)
+
+
+def scroll_spec(raw):
+    """scroll_until= → ("down"|"up", N) или None. Принимает пару из кода и
+    словарь {dir, max} из рецепта. Кривое значение — ValueError сразу, а не
+    тихое «не листать»."""
+    if raw is None:
+        return None
+    if isinstance(raw, dict):
+        d, n = raw.get("dir"), raw.get("max")
+    elif isinstance(raw, (list, tuple)) and len(raw) == 2:
+        d, n = raw
+    else:
+        raise ValueError('scroll_until — пара (направление, сколько раз), например ("down", 5)')
+    if d not in SCROLL_WORD:
+        raise ValueError("scroll_until: направление down или up")
+    if isinstance(n, bool) or not isinstance(n, int) or not 1 <= n <= SCROLL_MAX:
+        raise ValueError(f"scroll_until: сколько раз — целое от 1 до {SCROLL_MAX}")
+    return d, n
+
+
+def раз(n: int) -> str:
+    """1 раз, 2 раза, 5 раз, 12 раз."""
+    if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+        return f"{n} раза"
+    return f"{n} раз"
+
+
+def sel_name(sel) -> str:
+    """Как назвать цель в журнале: надпись или короткое имя id, а не словарь."""
+    for key, value in dict(sel or {}).items():
+        if key == "instance" or not isinstance(value, str) or not value:
+            continue
+        if key.startswith("resourceId"):
+            return value.split("/")[-1].rstrip("$").replace("_", " ")
+        return value
+    return "цель"
+
+
+def seek_what(name: str, within=None, near=None) -> str:
+    """«Нравится» рядом с «Иван Петров» — для строки журнала о листании."""
+    out = f"«{name}»"
+    if within:
+        out += f" внутри «{sel_name(within)}»"
+    if near:
+        out += f" рядом с «{sel_name(near)}»"
+    return out
+
+
+def _scrolled(scroll) -> str:
+    """Хвост сообщения о промахе: сколько листали."""
+    if not scroll:
+        return ""
+    return f" — пролистал {SCROLL_WORD[scroll[0]]} {раз(scroll[1])}, не нашлось"
 
 
 def _miss_json(sel, text, img, at) -> str:
@@ -501,15 +561,21 @@ class DeviceContext:
                 return None
 
     def click(self, timeout: float = 10, scroll: bool = True,
-              within: dict | None = None, near: dict | None = None, **selector) -> None:
+              within: dict | None = None, near: dict | None = None,
+              scroll_until=None, **selector) -> None:
         """Найти и нажать. Не нашлось на экране — проскроллить к элементу.
 
         Падает с понятным сообщением, если элемента нет и после прокрутки.
         Или не падает, а ждёт человека — см. `_stuck`.
         within/near — где искать среди одинаковых (см. `_click_scoped`).
+        scroll_until=("down", 5) — не видно на экране: листать и искать снова
+        (см. `_seek`); тогда u2 сам к элементу не прокручивает.
         """
+        scroll_until = scroll_spec(scroll_until)
         if within or near:
-            return self._click_scoped((selector,), within, near, timeout)
+            return self._click_scoped((selector,), within, near, timeout, scroll_until)
+        if scroll_until:
+            return self._click_scrolling((selector,), timeout, scroll_until)
         беда = f"не найден элемент {selector} за {timeout} с"
         while True:
             self.check_cancel()
@@ -532,16 +598,21 @@ class DeviceContext:
             self.fail(беда)
 
     def click_any(self, *selectors: dict, timeout: float = 10,
-                  within: dict | None = None, near: dict | None = None) -> None:
+                  within: dict | None = None, near: dict | None = None,
+                  scroll_until=None) -> None:
         """Цепочка селекторов из конструктора: нажимается первый найденный.
 
         Запасные селекторы спасают на другой прошивке или локали, где
         основной не совпал. Общий timeout делится на быстрые круги по всем
         кандидатам, затем последняя попытка — прокрутка к каждому.
-        within/near применяются к каждому варианту цепочки.
+        within/near применяются к каждому варианту цепочки, scroll_until — как
+        у `click`.
         """
+        scroll_until = scroll_spec(scroll_until)
         if within or near:
-            return self._click_scoped(selectors, within, near, timeout)
+            return self._click_scoped(selectors, within, near, timeout, scroll_until)
+        if scroll_until:
+            return self._click_scrolling(selectors, timeout, scroll_until)
         беда = f"не найден ни один из селекторов {list(selectors)} за {timeout} с"
         while True:
             self.check_cancel()
@@ -623,17 +694,90 @@ class DeviceContext:
         где = f"внутри {within}" if within else f"рядом с {near}"
         return f"не найден элемент {что} {где} за {timeout} с"
 
-    def _click_scoped(self, selectors, within, near, timeout: float) -> None:
+    def _click_scoped(self, selectors, within, near, timeout: float, scroll=None) -> None:
+        что = seek_what(sel_name(selectors[0]), within, near)
         while True:
             self.check_cancel()
             self._settle()
-            node, why = self.find_scoped(selectors, within, near, timeout)
+            why = ["target"]
+
+            def look(first):
+                # «Рядом с» требует ориентир И цель на одном экране: pick без
+                # ориентира цель не отдаёт — одна видимость ничего не даст.
+                node, why[0] = self.find_scoped(
+                    selectors, within, near, timeout if first else min(timeout, SCROLL_LOOK))
+                return node
+
+            node = self._seek(look, scroll, что)
             if node is None and self._rescue():
-                node, why = self.find_scoped(selectors, within, near, 5)
+                node, why[0] = self.find_scoped(selectors, within, near, 5)
             if node is not None:
                 self._tap_node(node)
                 return
-            беда = self._scope_miss(selectors, within, near, timeout, why)
+            беда = self._scope_miss(selectors, within, near, timeout, why[0]) + _scrolled(scroll)
+            решение = self._stuck(беда)
+            if решение == HOLD_RETRY:
+                continue
+            if решение == HOLD_SKIP:
+                return
+            self.fail(беда)
+
+    # ------------------------------------------------ «листать, пока не найдётся»
+    def _seek(self, look, scroll, что: str):
+        """Найти цель, а не видно — листать и искать снова, до N раз.
+
+        look(first) → находка или None; first — первый взгляд, с полным
+        таймаутом шага. Листание только по выбору (поле scroll шага), каждое
+        пишется в журнал словами: человек не должен гадать, отчего ферма
+        вдруг листает.
+        """
+        found = look(True)
+        if found is not None or not scroll:
+            return found
+        d, n = scroll
+        for i in range(1, n + 1):
+            self.check_cancel()
+            self.log(f"листаю {SCROLL_WORD[d]} ({i} из {n}): ищу {что}")
+            if d == "down":
+                self.scroll_down()
+            else:
+                self.scroll_up()
+            self._settle()
+            found = look(False)
+            if found is not None:
+                return found
+        return None
+
+    def _click_scrolling(self, selectors, timeout: float, scroll) -> None:
+        """click/click_any с листанием, без места поиска (поиск через u2)."""
+        if len(selectors) == 1:
+            беда = f"не найден элемент {dict(selectors[0])} за {timeout} с"
+        else:
+            беда = f"не найден ни один из селекторов {list(selectors)} за {timeout} с"
+        беда += _scrolled(scroll)
+        что = seek_what(sel_name(selectors[0]))
+
+        def look(first):
+            t = timeout if first else min(timeout, SCROLL_LOOK)
+            end = time.time() + t
+            while True:
+                for sel in selectors:
+                    кусок = t if len(selectors) == 1 else max(0.0, min(1.5, end - time.time()))
+                    el = self.find(timeout=кусок, **sel)
+                    if el is not None:
+                        return el
+                if time.time() >= end:
+                    return None
+
+        while True:
+            self.check_cancel()
+            self._settle()
+            el = self._seek(look, scroll, что)
+            if el is None and self._rescue():
+                el = look(False)
+            if el is not None:
+                self._click_el(el)
+                return
             решение = self._stuck(беда)
             if решение == HOLD_RETRY:
                 continue
@@ -740,7 +884,7 @@ class DeviceContext:
 
     def click_target(self, sel=None, text=None, img=None, at=None,
                      timeout: float = 10, within: dict | None = None,
-                     near: dict | None = None, at_rel=None) -> None:
+                     near: dict | None = None, at_rel=None, scroll_until=None) -> None:
         """Клик по многослойной цели: селекторы → текст → OCR → шаблон → точка.
 
         После «повторить» человек мог приложить исправленную цель: заменяются
@@ -751,15 +895,23 @@ class DeviceContext:
         within/near соблюдают все слои (resolve._resolve_scoped); точка с местом —
         только смещение `at_rel` от контейнера/ориентира, абсолютная `at` тогда
         для тапа не берётся.
+
+        scroll_until — листать, пока не найдётся (`_seek`). С листанием слой
+        точки не нажимается вовсе: после свайпа «место, где было» — уже другой
+        пост, а тап вслепую там хуже честного промаха.
         """
+        scroll_until = scroll_spec(scroll_until)
+
         def _беда(причина=""):
             if причина == "within":
-                return f"не найдено место поиска {within} — внутри него искать цель sel={sel}"
+                return (f"не найдено место поиска {within} — внутри него искать цель "
+                        f"sel={sel}{_scrolled(scroll_until)}")
             if причина == "near":
-                return f"не найден ориентир {near} — рядом с ним искать цель sel={sel}"
+                return (f"не найден ориентир {near} — рядом с ним искать цель "
+                        f"sel={sel}{_scrolled(scroll_until)}")
             где = (f" внутри {within}" if within else "") + (f" рядом с {near}" if near else "")
             return (f"цель не найдена ни одним слоем: "
-                    f"sel={sel} text={text} img={img} at={at}{где}")
+                    f"sel={sel} text={text} img={img} at={at}{где}{_scrolled(scroll_until)}")
         беда = _беда()
         while True:
             self.check_cancel()
@@ -768,12 +920,20 @@ class DeviceContext:
             if место:
                 место["at_rel"] = at_rel
             why: list = []
-            hit = resolve.resolve(self, sel=sel, text=text, img=img, at=at,
-                                  timeout=timeout, why=why, **место)
+            вслепую = not scroll_until
+
+            def look(first, место=место, sel=sel, text=text, img=img, at=at):
+                return resolve.resolve(
+                    self, sel=sel, text=text, img=img, at=at, blind=вслепую, why=why,
+                    timeout=timeout if first else min(timeout, SCROLL_LOOK), **место)
+
+            имя = (text[0] if text else sel_name((sel or [{}])[0])) if (text or sel) else "цель"
+            hit = self._seek(look, scroll_until,
+                             seek_what(str(имя), место.get("within"), место.get("near")))
             if hit is None and self._rescue():
-                why = []
+                why.clear()
                 hit = resolve.resolve(self, sel=sel, text=text, img=img, at=at,
-                                      timeout=5, why=why, **место)
+                                      timeout=5, why=why, blind=вслепую, **место)
             if hit is None and why:
                 беда = _беда(why[-1])
             if hit is not None and hit.layer == "point":
