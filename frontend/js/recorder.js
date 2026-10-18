@@ -2241,9 +2241,9 @@ function recFallbacks(step) {
 /* Какие запасные слои записались у шага. Порядок — как их пробует резолвер. */
 function recLayers(step) {
     const out = [];
-    if (step.texts && step.texts.length) out.push('текст');
-    if (step.crop) out.push('картинка');
-    if (step.point) out.push('координаты');
+    if (step.texts && step.texts.length) out.push(t('rec.sloy_tekst'));
+    if (step.crop) out.push(t('rec.sloy_kartinka'));
+    if (step.point) out.push(t('rec.sloy_tochka'));
     return out;
 }
 
@@ -2338,7 +2338,7 @@ function recMark(step, open) {
     if (!open) return '';
     if (step.kind !== 'click') return '';
     const layers = recLayers(step);
-    const tail = layers.length ? ' · запасные слои: ' + layers.join(', ') : '';
+    const tail = layers.length ? ' · ' + t('rec.zapasnoy_put', {list: layers.join(', ')}) : '';
     /* Про шаг из файла мы не знаем, однозначен ли его селектор: дампа того
        экрана давно нет. Писать «✓ уникален» было бы враньём. */
     if (step.adopted) return `<div class="rs-ok">из файла${esc(tail)}</div>`;
@@ -3171,6 +3171,7 @@ function recSaveForm() {
     <div class="row"><label class="kb" title="Сразу проверить сценарий на телефоне">
       <input type="checkbox" id="recStay" ${recRunAfterPending() ? 'checked' : ''} style="accent-color:var(--accent)">
       остаться в конструкторе</label></div>
+    ${recRunAfterPending() && !правка ? `<div class="row dim">${esc(t('rec.sohranit_dlya_proverki'))}</div>` : ''}
     ${правка ? `<div class="warn"><svg class="ic"><use href="#i-alert"/></svg>
       <span>«${esc(ключ)}» перезапишется — ручные правки в коде пропадут.</span></div>` : ''}`;
     $('mActs').innerHTML = '<span class="sp"></span>'
