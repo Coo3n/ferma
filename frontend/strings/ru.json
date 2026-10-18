@@ -562,5 +562,15 @@
   "bulk.prichina_stopped": "остановлено аварийной кнопкой",
   "bulk.prichina_other": "не получилось — подробности в подсказке",
   "fleet.klavishi": "Стрелки — по телефонам, пробел — выбрать, Enter — открыть, i — подробнее, F2 — имя, Esc — снять выбор",
-  "rec.tashchim_shagov": "Переносим шагов: {n}"
+  "rec.tashchim_shagov": "Переносим шагов: {n}",
+  "rec.chto_vvodit": "Что вводить",
+  "rec.svoy_tekst": "Свой текст",
+  "rec.iz_akkaunta": "Из аккаунта телефона",
+  "rec.sotsset": "Соцсеть",
+  "rec.pole": "Поле",
+  "rec.iz_akkaunta_podskazka": "На каждом телефоне подставится {pole} его аккаунта {set} из раздела «Аккаунты» — в сценарии пароля нет.",
+  "rec.otkryt_akkaunty": "Открыть «Аккаунты»",
+  "rec.iz_akkaunta_zapisano": "{pole} не записан текстом: на каждом телефоне подставится {pole} его аккаунта {set} из раздела «Аккаунты»",
+  "rec.iz_akkaunta_korotko": "{pole} — из аккаунта {set}",
+  "rec.parol_tekstom": "похоже на пароль — он запишется текстом. Лучше выберите в шаге «Из аккаунта телефона»"
 }

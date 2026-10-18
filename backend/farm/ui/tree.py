@@ -28,6 +28,11 @@ class Node:
     clickable: bool
     children: list[int] = field(default_factory=list)
     package: str = ""
+    # Поле ввода: пароль ли (маскируется), в фокусе ли и его подсказка —
+    # по ним запись понимает, что вводят логин/пароль, и берёт его из аккаунта.
+    password: bool = False
+    focused: bool = False
+    hint: str = ""
 
     @property
     def area(self) -> float:
@@ -82,6 +87,9 @@ def parse(xml: str, width: int, height: int) -> list[Node]:
                 cls=(element.get("class") or "").strip(),
                 clickable=element.get("clickable") == "true",
                 package=(element.get("package") or "").strip(),
+                password=element.get("password") == "true",
+                focused=element.get("focused") == "true",
+                hint=(element.get("hint") or "").strip(),
             ))
             if parent_id is not None:
                 nodes[parent_id].children.append(own_id)

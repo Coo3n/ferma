@@ -137,15 +137,18 @@ PRESETS = [
     },
     {
         "key": "login_fields",
-        "title": "Авторизация: логин и пароль",
-        "desc": "Логин, Tab, пароль, Enter — поле логина должно быть в фокусе. "
-                "Значения потом выносятся в параметры кнопкой {}",
-        "inputs": [{"name": "login", "label": "Логин", "hint": "user@example.com"},
-                   {"name": "password", "label": "Пароль", "hint": "••••••"}],
+        "title": "Войти в аккаунт телефона",
+        # Логин и пароль не вписываются в сценарий: на каждом телефоне берутся
+        # его аккаунт из раздела «Аккаунты» (ctx.account). Вписанный пароль
+        # работал бы на одном телефоне и лежал бы в файле открытым текстом.
+        "desc": "Логин, Tab, пароль, Enter — из аккаунта каждого телефона "
+                "(раздел «Аккаунты»). Поле логина должно быть в фокусе",
+        "inputs": [{"name": "platform", "label": "Аккаунт какой соцсети",
+                    "choices": {"vk": "VK", "inst": "Instagram", "tiktok": "TikTok", "tg": "Telegram"}}],
         "steps": [
-            {"kind": "type", "args": {"value": "{login}", "clear": True}},
+            {"kind": "type", "args": {"value": "", "clear": True, "account": "{platform}", "field": "login"}},
             {"kind": "key", "args": {"name": "tab"}},
-            {"kind": "type", "args": {"value": "{password}", "clear": True}},
+            {"kind": "type", "args": {"value": "", "clear": True, "account": "{platform}", "field": "password"}},
             {"kind": "key", "args": {"name": "enter"}},
         ],
     },

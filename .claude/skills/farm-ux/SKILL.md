@@ -65,7 +65,7 @@ Simultaneous identical actions on many phones = ban. Default ON: jitter modes of
 - Step labels come from `recLabel()` (recorder.js) — human words: «Нажать «Закрыть»», «Очистить данные «VK»», place on screen instead of coordinates. Never show class names (View, LinearLayout), resource ids raw, or `shell …`.
 - Every step must be testable alone: ▶ on scheme card / list row → `recRunStep(i)` → `/api/run` with `stop_step`.
 - Toolbar row 1 = flow (Запись → Проверить → Сохранить). Row 2 = editing tools. Canvas controls (zoom) live on the canvas. Each row must fit 1280px without wrapping.
-- Input steps can take login/password/phone from the phone's account (`args.account` + `args.field` → `ctx.account(...)[field]`). Offer it instead of hardcoded credentials.
+- Accounts in scenarios: never store credentials in a scenario. Recording into a focused password/login/phone field of vk/inst/tiktok/tg (dump `password`/`focused`/`hint`/`package`) becomes `type` with `args.account`+`args.field` (`recNoteType`, `recFieldKind`); the type step editor offers «Свой текст / Из аккаунта телефона» chips; preset «Войти в аккаунт телефона» uses account fields.
 - Builder needs a phone: use `pickPhone(title, then)` (devices.js), never a disabled button.
 - Re-render the scheme when it becomes visible (`recSetView`) — widths computed while hidden are wrong.
 

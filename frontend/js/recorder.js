@@ -2244,7 +2244,45 @@ function recCropData(img, sx, sy, sw, sh, scale) {
 }
 
 /* Живая клавиатура шлёт по символу — иначе «qwerty» это шесть строк кода. */
+/* Приложение → соцсеть раздела «Аккаунты». */
+const REC_PLATFORM_PKG = {
+    'com.vkontakte.android': 'vk', 'com.instagram.android': 'inst',
+    'com.zhiliaoapp.musically': 'tiktok', 'com.ss.android.ugc.trill': 'tiktok',
+    'org.telegram.messenger': 'tg', 'org.telegram.messenger.web': 'tg',
+};
+
+/* Во что сейчас вводят: поле в фокусе на последнем разборе экрана. Пароль —
+   по признаку поля (маскированное) или по словам в его id/подсказке; логин и
+   телефон — по словам. Пустая строка — обычное поле. */
+function recFieldKind(node) {
+    if (!node) return '';
+    const words = [node.resourceId, node.hint, node.text, node.description].join(' ').toLowerCase();
+    if (node.password || /pass|парол/.test(words)) return 'password';
+    if (/phone|телефон|номер/.test(words)) return 'phone';
+    if (/login|email|e-mail|user|логин|почт|имя польз/.test(words)) return 'login';
+    return '';
+}
+
 function recNoteType(payload) {
+    /* Ввод в поле логина/пароля соцсети из раздела «Аккаунты» записывается
+       не текстом, а ссылкой на аккаунт телефона: пароль не попадает в
+       сценарий, и тот же сценарий входит на каждом телефоне в свой аккаунт. */
+    const nodes = (REC.dump && REC.dump.nodes) || [];
+    const field = nodes.find(n => n.focused);
+    const kind = recFieldKind(field);
+    const platform = field && REC_PLATFORM_PKG[field.package];
+    if (kind && platform) {
+        const prev = REC.steps[REC.steps.length - 1];
+        if (prev && prev.kind === 'type' && prev.args.account === platform && prev.args.field === kind) return;
+        recPush({kind: 'type', args: {value: '', clear: true, account: platform, field: kind}});
+        toast(recFirstHint('acc-' + kind, t('rec.iz_akkaunta_zapisano', {
+            pole: REC_ACC_FIELDS[kind], set: PLATFORM_NAMES[platform]}), t('rec.iz_akkaunta_korotko', {
+            pole: REC_ACC_FIELDS[kind], set: PLATFORM_NAMES[platform]})));
+        return;
+    }
+    if (kind === 'password') {
+        toast(t('rec.parol_tekstom'), 'bad');
+    }
     const last = REC.steps[REC.steps.length - 1];
     if (last && last.kind === 'type' && !payload.clear && !last.args.clear) {
         last.args.value += payload.value;
@@ -2461,7 +2499,11 @@ function recLibPick(index) {
     }
     $('modal').querySelector('.sheet').classList.remove('wide');
     $('mTitle').textContent = preset.title;
-    $('mBody').innerHTML = preset.inputs.map(input => `
+    $('mBody').innerHTML = preset.inputs.map(input => input.choices ? `
+      <div class="row"><label>${esc(input.label)}</label>
+        <select class="grow" id="lib_${esc(input.name)}">${Object.entries(input.choices).map(([v, label]) =>
+            `<option value="${esc(v)}">${esc(label)}</option>`).join('')}</select>
+      </div>` : `
       <div class="row"><label>${esc(input.label)}</label>
         <input type="${input.number ? 'number' : 'text'}" step="any" class="grow"
                id="lib_${esc(input.name)}" placeholder="${esc(input.hint || '')}"
@@ -2799,18 +2841,31 @@ function recEditAnchor(id, value) {
    с аккаунтом тот же сценарий работает на всей ферме. */
 const REC_ACC_FIELDS = {login: 'логин', password: 'пароль', phone: 'телефон'};
 
+/* «Что вводить»: свой текст или поле аккаунта ЭТОГО телефона. Раньше —
+   список из двенадцати строк «пароль аккаунта TikTok…», который никто не
+   находил. Теперь два режима кнопками, в режиме аккаунта — соцсеть и поле. */
 function recTypeSource(step) {
     const a = step.args;
-    const cur = a.account ? `${a.account}:${a.field}` : '';
-    const opts = ['<option value="">свой текст</option>'];
-    for (const [p, pn] of Object.entries(PLATFORM_NAMES)) {
-        for (const [f, fn] of Object.entries(REC_ACC_FIELDS)) {
-            opts.push(`<option value="${p}:${f}">${fn} аккаунта ${pn}</option>`);
-        }
-    }
-    return `<div class="row"><label class="inline">Что вводить
-      <select onchange="recSetTypeSource(${step.id}, this.value)">${opts.join('')
-        .replace(`value="${cur}"`, `value="${cur}" selected`)}</select></label></div>`;
+    const chip = (on, onclick, label) => `<button class="chip ${on ? 'on' : ''}" aria-pressed="${on}"
+        onclick="${onclick}">${esc(label)}</button>`;
+    const mode = `<div class="blk-ed-row">
+      <span class="blk-ed-k">${esc(t('rec.chto_vvodit'))}</span>
+      <div class="chips" role="group">
+        ${chip(!a.account, `recSetTypeSource(${step.id}, '')`, t('rec.svoy_tekst'))}
+        ${chip(!!a.account, `recSetTypeSource(${step.id}, '${a.account || 'vk'}:${a.field || 'login'}')`, t('rec.iz_akkaunta'))}
+      </div></div>`;
+    if (!a.account) return mode;
+    const plat = Object.entries(PLATFORM_NAMES).map(([p, pn]) =>
+        chip(a.account === p, `recSetTypeSource(${step.id}, '${p}:${a.field}')`, pn)).join('');
+    const fields = Object.entries(REC_ACC_FIELDS).map(([f, fn]) =>
+        chip(a.field === f, `recSetTypeSource(${step.id}, '${a.account}:${f}')`, fn)).join('');
+    return mode + `<div class="blk-ed-row"><span class="blk-ed-k">${esc(t('rec.sotsset'))}</span>
+        <div class="chips" role="group">${plat}</div></div>
+      <div class="blk-ed-row"><span class="blk-ed-k">${esc(t('rec.pole'))}</span>
+        <div class="chips" role="group">${fields}</div></div>
+      <p class="blk-ed-hint">${esc(t('rec.iz_akkaunta_podskazka', {pole: REC_ACC_FIELDS[a.field] || a.field,
+          set: PLATFORM_NAMES[a.account] || a.account}))}
+        <a href="#" onclick="showView('accounts');return false">${esc(t('rec.otkryt_akkaunty'))}</a></p>`;
 }
 
 function recSetTypeSource(id, value) {

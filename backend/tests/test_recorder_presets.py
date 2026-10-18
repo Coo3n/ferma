@@ -5,6 +5,8 @@ from farm.recorder import presets, steps
 
 
 def _dummy(spec):
+    if spec.get("choices"):
+        return next(iter(spec["choices"]))   # первый вариант выбора
     return "1.5" if spec.get("number") else "com.example.app"
 
 
