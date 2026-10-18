@@ -45,12 +45,12 @@ fi
 if [ ! -x "$VENV/bin/python" ]; then
   say "Создаю виртуальное окружение…"
   "$PY" -m venv "$VENV"
-  "$VENV/bin/pip" install --quiet --upgrade pip
+  "$VENV/bin/pip" install --disable-pip-version-check --upgrade pip
 fi
 # Зависимости — заново, только если список изменился с прошлой установки.
 if ! cmp -s backend/requirements.txt "$VENV/.requirements.installed" 2>/dev/null; then
-  say "Ставлю зависимости…"
-  "$VENV/bin/pip" install --quiet -r backend/requirements.txt
+  say "Ставлю зависимости (видно ход установки, обычно меньше минуты)…"
+  "$VENV/bin/pip" install --disable-pip-version-check -r backend/requirements.txt
   cp backend/requirements.txt "$VENV/.requirements.installed"
 fi
 

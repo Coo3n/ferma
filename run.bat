@@ -1,6 +1,6 @@
 @echo off
 rem Запуск фермы на Windows. Всё нужное ставится само и только один раз:
-rem   Python 3.10+ - через winget, если его нет - установщик с python.org;
+rem   Python 3.10+ - официальный установщик с python.org, только для этого пользователя;
 rem   adb          - официальный архив Google в .deps\ (без прав администратора);
 rem   scrcpy       - необязателен, последний релиз с GitHub в .deps\;
 rem   зависимости  - в .venv, заново только если поменялся backend\requirements.txt.
@@ -15,17 +15,25 @@ set "PS=powershell -NoProfile -ExecutionPolicy Bypass -Command"
 rem ------------------------------------------------------------ Python 3.10+
 call :findpy
 if defined PY goto :venv
-echo -^> Python не найден - ставлю...
-where winget >nul 2>nul
-if not errorlevel 1 (
-  winget install -e --id Python.Python.3.12 --scope user --silent --accept-package-agreements --accept-source-agreements
-) else (
-  echo -^> Скачиваю установщик Python с python.org...
-  %PS% "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest 'https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe' -OutFile \"$env:TEMP\py-setup.exe\""
-  "%TEMP%\py-setup.exe" /quiet InstallAllUsers=0 PrependPath=1 Include_launcher=1
+echo -^> Python не найден - скачиваю официальный установщик с python.org...
+rem Без winget: при первом запуске он молча ждёт согласия с условиями магазина
+rem или окна прав, спрятанного за терминалом, и "крутится" бесконечно.
+rem Установщик ставит Python только для этого пользователя - без прав
+rem администратора; окно с полосой прогресса (/passive) видно, тишины нет.
+set "PYSETUP=%TEMP%\python-3.12.7-amd64.exe"
+rem Качаем во временный .part и переименовываем только целый файл: оборванная
+rem загрузка не должна остаться "уже скачанным" установщиком.
+if not exist "%PYSETUP%" (
+  del /q "%PYSETUP%.part" 2>nul
+  curl.exe -L --fail --progress-bar -o "%PYSETUP%.part" https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe || %PS% "Invoke-WebRequest 'https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe' -OutFile '%PYSETUP%.part'"
+  if not errorlevel 1 if exist "%PYSETUP%.part" move /y "%PYSETUP%.part" "%PYSETUP%" >nul
 )
+if not exist "%PYSETUP%" goto :nopy
+echo -^> Ставлю Python ^(1-2 минуты, появится окно с прогрессом^)...
+start "" /wait "%PYSETUP%" /passive InstallAllUsers=0 PrependPath=1 Include_launcher=1 Include_test=0 Shortcuts=0
 call :findpy
 if defined PY goto :venv
+:nopy
 echo Не удалось поставить Python. Поставьте вручную: https://www.python.org/downloads/ ^(галочка «Add python.exe to PATH»^) и запустите run.bat снова.
 pause
 exit /b 1
@@ -35,13 +43,13 @@ rem ------------------------------------------------------------ .venv + зав�
 if not exist ".venv\Scripts\python.exe" (
   echo -^> Создаю виртуальное окружение...
   "%PY%" -m venv .venv || goto :fail
-  ".venv\Scripts\python.exe" -m pip install --quiet --upgrade pip
+  ".venv\Scripts\python.exe" -m pip install --disable-pip-version-check --upgrade pip
 )
 rem Зависимости - заново, только если список изменился с прошлой установки.
 fc /b backend\requirements.txt .venv\requirements.installed >nul 2>nul
 if errorlevel 1 (
-  echo -^> Ставлю зависимости...
-  ".venv\Scripts\python.exe" -m pip install --quiet -r backend\requirements.txt || goto :fail
+  echo -^> Ставлю зависимости ^(видно ход установки, обычно меньше минуты^)...
+  ".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -r backend\requirements.txt || goto :fail
   copy /y backend\requirements.txt .venv\requirements.installed >nul
 )
 
