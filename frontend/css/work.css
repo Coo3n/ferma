@@ -941,8 +941,26 @@ button.held-shot:hover {
     padding-left: var(--s5);
 }
 
-.rg-only {
+.rg-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s2);
     margin: var(--s2) var(--s4) 0;
+}
+
+/* «Где встал» у упавшего телефона — второй строкой карточки. */
+.job:has(.jwhy) {
+    flex-wrap: wrap;
+}
+
+.job .jwhy {
+    flex-basis: 100%;
+    min-width: 0;
+    color: var(--bad);
+    font-size: var(--fs-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Правая панель шаблона: что делает, настройки по умолчанию, в расписание. */

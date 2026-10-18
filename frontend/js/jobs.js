@@ -81,8 +81,60 @@ function jobCard(job) {
     <span class="badge b-${job.status}">${jobStatusWord(job.status)}</span>${jobDegradedBadge(job)}
     <span class="nm">${esc(job.scenario_name)} · ${esc(job.device_name)}${window.jobProgressHtml ? jobProgressHtml(job) : ''}</span>
     <span style="color:var(--dim)">${job.duration ? job.duration + ' с' : ''}</span>
-    ${remove}
+    ${remove}${jobWhyHtml(job)}
   </div>`;
+}
+
+/* «Где встал» — прямо в строке упавшего телефона: в запуске на сорок без
+   этого приходилось открывать каждую задачу, чтобы понять, одна ли причина. */
+function jobWhereStopped(job) {
+    if (!job || job.status !== 'failed') return '';
+    const info = job.error_info || (job.error ? {title: job.error} : null);
+    const why = info && info.title ? info.title : '';
+    const step = Number.isInteger(job.step_index) && job.step_index >= 0 ? job.step_index + 1 : 0;
+    if (step && why) return t('jobs.vstal_na_shage', {n: step, why});
+    if (step) return t('jobs.vstal_na_shage_bez', {n: step});
+    return why;
+}
+
+function jobWhyHtml(job) {
+    const where = jobWhereStopped(job);
+    return where ? `<small class="jwhy" title="${esc(where)}">${esc(where)}</small>` : '';
+}
+
+/* «Перезапустить упавшие»: тот же сценарий с теми же параметрами, только на
+   телефонах, где задача этого запуска упала. Повтор — по одному разу. */
+function rerunFailedPlan(jobs) {
+    const failed = (jobs || []).filter(j => j.status === 'failed');
+    if (!failed.length) return null;
+    return {scenario: failed[0].scenario_key, params: failed[0].params || {},
+        serials: [...new Set(failed.map(j => j.serial))]};
+}
+
+function rerunFailedButton(batch, jobs) {
+    const plan = rerunFailedPlan(jobs);
+    /* Пока решается пробный запуск, у полосы проверки свои кнопки. */
+    if (!batch || !plan || (window.rdTrialPending && rdTrialPending(batch))) return '';
+    return `<button class="sm" onclick="event.stopPropagation();rerunFailed('${esc(batch)}')">
+      <svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg>${esc(t('jobs.perezapustit_upavshie', {n: plan.serials.length}))}</button>`;
+}
+
+/* Через окно запуска, а не напрямую: сводка готовности покажет, если
+   сбой был из-за аккаунта или телефон выпал из сети. */
+async function rerunFailed(batch) {
+    let jobs;
+    try {
+        jobs = await api(`/api/jobs?limit=${BATCH_LIMIT}&batch=${encodeURIComponent(batch)}`);
+    } catch (e) {
+        return toast(e.message, 'bad');
+    }
+    const plan = rerunFailedPlan(jobs);
+    if (!plan) return toast(t('jobs.upavshih_net'));
+    if (!S.scenarios.some(s => s.key === plan.scenario)) return toast(t('jobs.stsenariya_bolshe_net'), 'bad');
+    const online = new Set(S.devices.filter(d => d.online).map(d => d.serial));
+    const away = plan.serials.filter(s => !online.has(s)).length;
+    if (away) toast(t('jobs.upavshie_ne_v_seti', {n: away}), 'bad');
+    openRunDialog({scenario: plan.scenario, params: plan.params, serials: plan.serials});
 }
 
 async function pollJobs() {
@@ -106,7 +158,8 @@ async function pollJobs() {
     disableWithReason($('btnCancelAll'), !list.some(j => isActive(j.status)), 'Сейчас ничего не идёт');
     renderBatchBar(shown);
     setHTML($('jobList'), shown.length
-        ? (S.runBatch ? shown.map(jobCard).join('') : runGroupsHtml(shown))
+        ? (S.runBatch ? shown.map(jobCard).join('')
+            : (window.rdTrialBarsHtml ? rdTrialBarsHtml() : '') + runGroupsHtml(shown))
         : emptyBig({
             art: 'job',
             title: 'Запусков пока не было',
@@ -162,7 +215,8 @@ function runGroupHtml(g) {
       <span class="bb-track" aria-hidden="true"><i class="ok" style="width:${done / n * 100}%"></i><i class="bad" style="width:${fail / n * 100}%"></i></span>
     </button>
     ${open ? `<div class="rg-body">${g.jobs.map(jobCard).join('')}
-      <button class="sm ghost rg-only" onclick="showRuns('${esc(g.batch)}')">Только этот запуск</button></div>` : ''}
+      <div class="rg-acts">${rerunFailedButton(g.batch, g.jobs)}
+      <button class="sm ghost" onclick="showRuns('${esc(g.batch)}')">Только этот запуск</button></div></div>` : ''}
   </section>`;
 }
 
@@ -198,7 +252,9 @@ function renderBatchBar(jobs) {
       ${live ? `<span class="bb-n busy"><b>${live}</b> в работе</span>` : ''}
       <span class="bb-track" aria-hidden="true"><i class="ok" style="width:${done / jobs.length * 100}%"></i><i class="bad" style="width:${fail / jobs.length * 100}%"></i></span>
       <span class="sp"></span>
-      <button class="sm" onclick="showRuns()">Показать все запуски</button>`);
+      ${rerunFailedButton(S.runBatch, jobs)}
+      <button class="sm" onclick="showRuns()">Показать все запуски</button>
+      ${window.rdTrialBarHtml ? rdTrialBarHtml(S.runBatch) : ''}`);
 }
 
 /* «Починить шаг» у упавшей задачи — та же кнопка, что на карточке
