@@ -143,14 +143,49 @@ def delete(account_id: str) -> bool:
     return False
 
 
+def delete_many(ids: list[str]) -> int:
+    """Удалить пачку одним сохранением: 500 отдельных запросов DELETE
+    переписывали бы файл 500 раз и шли бы минуту."""
+    wanted = {str(i) for i in ids or ()}
+    with _lock:
+        items = _load()
+        before = len(items)
+        items[:] = [a for a in items if a["id"] not in wanted]
+        removed = before - len(items)
+        if removed:
+            _save()
+        return removed
+
+
+def unbind_many(ids: list[str]) -> int:
+    """Отвязать пачку от телефонов. Считаем только тех, кто был привязан."""
+    wanted = {str(i) for i in ids or ()}
+    with _lock:
+        count = 0
+        for a in _load():
+            if a["id"] in wanted and a.get("serial"):
+                a["serial"] = ""
+                a["updated"] = time.time()
+                count += 1
+        if count:
+            _save()
+        return count
+
+
+# Разделители по старшинству. Запятая — последней: она бывает в паролях,
+# а «логин,пароль» без других знаков встречается в выгрузках из таблиц.
+# Тот же порядок повторяет предпросмотр импорта в accounts.js.
+SEPARATORS = ("\t", ";", ":", ",")
+
+
 def parse_lines(text: str, platform: str) -> list[dict]:
-    """Строки «логин:пароль[:прокси]» или через ; / таб — как их отдают продавцы."""
+    """Строки «логин:пароль[:прокси]» или через ; / таб / запятую — как их отдают продавцы."""
     rows = []
     for line in (text or "").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        for sep in ("\t", ";", ":"):
+        for sep in SEPARATORS:
             if sep in line:
                 parts = [p.strip() for p in line.split(sep)]
                 break

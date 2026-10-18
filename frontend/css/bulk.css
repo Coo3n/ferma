@@ -118,8 +118,10 @@
 
 /* ---------------------------------------------------------------- аккаунты */
 
+/* Сверху без отступа: шапка таблицы прилипает к краю, и строки не
+   просвечивают в щели над ней при прокрутке. */
 #accList {
-    padding: var(--s4);
+    padding: 0 var(--s4) var(--s4);
 }
 
 .acc-table {
@@ -139,6 +141,8 @@
     border-bottom: 1px solid var(--line-soft);
     position: sticky;
     top: 0;
+    /* кнопки строк (риппл) позиционированы — без этого едут поверх шапки */
+    z-index: 2;
     background: var(--bg);
 }
 
@@ -766,6 +770,155 @@ button.armed {
 .acc-phone small {
     color: var(--dim);
 }
+
+/* Чипы статуса над таблицей: число рядом со словом — сколько в каждом. */
+.acc-filters {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    padding: var(--s2) var(--s4);
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--bg);
+    flex-wrap: wrap;
+}
+
+.acc-filters[hidden], .acc-selbar[hidden] {
+    display: none;
+}
+
+.acc-n {
+    color: var(--dim);
+    margin-left: 2px;
+}
+
+.chip.on .acc-n {
+    color: var(--text2);
+}
+
+/* Панель выбора — та же, что у шагов конструктора, без тени: лежит
+   в потоке над таблицей, а не поверх неё. */
+.acc-selbar {
+    display: flex;
+    align-items: center;
+    gap: var(--s2) var(--s3);
+    padding: var(--s2) var(--s4);
+    background: var(--panel2);
+    border-bottom: 1px solid var(--accent-line);
+    font-size: var(--fs-2);
+    flex-wrap: wrap;
+}
+
+.acc-selbar .dim {
+    color: var(--dim);
+}
+
+.acc-selbar button .ic {
+    margin-right: 2px;
+}
+
+/* Колонка галочек: узкая, без растяжки, которую поля строки берут себе. */
+.acc-table .acc-ck {
+    width: 36px;
+    padding-left: var(--s2);
+    padding-right: 0;
+}
+
+.acc-table .acc-ck input {
+    width: auto;
+    min-width: 0;
+    margin: 0;
+    accent-color: var(--accent);
+    vertical-align: middle;
+}
+
+.acc-table tr.sel td {
+    background: var(--accent-dim);
+}
+
+/* Длинный прокси (логин:пароль@хост:порт) не раздвигает таблицу:
+   обрезается многоточием, целиком — в подсказке и при правке. */
+.acc-table .acc-proxy {
+    width: 200px;
+    max-width: 200px;
+}
+
+.acc-table .acc-proxy input:not(:focus) {
+    text-overflow: ellipsis;
+}
+
+.acc-none {
+    padding: var(--s4) !important;
+    color: var(--dim);
+    text-align: center;
+}
+
+/* Выбор телефона: на этом уже есть аккаунт той же платформы. */
+.phone-pick .acc-dup span:last-child {
+    color: var(--warn);
+}
+
+.phone-pick button.armed {
+    box-shadow: inset 0 0 0 1px var(--warn);
+}
+
+/* Предпросмотр вставки списком: что добавится, что нет и почему. */
+#accImpPreview:not(:empty) {
+    margin-top: var(--s3);
+}
+
+.acc-imp-sum {
+    display: flex;
+    gap: var(--s3);
+    font-size: var(--fs-2);
+    margin-bottom: var(--s2);
+}
+
+.acc-imp-wrap {
+    max-height: 240px;
+    overflow: auto;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--r2);
+}
+
+.acc-imp-wrap p {
+    margin: var(--s2) var(--s3);
+    font-size: var(--fs-1);
+}
+
+.acc-imp {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-2);
+}
+
+.acc-imp th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--dim);
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+}
+
+.acc-imp th, .acc-imp td {
+    padding: 4px var(--s2);
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.acc-imp .dim {
+    color: var(--dim);
+}
+
+.acc-imp-proxy {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.acc-imp--ok { color: var(--ok); }
+.acc-imp--dup { color: var(--warn); }
+.acc-imp--bad { color: var(--bad); }
 
 /* Строка «Приложение»: список и три кнопки — кнопки переносятся под
    список, а не обрезаются. */
