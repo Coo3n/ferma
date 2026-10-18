@@ -250,7 +250,7 @@ function recBadges(step) {
 function recFlexEditor(step) {
     if (!ST_FLEX.has(step.kind)) return '';
     const fail = stFailGet(step);
-    const tries = ST_FAIL_TRIES.map(n =>
+    const tries = stFailTriesOptions(fail.tries).map(n =>
         `<option value="${n}" ${fail.tries === n ? 'selected' : ''}>${n}</option>`).join('');
     return `<div class="rs-flex rs-fail">
     <span class="rs-fail-h">${esc(t('rec.nenashel'))}:</span>
@@ -878,7 +878,9 @@ function recRunStep(index) {
 }
 
 async function recRunGo() {
-    if (REC.run && REC.run.active) {
+    /* runStarting — пока идут проверка и сохранение: второй клик в это
+       время ставил на телефон вторую проверку следом за первой. */
+    if ((REC.run && REC.run.active) || REC.runStarting) {
         toast('проверка ещё идёт', 'bad');
         return;
     }
@@ -886,6 +888,15 @@ async function recRunGo() {
         toast('сначала откройте телефон', 'bad');
         return;
     }
+    REC.runStarting = true;
+    try {
+        await recRunStart();
+    } finally {
+        REC.runStarting = false;
+    }
+}
+
+async function recRunStart() {
     const check = await recValidate();
     if (!check || !check.ok) {
         if (check) toast('в сценарии есть ошибки — запуск отменён', 'bad');

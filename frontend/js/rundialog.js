@@ -291,13 +291,28 @@ function rdTrialArm() {
     if (!RD.trialTimer) RD.trialTimer = setInterval(rdTrialTick, RD_TRIAL_POLL_MS);
 }
 
+const rdTrialLive = tr => tr.stage === 'run' || tr.stage === 'held';
+
 async function rdTrialTick() {
-    const live = [...RD_TRIALS.values()].filter(tr => tr.stage === 'run' || tr.stage === 'held');
+    /* Медленная сеть: тик дольше интервала, и два тика разом оба видели
+       «прошла» — остальные телефоны запускались дважды. */
+    if (RD.trialTicking) return;
+    const live = [...RD_TRIALS.values()].filter(rdTrialLive);
     if (!live.length) {
         clearInterval(RD.trialTimer);
         RD.trialTimer = null;
         return;
     }
+    RD.trialTicking = true;
+    try {
+        await rdTrialCheck(live);
+    } finally {
+        RD.trialTicking = false;
+    }
+    if (S.view === 'jobs') pollJobs();
+}
+
+async function rdTrialCheck(live) {
     for (const tr of live) {
         let job;
         try {
@@ -306,6 +321,8 @@ async function rdTrialTick() {
         } catch (e) {
             continue;
         }
+        /* Пока ждали ответа, человек мог нажать «Не запускать остальные». */
+        if (RD_TRIALS.get(tr.batch) !== tr || !rdTrialLive(tr)) continue;
         if (!job) {   // удалили из журнала — проверять больше нечего
             RD_TRIALS.delete(tr.batch);
             continue;
@@ -320,7 +337,6 @@ async function rdTrialTick() {
         else if (stage === 'fail') toast(t('run.proba_ne_proshla', {name: who, n: tr.rest.length}), 'bad',
             {label: t('run.pokazat'), onClick: () => showRuns(tr.batch)});
     }
-    if (S.view === 'jobs') pollJobs();
 }
 
 function rdName(serial) {
@@ -480,14 +496,15 @@ async function rdGroupCheck(sel) {
 
 async function rdGroupsGo(ev) {
     const btn = ev && ev.currentTarget;
+    if (btn && btn.disabled) return;
+    const repeat = Number($('rdRepeat').value) || 1;
+    const plan = [...document.querySelectorAll('.grun select')].filter(sel => sel.value);
+    /* До блокировки кнопки: иначе она оставалась «Запускаю…» навсегда. */
+    if (!plan.length) return toast('выберите сценарий хотя бы для одной группы', 'bad');
     if (btn) {
-        if (btn.disabled) return;
         btn.disabled = true;
         btn.textContent = 'Запускаю…';
     }
-    const repeat = Number($('rdRepeat').value) || 1;
-    const plan = [...document.querySelectorAll('.grun select')].filter(sel => sel.value);
-    if (!plan.length) return toast('выберите сценарий хотя бы для одной группы', 'bad');
     let total = 0, phones = 0;
     for (const sel of plan) {
         if (!sel._check) await rdGroupCheck(sel);

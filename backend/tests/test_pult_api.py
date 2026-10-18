@@ -99,3 +99,22 @@ def test_повторная_остановка_видео_отклоняется
     with pytest.raises(HTTPException) as e:
         api_screen.record_stop("A")
     assert e.value.status_code == 409
+
+
+def test_клавиша_с_командой_не_уходит_в_shell(phone, monkeypatch):
+    """`input keyevent` идёт через sh телефона: хвост после «;» стал бы командой."""
+    from farm.control import input as inp
+    monkeypatch.setattr(inp, "via_u2", lambda serial, fn: False)
+    monkeypatch.setattr(inp.adb, "shell", lambda s, cmd, timeout=None: phone.append(cmd))
+    with pytest.raises(HTTPException) as e:
+        api_screen.action("A", {"type": "key", "name": "KEYCODE_HOME; reboot"})
+    assert e.value.status_code == 400
+    assert phone == []
+    api_screen.action("A", {"type": "key", "name": "keycode_camera"})
+    assert phone == [["input", "keyevent", "KEYCODE_CAMERA"]]
+
+
+def test_кривые_координаты_это_400(phone):
+    with pytest.raises(HTTPException) as e:
+        api_screen.action("A", {"type": "tap", "x": "abc", "y": 0.5})
+    assert e.value.status_code == 400

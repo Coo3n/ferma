@@ -44,3 +44,15 @@ def test_phones_independent(monkeypatch):
     t0 = time.monotonic()
     bulk._enqueue("b", 0.0, lambda s: None)
     assert puts[1][0] - t0 < 0.1   # чужая очередь не тормозит
+
+
+def test_кривой_разброс_это_400(monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+    from types import SimpleNamespace
+    _fresh(monkeypatch)
+    monkeypatch.setattr(bulk.registry, "get", lambda s: SimpleNamespace(online=True))
+    for bad in ([5], ["abc"]):
+        with pytest.raises(HTTPException) as e:
+            bulk.bulk_action(["a", "b"], {"type": "tap", "x": 0.5, "y": 0.5}, bad, "a")
+        assert e.value.status_code == 400

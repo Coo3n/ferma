@@ -351,7 +351,14 @@ def _hold(job: Job, что: str, miss: str = "", sc=None, kind: str = "",
     # и запись после флипа могла оказаться в журнале позже неё.
     job.add_line(f"жду решения человека: {что}")
     job.status = HELD
-    _record_hold(job, что, miss, sc, obstacle)
+    # Отмена, пришедшая между check_cancel шага и сбросом события выше,
+    # уже поставила _decided — а сброс его стёр: задача проспала бы отмену
+    # все HOLD_TIMEOUT в статусе HELD. cancel ставит _cancel раньше
+    # _decided, поэтому этой проверки после сброса достаточно.
+    if job._cancel.is_set():
+        job._decided.set()
+    else:
+        _record_hold(job, что, miss, sc, obstacle)
 
     job._decided.wait(timeout=config.HOLD_TIMEOUT)
     # Чтение решения и возврат статуса — под замком decide: иначе ответ,
@@ -594,9 +601,14 @@ def _execute(job: Job) -> None:
 
 
 class Runner:
+    WORKER_IDLE = 300   # с простоя, после которых поток устройства закрывается
+
     def __init__(self) -> None:
         self.jobs: dict[str, Job] = {}
-        self.order: deque[str] = deque(maxlen=config.JOB_HISTORY)
+        # Без maxlen: история обрезается в _prune и только по завершённым —
+        # иначе запуск 40 × 200 вытеснял из журнала ещё не начатые задачи,
+        # и воркер молча их пропускал.
+        self.order: deque[str] = deque()
         self._queues: dict[str, queue.Queue] = {}
         self._workers: dict[str, threading.Thread] = {}
         self._lock = threading.RLock()
@@ -626,11 +638,16 @@ class Runner:
             stepflow.module_from_step(sc, verified_line_map(sc), start_step, stop_step)
 
         batch = batch or uuid.uuid4().hex[:10]
-        created: list[Job] = []
+        # Все устройства — до первой задачи: иначе неизвестный третий телефон
+        # давал 400, а первые два уже работали, и повтор запуска их удваивал.
+        devices = []
         for serial in serials:
             dev = registry.get(serial)
             if dev is None:
                 raise ValueError(f"устройство {serial} не подключено")
+            devices.append((serial, dev))
+        created: list[Job] = []
+        for serial, dev in devices:
             for _ in range(max(1, repeat)):
                 job = Job(
                     id=uuid.uuid4().hex[:12],
@@ -647,10 +664,13 @@ class Runner:
                 with self._lock:
                     self.jobs[job.id] = job
                     self.order.append(job.id)
-                    self._prune()
-                self._queue_for(serial).put(job.id)
+                    # put под замком: воркер решает «очередь пуста — выхожу»
+                    # под ним же, и задача не попадёт к уже уходящему потоку.
+                    self._queue_for(serial).put(job.id)
                 created.append(job)
                 log.info("задача %s: %s → %s", job.id, sc.name, dev.name)
+        with self._lock:
+            self._prune()   # раз на запуск: проход по журналу, а не по задаче
         return created
 
     def cancel(self, job_id: str) -> bool:
@@ -791,10 +811,20 @@ class Runner:
         return s
 
     def _prune(self) -> None:
-        alive = set(self.order)
-        for jid in list(self.jobs):
-            if jid not in alive:
+        """Держать в журнале не больше JOB_HISTORY задач, выбрасывая старейшие
+        завершённые. Живые (очередь, работа, HELD) не трогаем никогда."""
+        лишних = len(self.order) - config.JOB_HISTORY
+        if лишних <= 0:
+            return
+        keep: deque[str] = deque()
+        for jid in self.order:
+            job = self.jobs.get(jid)
+            if лишних > 0 and (job is None or job.status not in ACTIVE):
                 self.jobs.pop(jid, None)
+                лишних -= 1
+                continue
+            keep.append(jid)
+        self.order = keep
 
     # ------------------------------------------------------------------ воркеры
     def _queue_for(self, serial: str) -> queue.Queue:
@@ -813,9 +843,16 @@ class Runner:
     def _worker(self, serial: str, q: queue.Queue) -> None:
         while True:
             try:
-                job_id = q.get(timeout=300)
+                job_id = q.get(timeout=self.WORKER_IDLE)
             except queue.Empty:
-                return  # простаивал 5 минут — поток закрывается
+                # Простаивал — поток закрывается. Решение под замком submit:
+                # иначе задача, положенная в момент выхода, ждала бы вечно.
+                with self._lock:
+                    if q.empty():
+                        if self._workers.get(serial) is threading.current_thread():
+                            self._workers.pop(serial, None)
+                        return
+                continue
             job = self.jobs.get(job_id)
             if job is None or job.status != QUEUED:
                 continue

@@ -112,7 +112,11 @@ def bulk_action(serials: list[str] = Body(...), action: dict = Body(...),
     if lead is None and not jitter:
         return _each(targets, run)
 
-    lo, hi = sorted(max(0.0, min(float(v), MAX_JITTER)) for v in (jitter or [0, 0])[:2])
+    try:
+        lo, hi = sorted(max(0.0, min(float(v), MAX_JITTER)) for v in (jitter or [0, 0])[:2])
+    except (TypeError, ValueError):
+        # [5] или ["abc"] раньше падали распаковкой — 500 вместо понятного 400.
+        raise HTTPException(400, "jitter: два числа [от, до] в секундах")
     followers = [s for s in targets if s != lead]
     for s in followers:
         _enqueue(s, random.uniform(lo, hi), run)
