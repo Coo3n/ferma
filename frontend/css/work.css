@@ -1017,3 +1017,12 @@ button.held-shot:hover {
     vertical-align: middle;
     animation: pulse 1.6s infinite;
 }
+
+/* «Ждёт вас»: счётчик в шапке и окно-очередь. */
+.inbox-btn { color: var(--warn); background: var(--warn-dim); }
+.inbox { display: grid; gap: var(--s3); max-height: 70vh; overflow: auto; }
+.inbox-h { margin: var(--s2) 0 0; font-size: var(--fs-3); color: var(--text2); }
+.inbox-item { padding: var(--s3); background: var(--panel2); border-radius: var(--r2); }
+.inbox-item h4 { margin: 0 0 var(--s2); font-size: var(--fs-3); }
+.inbox-failed p { margin: 0 0 var(--s2); color: var(--bad); font-size: var(--fs-2); }
+.inbox-acts { display: flex; gap: var(--s2); flex-wrap: wrap; }

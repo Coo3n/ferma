@@ -191,3 +191,52 @@ def test_проверка_шага_внутри_повтора_с_выходом
     fn = tree.body[0]
     fn.body = [stepflow._LooseBreak().visit(st) for st in fn.body[0].body]
     compile(ast.fix_missing_locations(tree), "t", "exec")
+
+
+# --------------------------------------------- проверка заголовка с условием
+
+class _Seen:
+    def __init__(self, found):
+        self.found = found
+        self.calls = []
+
+    def seen(self, features, timeout=3):
+        return self.found
+
+    def until_found(self, features, tries=20, on_fail="skip"):
+        self.calls.append(("until", tries, on_fail))
+        return iter(()) if self.found else iter(range(tries))
+
+    def key(self, name):
+        self.calls.append(name)
+
+
+def _header_module(tmp_path, step):
+    from farm import stepflow
+    items = steps.normalize_steps([step, {"kind": "key", "args": {"name": "back"}}])
+    code, lm = codegen.render_mapped(META, {}, items, today=date(2026, 1, 1))
+    path = tmp_path / "h.py"
+    path.write_text(code, "utf-8")
+    mod = types.ModuleType("h_mod")
+    exec(compile(code, str(path), "exec"), mod.__dict__)
+    sc = types.SimpleNamespace(path=str(path), module=mod)
+    return lambda: stepflow.module_from_step(sc, lm, 0, 1)
+
+
+def test_проверка_заголовка_если_на_экране_проверяет_условие(tmp_path):
+    build = _header_module(tmp_path, {"kind": "if_seen", "args": {"span": 1}, "any": ['text="X"']})
+    for found, want in ((True, ["back"]), (False, [])):
+        ctx = _Seen(found)
+        build().run(ctx)
+        assert ctx.calls == want
+
+
+def test_проверка_заголовка_пока_не_найдёшь_один_круг(tmp_path):
+    build = _header_module(tmp_path, {"kind": "until", "args": {"span": 1, "tries": 9, "on_fail": "ask"},
+                                      "any": ['text="X"']})
+    ctx = _Seen(False)
+    build().run(ctx)
+    assert ctx.calls == [("until", 1, "skip"), "back"]
+    ctx = _Seen(True)
+    build().run(ctx)
+    assert ctx.calls == [("until", 1, "skip")]

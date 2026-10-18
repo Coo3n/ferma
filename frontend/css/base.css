@@ -130,11 +130,11 @@ button:not(:disabled).ripple::before {
    вокруг. Прозрачная накладка при gap 4px в панели вкладок перекрывала бы
    соседа и воровала его клики — цена больше пользы. */
 button {
-    min-height: 32px
+    min-height: var(--ctl)
 }
 
 button.sm {
-    min-height: 30px
+    min-height: var(--ctl)
 }
 
 button:hover:not(:disabled) {
@@ -272,11 +272,11 @@ button:not(:has(:not(svg))) {
 
 /* ------------------------------------------------------------------- поля */
 
-input[type=text], input[type=search], input[type=number], input[type=time], input[type=date], select, textarea {
+input[type=text], input[type=search], input[type=password], input[type=number], input[type=time], input[type=date], select, textarea {
     background-color: var(--well);
     border: 1px solid var(--line);
     border-radius: var(--r2);
-    padding: 6px 10px;
+    padding: 4px 10px;
     width: 100%;
     font-family: var(--sans);
     font-size: var(--fs-3);
@@ -603,4 +603,10 @@ input[type=checkbox] {
         animation: none !important;
         transition: none !important
     }
+}
+
+/* Однострочные поля и списки — высоты --ctl, как кнопки рядом с ними. */
+input[type=text], input[type=search], input[type=number], input[type=time], input[type=date],
+input[type=password], select {
+    height: var(--ctl);
 }

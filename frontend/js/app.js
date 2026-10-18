@@ -39,7 +39,13 @@ function showView(name) {
     });
 
     const hash = name === 'device' ? `#device/${S.active}` : '#' + name;
-    if (location.hash !== hash) history.replaceState(null, '', hash);
+    /* pushState, а не replace: кнопка «Назад» браузера возвращает на прошлый
+       раздел (с телефона — на ферму), а не уводит с сайта. Переход по «Назад»
+       сам меняет hash, и сюда он приходит уже совпавшим — новой записи нет. */
+    if (location.hash !== hash) {
+        if (location.hash) history.pushState(null, '', hash);
+        else history.replaceState(null, '', hash);
+    }
 
     /* Чип устройства в шапке зависит от текущего раздела (на самом
        устройстве он прячется), а не только от того, что устройство
@@ -122,11 +128,14 @@ async function pollStatus() {
            проверки отмены, — значок в полёте её обязан учитывать. */
         const active = (jobs.queued || 0) + (jobs.running || 0) + held
             + (jobs.cancelling || 0);
-        setHTML($('stJobs'), active
+        /* «Ждёт вас» — кнопка: ждущие решения и свежие сбои одним окном
+           (inbox.js), а не надпись, которую нельзя нажать. */
+        const waiting = window.inboxCount ? Math.max(held, inboxCount()) : held;
+        setHTML($('stJobs'), (active
             ? `работает <b>${jobs.running || 0}</b>`
               + (jobs.queued ? ` · в очереди <b>${jobs.queued}</b>` : '')
-              + (held ? ` · <b style="color:var(--warn)">ждёт ${held}</b>` : '')
-            : '');
+            : '')
+            + (waiting ? ` <button class="sm inbox-btn" onclick="inboxOpen()">${esc(t('inbox.zhdet_vas', {n: waiting}))}</button>` : ''));
 
         // Значок на «Задачах»: сколько работ в полёте прямо сейчас.
         const badge = $('navJobs');

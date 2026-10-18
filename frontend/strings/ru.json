@@ -410,5 +410,15 @@
   "device.kakoy_telefon_zapis": "На каком телефоне продолжить запись?",
   "device.zapis_na_pauze": "запись на паузе — продолжите кнопкой «Запись» на новом телефоне",
   "pult.zapustit_zdes": "Запустить",
-  "pult.zapustit_zdes_podskazka": "Запустить сценарий на этом телефоне"
+  "pult.zapustit_zdes_podskazka": "Запустить сценарий на этом телефоне",
+  "inbox.title": "Ждёт вас",
+  "inbox.zhdet_vas": "ждёт вас: {n}",
+  "inbox.pusto": "Сейчас ничего не ждёт — всё идёт само.",
+  "inbox.upal": "запуск упал",
+  "inbox.otkryt_telefon": "Открыть телефон",
+  "inbox.zapustit_snova": "Запустить снова",
+  "inbox.ponyatno": "Понятно",
+  "inbox.zhdut_resheniya": "Ждут решения: {n}",
+  "inbox.upali": "Упали за полчаса: {n}",
+  "inbox.zakryt": "Закрыть"
 }

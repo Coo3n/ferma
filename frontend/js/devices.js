@@ -34,7 +34,9 @@ async function pollDevices() {
 
     // Полная перерисовка нужна, только если что-то правда изменилось:
     // плитки живые, в них крутятся превью, и трогать их зря не стоит.
-    const signature = deviceSignature(list);
+    /* «Ждёт решения» приходит из списка запусков, а не телефонов — входит в
+       подпись, иначе плитка оставалась «занято», пока не сменится что-то ещё. */
+    const signature = deviceSignature(list) + '|' + list.filter(deviceHeld).map(d => d.serial).join();
     if (signature !== S.devSig) {
         S.devSig = signature;
         renderFleet();

@@ -66,6 +66,10 @@ def _cut(stmts: list, keep, line_map: dict) -> tuple[list, bool]:
                 continue
             cut = True
             if keep(st.lineno) and not inner:
+                checked = _check_header(st, line_map)
+                if checked is not None:
+                    out.append(checked)
+                    continue
                 inner, _ = _cut(st.body, lambda n: True, line_map)
             out += inner
         elif keep(st.lineno):
@@ -73,6 +77,37 @@ def _cut(stmts: list, keep, line_map: dict) -> tuple[list, bool]:
         else:
             cut = True
     return out, cut
+
+
+def _ctx_call(node, name: str):
+    """Вызов ctx.<name>(…) в условии/итераторе блока (в том числе под not)."""
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+        node = node.operand
+    if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and node.func.attr == name):
+        return node
+    return None
+
+
+def _check_header(st, line_map: dict):
+    """Проверка одного заголовка блока с условием — условие проверяется по-
+    настоящему, а не пропускается. «Если на экране» остаётся «если» (шаги
+    внутри — только если цель есть/нет). «Пока не найдёшь» — один круг:
+    цель уже на экране — шаги не выполняются, нет — выполняются раз и
+    дальше без ошибки. Повтор и «иногда» — как раньше, один проход тела."""
+    body, _ = _cut(st.body, lambda n: True, line_map)
+    if isinstance(st, ast.If) and _ctx_call(st.test, "seen"):
+        st.body = body or [ast.Pass()]
+        st.orelse = []
+        return st
+    call = _ctx_call(st.iter, "until_found") if isinstance(st, ast.For) else None
+    if call is not None:
+        call.keywords = [kw for kw in call.keywords if kw.arg not in ("tries", "on_fail")]
+        call.keywords += [ast.keyword(arg="tries", value=ast.Constant(1)),
+                          ast.keyword(arg="on_fail", value=ast.Constant("skip"))]
+        st.body = body or [ast.Pass()]
+        return st
+    return None
 
 
 class _LooseBreak(ast.NodeTransformer):
