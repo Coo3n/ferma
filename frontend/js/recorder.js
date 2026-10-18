@@ -1554,6 +1554,19 @@ function grDragStart(ev, id) {
         host.removeEventListener('pointerup', onUp);
         if (frame) cancelAnimationFrame(frame);
         canvas.querySelectorAll('.gr-node.dragging').forEach(el => el.classList.remove('dragging'));
+        /* Бросили на другую карточку — это перестановка шагов, как в списке:
+           порядок выполнения меняется, схема раскладывается заново. Бросили на
+           пустое место — карточка просто стоит там, куда её поставили. */
+        const over = document.elementsFromPoint(e.clientX, e.clientY)
+            .map(el => el.closest && el.closest('.gr-node[data-id]'))
+            .find(el => el && !movingIds.has(Number(el.dataset.id)));
+        if (step && over) {
+            const r = over.getBoundingClientRect();
+            REC.steps.forEach(s => { delete s.pos; });
+            if (!recMovePack(moving, Number(over.dataset.id), e.clientY < r.top + r.height / 2)) recRender();
+            recSchemeSpine();
+            return;
+        }
         if (step) {
             applyShift(shift(e));
             recSave();
@@ -1577,7 +1590,7 @@ const SCH_ICONS = {
     loop: ['loop', 'rotate'],
     chance: ['chance', 'dice'],
     until: ['until', 'search'],
-    if_seen: ['until', 'eye-off'],
+    if_seen: ['until', 'eye'],
     break: ['block', 'stop'],
     finish: ['block', 'check'],
     call: ['block', 'layers'],
@@ -1595,6 +1608,8 @@ const SCH_ICONS = {
 };
 
 function schIcon(step) {
+    /* «Если на экране нет» — перечёркнутый глаз, «есть» — обычный. */
+    if (step.kind === 'if_seen' && step.args && step.args.negate) return ['until', 'eye-off'];
     return SCH_ICONS[step.kind] || ['', 'zap'];   // click / tap / long_tap
 }
 
@@ -2314,7 +2329,7 @@ function recBlockNew(kind) {
         toast(t('rec.slishkom_gluboko', {n: BLOCK_DEPTH_MAX}), 'bad');
     } else {
         REC.open = head.id;
-        REC.insertAfter = head.id;
+        /* Запись не уходит внутрь молча: туда пишет только «Записать сюда». */
         toast(recFirstHint('block-' + kind, blockAddedHint(kind), t('rec.blok_dobavlen')));
     }
     recRender();
@@ -3044,7 +3059,15 @@ function recDrop(ev, id) {
     if (REC.drag == null || REC.drag === id) return;
 
     const block = recDragBlock(REC.drag);
-    if (block.some(s => s.id === id)) return;
+    REC.drag = null;
+    recMovePack(block, id, выше);
+}
+
+/* Переставить пачку шагов (или блок) к шагу id — выше или ниже его. Общая
+   для списка (recDrop) и схемы (grDragStart): порядок в списке — это и есть
+   порядок выполнения. */
+function recMovePack(block, id, выше) {
+    if (block.some(s => s.id === id)) return false;
     const blockIds = new Set(block.map(s => s.id));
     const snap = blockSnap();
     REC.steps = REC.steps.filter(s => !blockIds.has(s.id));
@@ -3060,10 +3083,13 @@ function recDrop(ev, id) {
        из чужого блока). Все они садятся туда же, куда встал первый. */
     const корень = block[0].parent ?? null;
     for (const s of block) if (!blockIds.has(s.parent)) s.parent = корень;
-    REC.drag = null;
-    if (blockUndoIfTooDeep(snap)) return recRender();
+    if (blockUndoIfTooDeep(snap)) {
+        recRender();
+        return false;
+    }
     recRender();
     recSave();
+    return true;
 }
 
 function recEditValue(id, value) {

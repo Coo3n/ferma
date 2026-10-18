@@ -21,7 +21,7 @@ const BLOCK_KINDS = {
     loop: {icon: 'rotate', defaults: () => ({times: 10, pause_min: 1, pause_max: 3, watch: true})},
     chance: {icon: 'dice', defaults: () => ({percent: 15})},
     until: {icon: 'search', defaults: () => ({tries: 20, on_fail: 'skip'})},
-    if_seen: {icon: 'eye-off', defaults: () => ({negate: false, timeout: 3})},
+    if_seen: {icon: 'eye', defaults: () => ({negate: false, timeout: 3})},
 };
 const UNTIL_ON_FAIL = ['skip', 'fail', 'ask'];
 const UNTIL_FEATS = ['textContains', 'text', 'resourceId', 'descriptionContains'];
@@ -274,7 +274,7 @@ function recBlockEditor(step) {
       <button class="sm ghost" onclick="recBlockWrap('loop', [${step.id}])">${recIcon('rotate')}${esc(t('rec.blok_povtor'))}</button>
       <button class="sm ghost" onclick="recBlockWrap('chance', [${step.id}])">${recIcon('dice')}${esc(t('rec.blok_shans'))}</button>
       <button class="sm ghost" onclick="recBlockWrap('until', [${step.id}])">${recIcon('search')}${esc(t('rec.blok_poka'))}</button>
-      <button class="sm ghost" onclick="recBlockWrap('if_seen', [${step.id}])">${recIcon('eye-off')}${esc(t('rec.blok_esli'))}</button>
+      <button class="sm ghost" onclick="recBlockWrap('if_seen', [${step.id}])">${recIcon('eye')}${esc(t('rec.blok_esli'))}</button>
     </div>`;
     }
     const body = step.kind === 'loop' ? blockLoopEditor(step)
@@ -343,7 +343,7 @@ function blockFeatsEditor(step, after) {
       </div>
       <div class="blk-ed-row">
         <span class="blk-ed-k"></span>
-        <button class="sm ${REC.blockPick === step.id || !(step.any || []).length ? 'primary' : ''}" onclick="recBlockPickToggle(${step.id})"
+        <button class="sm ${REC.blockPick === step.id ? 'armed' : ''}" onclick="recBlockPickToggle(${step.id})"
                 title="${esc(t('rec.ukazat_na_ekrane_podskazka'))}">${recIcon('crosshair')}${esc(REC.blockPick === step.id ? t('rec.otmena') : t('rec.ukazat_na_ekrane'))}</button>
         ${after ? `<button class="sm ghost" onclick="recUntilFromStep(${step.id}, ${after.id})"
             title="${esc(recLabel(after))}">${esc(t('rec.vzyat_iz_shaga', {n: REC.steps.indexOf(after) + 1}))}</button>` : ''}
@@ -404,7 +404,8 @@ async function recBlockPickTap(payload) {
         toast(t('rec.element_ne_raspoznan'), 'bad');
         return true;
     }
-    head.any = [...new Set([...feats, ...(head.any || [])])].slice(0, 3);
+    /* Указали на экране — это новая цель целиком, а не добавка к старой. */
+    head.any = feats.slice(0, 3);
     REC.open = head.id;
     recRender();
     recSave();

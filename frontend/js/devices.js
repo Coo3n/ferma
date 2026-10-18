@@ -65,8 +65,15 @@ function deviceSignature(list) {
     ]);
 }
 
+/* Запуск на телефоне стоит и ждёт человека — самое срочное состояние:
+   на ферме оно не должно выглядеть обычным «занято». */
+function deviceHeld(device) {
+    return !!device.busy_job && (S.jobs || []).some(j => j.serial === device.serial && j.status === 'held');
+}
+
 function statusClass(device) {
     if (!device.online) return 'off';
+    if (deviceHeld(device)) return 'held';
     if (device.busy_job) return 'busy';
     return device.warnings.length ? 'err' : 'on';
 }
@@ -228,10 +235,14 @@ function pickPhoneGo(serial) {
    остаётся, меняется только экран. Идущая запись встаёт на паузу — иначе
    следующее нажатие записалось бы по разметке чужого экрана. */
 function switchPhone() {
-    pickPhone(t('device.kakoy_telefon'), serial => {
+    const recording = !!(window.REC && REC.on);
+    pickPhone(recording ? t('device.kakoy_telefon_zapis') : t('device.kakoy_telefon'), serial => {
         if (serial === S.active) return;
         if (window.REC) {
-            if (REC.on && window.recPause) recPause();
+            if (REC.on && window.recPause) {
+                recPause();
+                toast(t('device.zapis_na_pauze'));
+            }
             REC.dump = null;
         }
         setActive(serial);

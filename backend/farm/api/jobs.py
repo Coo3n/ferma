@@ -25,8 +25,16 @@ def list_jobs(limit: int = 60, serial: Optional[str] = None, batch: Optional[str
 
 
 @router.post("/cancel_all")
-def cancel_all(serial: Optional[str] = None):
-    return {"ok": True, "cancelled": runner.cancel_all(serial)}
+def cancel_all(serial: Optional[str] = None, everything: bool = False):
+    """everything=1 — аварийная остановка всей фермы: кроме запусков ещё
+    выключаются смены и выбрасывается очередь массовых действий."""
+    out = {"ok": True, "cancelled": runner.cancel_all(serial)}
+    if everything and serial is None:
+        from ..schedule import scheduler
+        from .bulk import drain_queues
+        out["shifts_paused"] = scheduler.pause_all()
+        out["actions_dropped"] = drain_queues()
+    return out
 
 
 @router.post("/clear")

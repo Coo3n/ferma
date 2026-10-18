@@ -578,13 +578,21 @@ function cancelJob(id) {
     }).catch(e => toast(e.message, 'bad'));
 }
 
+/* Аварийная остановка: запуски, включённые смены и отложенные массовые
+   действия — иначе смена через полчаса запускала ферму снова. */
 function cancelAll(ev) {
     const live = (S.jobs || []).filter(j => isActive(j.status)).length;
-    if (!live) return toast('ничего не идёт');
-    if (ev && !armConfirm(ev.currentTarget, `Остановить ${live}?`)) return;
-    return post('/api/jobs/cancel_all').then(result => {
-        toast(`остановлено запусков: ${result.cancelled}`);
+    const shifts = (window.SCHED && SCHED.items || []).filter(s => s.enabled).length;
+    if (ev && !armConfirm(ev.currentTarget, t('jobs.ostanovit_vse_podtv', {
+        n: live, slovo: declOfNum(live, ['запуск', 'запуска', 'запусков']),
+    }))) return;
+    return post('/api/jobs/cancel_all?everything=1').then(result => {
+        const parts = [`остановлено запусков: ${result.cancelled}`];
+        if (result.shifts_paused) parts.push(`смен на паузе: ${result.shifts_paused}`);
+        if (result.actions_dropped) parts.push(`отменено действий: ${result.actions_dropped}`);
+        toast(parts.join(', '));
         pollJobs();
+        if (window.loadSchedules) loadSchedules();
     }).catch(e => toast(e.message, 'bad'));
 }
 

@@ -250,6 +250,7 @@ function tileCreate(serial) {
     });
     el.querySelector('.pick').addEventListener('click', ev => {
         ev.stopPropagation();
+        if (ev.shiftKey && FLEET.anchor) return selectRange(FLEET.anchor, serial);
         toggleSel(serial, !S.selected.has(serial));
         FLEET.anchor = serial;
         renderFleet();
@@ -305,7 +306,11 @@ function tileUpdate(el, device, ghost) {
 
     // Флаг поверх превью: занятость и ошибку видно, даже если экран чёрный.
     const flag = el.querySelector('.flag');
-    if (device.busy_job) {
+    if (deviceHeld(device)) {
+        flag.hidden = false;
+        flag.className = 'flag held';
+        setText(flag, 'ждёт решения');
+    } else if (device.busy_job) {
         flag.hidden = false;
         flag.className = 'flag busy';
         setText(flag, 'занято');
@@ -386,6 +391,7 @@ function setHref(use, href) {
 
 function statusWord(device) {
     if (!device.online) return device.state === 'unauthorized' ? 'не авторизовано' : 'офлайн';
+    if (deviceHeld(device)) return 'ждёт вашего решения';
     if (device.busy_job) return 'занято запуском';
     return device.warnings.length ? 'есть тревоги' : 'в сети';
 }
@@ -401,7 +407,8 @@ function tileMetrics(box, device) {
         const key = 'sn:' + device.serial;
         if (box.dataset.key !== key) {
             box.dataset.key = key;
-            box.innerHTML = `<span class="m sn" title="${esc(device.serial)}">${esc(device.serial)}</span>`;
+            /* Серийный номер человеку ничего не говорит — только в подсказке. */
+            box.innerHTML = `<span class="m sn" title="${esc(device.serial)}">${esc(statusWord(device))}</span>`;
         }
         return;
     }
@@ -424,7 +431,9 @@ function tileMetrics(box, device) {
         bits.push(`<span class="m ${tone}" title="Заряд${charging ? ', на зарядке' : ''}">
       <svg class="ic"><use href="#i-${charging ? 'zap' : 'battery'}"/></svg>${device.battery}%</span>`);
     }
-    if (device.temperature != null) {
+    /* Температура — только когда это повод посмотреть: на каждой плитке она
+       обрезалась на полуцифре и спорила с зарядом. */
+    if (device.temperature != null && device.temperature >= 40) {
         const hot = device.temperature >= 42 ? 'hot' : '';
         bits.push(`<span class="m ${hot}" title="Температура батареи">
       <svg class="ic"><use href="#i-thermo"/></svg>${device.temperature.toFixed(0)}°</span>`);
@@ -535,6 +544,7 @@ function renderFleet() {
    перегрев: телефон без разрешения отладки и аккаунт в бане тоже ждут
    человека, а раньше в «Требуют внимания» их не было. */
 function attentionReason(device) {
+    if (deviceHeld(device)) return 'запуск ждёт вашего решения';
     if (device.state === 'unauthorized') return 'нажмите «Разрешить» на телефоне';
     const acc = device.accounts || [];
     const banned = acc.find(a => a.status === 'banned');

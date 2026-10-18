@@ -207,3 +207,7 @@
 .toast.warn {
     border-left-color: var(--warn)
 }
+
+/* Выбраны телефоны — снизу панель «Запустить / Действия»: тосты встают
+   над ней, а не закрывают главные кнопки. */
+body:has(#runbar:not([hidden])) #toast { bottom: 84px; }

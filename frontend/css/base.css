@@ -272,7 +272,7 @@ button:not(:has(:not(svg))) {
 
 /* ------------------------------------------------------------------- поля */
 
-input[type=text], input[type=number], input[type=time], input[type=date], select, textarea {
+input[type=text], input[type=search], input[type=number], input[type=time], input[type=date], select, textarea {
     background-color: var(--well);
     border: 1px solid var(--line);
     border-radius: var(--r2);

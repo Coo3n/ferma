@@ -256,7 +256,13 @@
 .run-chips { margin-top: 8px; }
 button.jchip { border: 0; cursor: pointer; }
 button.jchip:hover { filter: brightness(1.25); }
-.jchip.now { background: var(--accent-fill); color: var(--accent-ink); animation: st-now 1.4s var(--ease) infinite; }
+.jchip.now { background: var(--accent-fill); color: var(--accent-ink); animation: chip-now 1.4s var(--ease) infinite; }
+/* Пульс кольцом, а не фоном: st-now гасил заливку до 12 %, и тёмная цифра на
+   ней не читалась (контраст 1:1). */
+@keyframes chip-now {
+    0%, 100% { box-shadow: 0 0 0 0 var(--accent-line); }
+    50% { box-shadow: 0 0 0 3px var(--accent-line); }
+}
 .rs-sel { width: 15px; height: 15px; cursor: pointer; }
 .iss { padding: 5px 8px; border-radius: var(--r1); background: rgba(255, 255, 255, .03); }
 .iss.error { background: color-mix(in srgb, var(--bad) 8%, transparent); }
@@ -309,3 +315,8 @@ button.jchip:hover { filter: brightness(1.25); }
 .iss-box[open] { padding-bottom: var(--s3); }
 .iss-box summary { min-height: 36px; padding: 0; align-items: center; }
 .iss { padding: 6px 10px; }
+
+/* «с шага» не шире панели: общее #recRun select{width:auto} перебивало
+   ширину, и выбор растягивался за край, а подпись ломалась в три строки. */
+#recRun #runFrom { width: 210px; max-width: 100%; }
+.run-lbl { white-space: nowrap; }

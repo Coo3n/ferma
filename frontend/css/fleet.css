@@ -1047,3 +1047,8 @@
     outline: 2px dashed var(--accent-line);
     outline-offset: 2px;
 }
+
+/* Ждёт решения человека — янтарь, громче «занято»: это повод подойти. */
+.tile[data-st="held"] { border-color: var(--warn-line); box-shadow: inset 0 3px 0 var(--warn); }
+.tile .flag.held { background: color-mix(in srgb, var(--warn) 18%, var(--panel)); color: var(--warn); }
+.dot.held { background: var(--warn); }

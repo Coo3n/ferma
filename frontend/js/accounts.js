@@ -157,11 +157,16 @@ document.addEventListener('change', async ev => {
 
 async function accDelete(id, btn) {
     btn.title = 'Нажмите ещё раз — аккаунт удалится';
-    if (!armConfirm(btn, '')) return;
+    if (!armConfirm(btn, '')) {
+        toast('нажмите ещё раз, чтобы удалить аккаунт');
+        return;
+    }
+    const acc = ACC.items.find(a => a.id === id);
     try {
         await api(`/api/accounts/${id}`, {method: 'DELETE'});
         ACC.items = ACC.items.filter(a => a.id !== id);
         renderAccounts();
+        toast(`аккаунт ${acc ? acc.login : ''} удалён`);
     } catch (e) {
         toast(e.message, 'bad');
     }
@@ -187,21 +192,29 @@ function accImport() {
       </div>
       <textarea id="accImpText" rows="8" placeholder="79001234567:secret&#10;user@mail.ru:pass:1.2.3.4:8080"></textarea></label>`;
     $('mActs').innerHTML = `<button onclick="closeModal()">Отмена</button>
-      <button class="primary" onclick="accImportGo()">Добавить</button>`;
+      <button class="primary" onclick="accImportGo(this)">Добавить</button>`;
     $('accImpPlatform').value = ACC.platform || 'vk';
     openModal();
 }
 
-async function accImportGo() {
+async function accImportGo(btn) {
+    /* Двойной клик раньше отправлял список дважды. */
+    if (btn) btn.disabled = true;
     try {
         const res = await post('/api/accounts/import', {
             text: $('accImpText').value, platform: $('accImpPlatform').value,
         });
-        toast(`добавлено аккаунтов: ${res.count}`, 'ok');
+        const bad = res.bad_lines || [];
+        const parts = [`добавлено ${res.count}`];
+        if (res.duplicates) parts.push(`${res.duplicates} уже были — пропущены`);
+        if (bad.length) parts.push(`без пароля строки ${bad.slice(0, 5).join(', ')}${bad.length > 5 ? '…' : ''}`);
+        toast(parts.join(', '), bad.length ? 'bad' : 'ok');
         closeModal();
         loadAccounts();
     } catch (e) {
         toast(e.message, 'bad');
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 

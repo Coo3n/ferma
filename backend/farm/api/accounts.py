@@ -48,10 +48,11 @@ def import_accounts(text: str = Body(...), platform: str = Body(...)):
     if not platform.strip():
         raise HTTPException(400, "укажите платформу")
     try:
-        created = accounts.import_lines(text, platform.strip())
+        report = accounts.import_report(text, platform.strip())
     except ValueError as e:
         raise HTTPException(400, str(e))
-    return {"ok": True, "count": len(created)}
+    return {"ok": True, "count": len(report["created"]),
+            "duplicates": report["duplicates"], "bad_lines": report["bad_lines"]}
 
 
 @router.post("/autobind")

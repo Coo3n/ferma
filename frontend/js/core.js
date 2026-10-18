@@ -383,7 +383,10 @@ function disableWithReason(button, disabled, reason) {
     if (!button) return;
     button.disabled = !!disabled;
     if (disabled) {
-        if (!button.dataset.title) button.dataset.title = button.title || '';
+        /* === undefined, а не «пусто»: у кнопки без подсказки исходный title
+           пустой, и второй вызов сохранял причину как «исходную» — она
+           оставалась висеть и после включения. */
+        if (button.dataset.title === undefined) button.dataset.title = button.title || '';
         button.title = reason;
     } else if (button.dataset.title !== undefined) {
         button.title = button.dataset.title;

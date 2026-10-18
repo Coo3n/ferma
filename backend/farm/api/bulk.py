@@ -98,6 +98,21 @@ def _enqueue(serial: str, delay: float, fn) -> None:
     q.put((due, fn))
 
 
+def drain_queues() -> int:
+    """Выбросить отложенные (с разбросом) действия, ещё не дошедшие до
+    телефонов, — часть аварийной остановки фермы."""
+    n = 0
+    with _queues_lock:
+        for q in _queues.values():
+            while True:
+                try:
+                    q.get_nowait()
+                except queue.Empty:
+                    break
+                n += 1
+    return n
+
+
 @router.post("/action")
 def bulk_action(serials: list[str] = Body(...), action: dict = Body(...),
                 jitter: list[float] | None = Body(None), lead: str | None = Body(None)):

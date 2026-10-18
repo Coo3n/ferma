@@ -151,7 +151,6 @@
 .b-running {
     background: color-mix(in srgb, var(--busy) 14%, transparent);
     color: var(--busy);
-    animation: pulse 1.6s infinite
 }
 
 /* CANCELLING — задача ещё идёт, но уже доживает: пульс как у работающей,
@@ -159,7 +158,6 @@
 .b-cancelling {
     background: color-mix(in srgb, var(--warn) 12%, transparent);
     color: var(--warn);
-    animation: pulse 1.6s infinite
 }
 
 .b-passed {
@@ -214,7 +212,7 @@
    повторится, запишется новая строка. */
 .dvn.seen {
     border-left-color: var(--panel3);
-    opacity: .6;
+    color: var(--text2);
 }
 
 .dvn-head {
@@ -1005,3 +1003,17 @@ button.held-shot:hover {
 .sc-tpl-facts dd { margin: 0; color: var(--text); font-variant-numeric: tabular-nums; }
 
 .sc-tpl-info > button { justify-self: start; }
+
+/* Идёт / ждёт: мигает только точка, текст остаётся читаемым (весь значок
+   мигал до прозрачности .3 — контраст падал до 2:1). */
+.b-running::before, .b-held::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    vertical-align: middle;
+    animation: pulse 1.6s infinite;
+}

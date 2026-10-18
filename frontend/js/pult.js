@@ -7,7 +7,7 @@
    это те же узлы, что под экраном в конструкторе, их переносят в пульт и
    обратно (pultPlace). Два поля ввода с одним смыслом путали бы. */
 
-const PULT = {apps: {}, jobsSig: '', appsFor: '', rec: null, recTimer: null};
+const PULT = {apps: {}, jobsSig: null, appsFor: '', rec: null, recTimer: null};
 
 /* Какие узлы переезжают в пульт: id → слот в пульте. */
 const PULT_MOVES = [['deviceHeldBar', 'held'], ['padText', 'text'], ['kbLabel', 'kb']];

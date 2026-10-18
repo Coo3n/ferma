@@ -166,7 +166,39 @@ def parse_lines(text: str, platform: str) -> list[dict]:
 
 
 def import_lines(text: str, platform: str) -> list[dict]:
-    return [create(row) for row in parse_lines(text, platform)]
+    return import_report(text, platform)["created"]
+
+
+def import_report(text: str, platform: str) -> dict:
+    """Импорт списка без дублей и мусора.
+
+    Тот же логин той же платформы второй раз не заводится (повторная вставка
+    списка или двойной клик давали двойников — два телефона в одном аккаунте
+    = бан). Строка без пароля не импортируется, а называется номером: иначе
+    в базе оставался аккаунт, которым не войти."""
+    platform_key = platform.lower()
+    with _lock:
+        known = {a["login"].lower() for a in _load() if a["platform"] == platform_key}
+    created, duplicates, bad = [], 0, []
+    lineno = 0
+    for raw in (text or "").splitlines():
+        lineno += 1
+        if not raw.strip() or raw.strip().startswith("#"):
+            continue
+        rows = parse_lines(raw, platform)
+        if not rows:
+            continue
+        row = rows[0]
+        if not row.get("password"):
+            bad.append(lineno)
+            continue
+        key = row["login"].lower()
+        if key in known:
+            duplicates += 1
+            continue
+        known.add(key)
+        created.append(create(row))
+    return {"created": created, "duplicates": duplicates, "bad_lines": bad}
 
 
 def auto_bind(platform: str, serials: list[str]) -> int:

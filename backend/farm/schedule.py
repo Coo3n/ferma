@@ -251,6 +251,19 @@ class Scheduler:
                     return dict(s)
         raise KeyError(sid)
 
+    def pause_all(self) -> int:
+        """Аварийная остановка: выключить все включённые смены. Иначе после
+        «Остановить всё» смена через 20 минут запускала ферму снова."""
+        with self._lock:
+            n = 0
+            for s in self._items:
+                if s["enabled"]:
+                    s["enabled"] = False
+                    n += 1
+            if n:
+                self._save()
+            return n
+
     # ---- план со статусами
     def _slot(self, sid: str, day: Date, serial: str, at: datetime) -> dict:
         key = f"{sid}|{day.isoformat()}"

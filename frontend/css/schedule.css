@@ -346,3 +346,7 @@
     font-size: var(--fs-2);
     font-weight: 600;
 }
+
+/* 40 телефонов в списке смены: строки не сжимаются до 5px внутри сетки с
+   max-height — у каждой минимум высота строки. */
+.sch-phones { grid-auto-rows: minmax(32px, auto); }

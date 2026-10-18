@@ -505,7 +505,7 @@
                         </svg>
                         <span data-t="device.stop_kadr">стоп-кадр</span>
                     </button>
-                    <button class="sm" onclick="openScrcpy()" aria-label="Открыть в отдельном окне"
+                    <button class="sm" id="btnScrcpy" onclick="openScrcpy()" aria-label="Открыть в отдельном окне"
                             title="Плавный экран в отдельном окне" data-t-title="device.plavnyy_ekran_v_otdelnom" data-t-aria-label="device.otkryt_v_otdelnom_okne">
                         <svg class="ic" aria-hidden="true">
                             <use href="#i-external"/>
@@ -691,6 +691,11 @@
                     <button class="sm ghost" onclick="devToolsOpen()" title="Ссылка, починка связи, консоль" data-t="pult.upravlenie" data-t-title="pult.ssylka_pochinka_svyazi_konsol">
                         <svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg>Управление</button>
                     <span class="sp"></span>
+                    <!-- Запустить на этом телефоне — без возврата на ферму и галочек. -->
+                    <button class="sm" onclick="openRunDialog({serials: [S.active]})"
+                            title="Запустить сценарий на этом телефоне" data-t-title="pult.zapustit_zdes_podskazka">
+                        <svg class="ic" aria-hidden="true"><use href="#i-play"/></svg>
+                        <span data-t="pult.zapustit_zdes">Запустить</span></button>
                     <button class="primary" id="btnRecBegin" onclick="recBegin()">
                         <svg class="ic dotrec" aria-hidden="true"><use href="#i-record"/></svg>
                         <span data-t="pult.zapisat_stsenariy">Записать сценарий</span></button>
@@ -738,7 +743,7 @@
             <a class="btn sm" href="/api/jobs/export.csv" download
                title="Таблица запусков для Excel" data-t="jobs.skachat_tablitsu" data-t-title="jobs.tablitsa_zapuskov_dlya_excel">
                 <svg class="ic" aria-hidden="true">
-                    <use href="#i-down"/>
+                    <use href="#i-download"/>
                 </svg>
                 Скачать таблицу
             </a>
@@ -748,11 +753,13 @@
                 </svg>
                 Очистить завершённые
             </button>
-            <button class="sm danger" id="btnCancelAll" onclick="cancelAll(event)" data-t="jobs.ostanovit_vse_zapuski">
+            <button class="sm danger" id="btnCancelAll" onclick="cancelAll(event)"
+                    title="Остановить запуски, поставить смены на паузу и отменить отложенные действия"
+                    data-t-title="jobs.ostanovit_vse_podskazka">
                 <svg class="ic" aria-hidden="true">
                     <use href="#i-x"/>
                 </svg>
-                Остановить все запуски
+                <span data-t="jobs.ostanovit_vse_zapuski">Остановить всё</span>
             </button>
         </div>
         <div class="batchbar" id="jobBatch" hidden></div>

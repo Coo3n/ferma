@@ -275,7 +275,8 @@ function bulkAppDo(kind, ev) {
     const name = recApp(pkg);
     if (kind === 'launch') return bulkAction({type: 'launch', package: pkg}, `Открыть ${name}`);
     if (kind === 'stop') return bulkAction({type: 'stop', package: pkg}, `Закрыть ${name}`);
-    if (!armConfirm(ev.currentTarget, 'Нажмите ещё раз — вход в аккаунт пропадёт')) return;
+    const n = bulkTargets().length;
+    if (!armConfirm(ev.currentTarget, `Очистить на ${n} ${declOfNum(n, ['телефоне', 'телефонах', 'телефонах'])}? Вход пропадёт`)) return;
     bulkAction({type: 'shell', cmd: `pm clear ${pkg}`}, `Очистка ${name}`);
 }
 
@@ -359,7 +360,8 @@ async function bulkSetGroup() {
 }
 
 async function bulkReboot(ev) {
-    if (!armConfirm(ev.currentTarget, 'нажмите ещё раз — телефоны перезагрузятся')) return;
+    const n = bulkTargets().length;
+    if (!armConfirm(ev.currentTarget, `Перезагрузить ${n} ${declOfNum(n, ['телефон', 'телефона', 'телефонов'])}?`)) return;
     try {
         bulkReport('Перезагрузка', await post('/api/bulk/reboot', {serials: bulkTargets()}));
     } catch (e) {

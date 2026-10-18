@@ -361,7 +361,7 @@ function recSelBar() {
       <button class="sm" onclick="recSelBlock('loop')" title="${esc(t('rec.blok_povtor_podskazka'))}">${recIcon('rotate')} ${esc(t('rec.blok_povtor'))}</button>
       <button class="sm" onclick="recSelBlock('chance')" title="${esc(t('rec.blok_shans_podskazka'))}">${recIcon('dice')} ${esc(t('rec.blok_shans'))}</button>
       <button class="sm" onclick="recSelBlock('until')" title="${esc(t('rec.blok_poka_podskazka'))}">${recIcon('search')} ${esc(t('rec.blok_poka'))}</button>
-      <button class="sm" onclick="recSelBlock('if_seen')" title="${esc(t('rec.blok_esli_podskazka'))}">${recIcon('eye-off')} ${esc(t('rec.blok_esli'))}</button>
+      <button class="sm" onclick="recSelBlock('if_seen')" title="${esc(t('rec.blok_esli_podskazka'))}">${recIcon('eye')} ${esc(t('rec.blok_esli'))}</button>
     </div>
     <div class="selbar-grp">
       <button class="sm" onclick="recSelDup()">${recIcon('copy')} дублировать</button>
@@ -405,13 +405,21 @@ function recSelRetries(value) {
 function recSelPause() {
     const seconds = Math.max(0.1, Number(($('selPause') || {}).value) || 1);
     const chosen = new Set(REC.sel);
+    /* У заголовка блока пауза встаёт после всего блока, а не первым шагом
+       внутри: «пауза после каждого» — после выбранного целиком. */
+    const after = new Map();   // id последнего шага → шаг, после которого пауза
+    REC.steps.forEach(step => {
+        if (!chosen.has(step.id)) return;
+        const tail = blockOf(step);
+        after.set(tail[tail.length - 1].id, step);
+    });
     const out = [];
     for (const step of REC.steps) {
         out.push(step);
-        if (chosen.has(step.id)) {
+        const owner = after.get(step.id);
+        if (owner) {
             out.push({id: REC.nextId++, kind: 'sleep', args: {seconds: seconds},
-                param: null, note: '', warn: '',
-                parent: blockIsHead(step) ? step.id : (step.parent ?? null)});
+                param: null, note: '', warn: '', parent: owner.parent ?? null});
         }
     }
     REC.steps = out;
@@ -421,10 +429,23 @@ function recSelPause() {
 }
 
 function recSelDup() {
-    const chosen = stSelected();
+    /* Отмечен заголовок блока — копируем весь блок, иначе пустой заголовок
+       вставал внутрь оригинала. Связи parent переводим на копии. */
+    const ids = new Set(stSelected().map(s => s.id));
+    REC.steps.forEach(s => { if (ids.has(s.id) && blockIsHead(s)) blockInside(s).forEach(c => ids.add(c.id)); });
+    const chosen = REC.steps.filter(s => ids.has(s.id));
     if (!chosen.length) return;
     const last = REC.steps.indexOf(chosen[chosen.length - 1]);
-    const copies = chosen.map(stCopyOf);
+    const map = new Map();
+    const copies = chosen.map(s => {
+        const c = stCopyOf(s);
+        map.set(s.id, c.id);
+        return c;
+    });
+    copies.forEach((c, k) => {
+        const p = chosen[k].parent;
+        c.parent = map.has(p) ? map.get(p) : (REC.steps[last].parent === p ? p : (chosen[0].parent ?? null));
+    });
     REC.steps.splice(last + 1, 0, ...copies);
     REC.sel = new Set(copies.map(step => step.id));
     recRender();

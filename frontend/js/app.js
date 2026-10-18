@@ -109,8 +109,11 @@ async function pollStatus() {
         /* Шапка молчит, пока всё штатно: «сколько в сети» уже на карточках
            фермы, итоги ok/сбой — в «Задачах» и «Отклонениях». Здесь только то,
            что нужно знать с любой страницы: идёт работа или что-то сломалось. */
-        setHTML($('stStatus'), status.scrcpy
-            ? '' : '<span style="color:var(--warn)" title="Установите scrcpy на компьютер фермы">кнопка «В окне» не работает</span>');
+        /* Нет scrcpy — гасим саму кнопку «В окне» с причиной, а не держим
+           вечное оранжевое предупреждение в шапке на каждом экране. */
+        setHTML($('stStatus'), '');
+        const scr = $('btnScrcpy');
+        if (scr && window.disableWithReason) disableWithReason(scr, !status.scrcpy, 'Установите scrcpy на компьютер фермы');
 
         const jobs = status.jobs || {};
         const held = jobs.held || 0;
