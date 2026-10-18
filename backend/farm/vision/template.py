@@ -63,12 +63,24 @@ def pick(peaks, near=None):
     return min(peaks, key=lambda p: (p[0] - near[0]) ** 2 + (p[1] - near[1]) ** 2)
 
 
+def crop_box(region, sw: int, sh: int):
+    """Рамка в долях экрана → пиксели (x1, y1, x2, y2), обрезанные экраном.
+    Чистая функция, без opencv."""
+    x1 = max(0, min(sw, int(round(region[0] * sw))))
+    y1 = max(0, min(sh, int(round(region[1] * sh))))
+    x2 = max(x1, min(sw, int(round(region[2] * sw))))
+    y2 = max(y1, min(sh, int(round(region[3] * sh))))
+    return x1, y1, x2, y2
+
+
 def find(screen_png: bytes, template_png: bytes, base_scale: float = 1.0,
-         near=None, with_count: bool = False):
+         near=None, with_count: bool = False, region=None):
     """(cx, cy, score) в долях экрана — или None.
 
     Похожих мест больше одного — выбор делает `pick` (ближайшее к `near`).
     `with_count` добавляет четвёртым числом, сколько похожих мест нашлось.
+    `region` — рамка (x1, y1, x2, y2) в долях экрана: искать только в ней
+    («внутри» контейнера). Ответ всё равно в долях всего экрана.
     """
     import cv2
     import numpy as np
@@ -77,6 +89,13 @@ def find(screen_png: bytes, template_png: bytes, base_scale: float = 1.0,
     original = cv2.imdecode(np.frombuffer(template_png, np.uint8), cv2.IMREAD_GRAYSCALE)
     if screen is None or original is None:
         return None
+    full_h, full_w = screen.shape[:2]
+    ox = oy = 0
+    if region is not None:
+        ox, oy, x2, y2 = crop_box(region, full_w, full_h)
+        screen = screen[oy:y2, ox:x2]
+        if screen.size == 0:
+            return None
     sh, sw = screen.shape[:2]
     points = []
     min_dx = min_dy = 1.0
@@ -93,8 +112,9 @@ def find(screen_png: bytes, template_png: bytes, base_scale: float = 1.0,
         order = np.argsort(-res[ys, xs])[:MAX_PEAKS]
         for i in order:
             x, y = int(xs[i]), int(ys[i])
-            points.append(((x + w / 2) / sw, (y + h / 2) / sh, float(res[y, x])))
-        min_dx, min_dy = min(min_dx, w / 2 / sw), min(min_dy, h / 2 / sh)
+            points.append(((ox + x + w / 2) / full_w, (oy + y + h / 2) / full_h,
+                           float(res[y, x])))
+        min_dx, min_dy = min(min_dx, w / 2 / full_w), min(min_dy, h / 2 / full_h)
     peaks = suppress(points, min_dx, min_dy)
     best = pick(peaks, near)
     if not best:

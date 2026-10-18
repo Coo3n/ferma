@@ -179,7 +179,7 @@ def normalize_target(raw) -> dict:
         return {}
     if not isinstance(raw, dict):
         raise ValueError("цель должна быть объектом")
-    лишние = set(raw) - {"sel", "text", "img", "at", "within", "near"}
+    лишние = set(raw) - {"sel", "text", "img", "at", "within", "near", "at_rel"}
     if лишние:
         raise ValueError(f"неизвестные поля цели: {', '.join(sorted(map(str, лишние)))}")
     out: dict = {}
@@ -210,6 +210,17 @@ def normalize_target(raw) -> dict:
         if not ok:
             raise ValueError("at — две доли экрана от 0 до 1")
         out["at"] = [float(c) for c in v]
+    # Смещение точки от места поиска: None — снять (новое место без смещения).
+    if "at_rel" in raw:
+        v = raw["at_rel"]
+        if v is not None:
+            ok = (isinstance(v, (list, tuple)) and len(v) == 2
+                  and all(isinstance(c, (int, float)) and not isinstance(c, bool)
+                          and -1 <= c <= 1 for c in v))
+            if not ok:
+                raise ValueError("at_rel — два числа от -1 до 1")
+            v = [float(c) for c in v]
+        out["at_rel"] = v
     # Место поиска: словарь — заменить, None — снять (у нового шага его нет).
     for поле in ("within", "near"):
         if поле in raw:
@@ -729,15 +740,23 @@ class DeviceContext:
 
     def click_target(self, sel=None, text=None, img=None, at=None,
                      timeout: float = 10, within: dict | None = None,
-                     near: dict | None = None) -> None:
+                     near: dict | None = None, at_rel=None) -> None:
         """Клик по многослойной цели: селекторы → текст → OCR → шаблон → точка.
 
         После «повторить» человек мог приложить исправленную цель: заменяются
         ровно присланные ключи, и дальше все попытки ЭТОГО вызова идут с ней
         (даже если следующая остановка пройдёт без нового патча). Патч живёт в
         локальных переменных — следующий click_target получит свои аргументы.
+
+        within/near соблюдают все слои (resolve._resolve_scoped); точка с местом —
+        только смещение `at_rel` от контейнера/ориентира, абсолютная `at` тогда
+        для тапа не берётся.
         """
-        def _беда():
+        def _беда(причина=""):
+            if причина == "within":
+                return f"не найдено место поиска {within} — внутри него искать цель sel={sel}"
+            if причина == "near":
+                return f"не найден ориентир {near} — рядом с ним искать цель sel={sel}"
             где = (f" внутри {within}" if within else "") + (f" рядом с {near}" if near else "")
             return (f"цель не найдена ни одним слоем: "
                     f"sel={sel} text={text} img={img} at={at}{где}")
@@ -746,11 +765,17 @@ class DeviceContext:
             self.check_cancel()
             self._settle()
             место = {k: v for k, v in (("within", within), ("near", near)) if v}
+            if место:
+                место["at_rel"] = at_rel
+            why: list = []
             hit = resolve.resolve(self, sel=sel, text=text, img=img, at=at,
-                                  timeout=timeout, **место)
+                                  timeout=timeout, why=why, **место)
             if hit is None and self._rescue():
+                why = []
                 hit = resolve.resolve(self, sel=sel, text=text, img=img, at=at,
-                                      timeout=5, **место)
+                                      timeout=5, why=why, **место)
+            if hit is None and why:
+                беда = _беда(why[-1])
             if hit is not None and hit.layer == "point":
                 # Ни один слой, кроме сохранённых координат, цель не нашёл:
                 # тап уйдёт «в то место, где она была». Спрашиваем ДО тапа —
@@ -781,6 +806,9 @@ class DeviceContext:
                     at = патч.get("at", at)
                     within = патч.get("within", within)
                     near = патч.get("near", near)
+                    # Новое место — старое смещение от него не годится.
+                    if "within" in патч or "near" in патч or "at_rel" in патч:
+                        at_rel = патч.get("at_rel")
                     беда = _беда()
                     self.log(f"цель заменена человеком: {', '.join(патч)}")
                 continue

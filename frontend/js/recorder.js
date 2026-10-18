@@ -496,11 +496,34 @@ function recBuildClickStep(target, dump, point) {
         warn: warns.join('; '),
     };
     if (scopes.length) {
+        /* Точка шага от каждого места — запасной слой «точка» с местом
+           считается от него, а не от угла экрана (resolve.point_from). */
+        scopes.forEach(s => { s.rel = recPointRel(nodes, step.point, {[s.kind]: s.args}); });
         step.scopes = scopes;
         step[scopes[0].kind] = scopes[0].args;
+        if (scopes[0].rel) step.point_rel = scopes[0].rel;
         step.scopeMatches = 1;
     }
     return step;
+}
+
+/* Точка шага от места поиска: у «внутри» — доли рамки контейнера, у «рядом
+   с» — смещение от центра ориентира. Зеркалит resolve.point_from. null —
+   места на этом экране нет или точка вне рамки контейнера. */
+function recPointRel(nodes, point, scope) {
+    if (!point || !scope) return null;
+    const sel = recParseArgs(scope.within || scope.near);
+    const node = sel ? (recSelFind(nodes, sel) || [])[0] : null;
+    if (!node) return null;
+    const r = v => Math.round(v * 1e4) / 1e4;
+    if (scope.within) {
+        const [x1, y1, x2, y2] = node.bounds;
+        if (!(x2 > x1 && y2 > y1)) return null;
+        const rx = (point[0] - x1) / (x2 - x1), ry = (point[1] - y1) / (y2 - y1);
+        return rx >= 0 && rx <= 1 && ry >= 0 && ry <= 1 ? [r(rx), r(ry)] : null;
+    }
+    const [ax, ay] = recCenter(node);
+    return [r(point[0] - ax), r(point[1] - ay)];
 }
 
 /* ------------------------------------------------ «внутри» и «рядом с»
@@ -744,11 +767,13 @@ function recPickScope(id, index) {
     if (!step || step.kind !== 'click') return;
     delete step.within;
     delete step.near;
+    delete step.point_rel;
     step.scopeMatches = null;
     const s = index >= 0 ? (step.scopes || [])[index] : null;
     if (s) {
         step.selector = {call: 'click', args: s.base};
         step[s.kind] = s.args;
+        if (s.rel) step.point_rel = s.rel;
         step.scopeMatches = 1;
         step.warn = '';
     } else {
@@ -786,6 +811,11 @@ function recScopeTap(payload) {
     delete step.within;
     step.selector = {call: 'click', args: base};
     step.near = a.args;
+    /* Смещение — от цели на ЭТОМ экране: точка записи могла быть на другом. */
+    const goal = recScopePick(nodes, base, {near: a.args});
+    const rel = goal ? recPointRel(nodes, recCenter(goal), {near: a.args}) : null;
+    if (rel) step.point_rel = rel;
+    else delete step.point_rel;
     step.scopeMatches = recScopeCount(nodes, base, {near: a.args});
     step.warn = step.scopeMatches === 1 ? '' : t('rec.warn_mnogo', {n: step.scopeMatches});
     recRender();
@@ -2243,7 +2273,9 @@ function recLayers(step) {
     const out = [];
     if (step.texts && step.texts.length) out.push(t('rec.sloy_tekst'));
     if (step.crop) out.push(t('rec.sloy_kartinka'));
-    if (step.point) out.push(t('rec.sloy_tochka'));
+    /* С местом поиска точка считается от него (point_rel); без смещения
+       старая точка экрана для тапа не берётся — слоя нет. */
+    if (step.within || step.near ? step.point_rel : step.point) out.push(t('rec.sloy_tochka'));
     return out;
 }
 
@@ -2278,13 +2310,17 @@ function recCode(step, index) {
             : step.near ? [`near=dict(${step.near})`] : [];
         /* Зеркалит ветку click в farm/recorder/codegen.py: что здесь видно,
            то и попадёт в файл. Расхождение читалось бы как враньё. */
-        if (recLayers(step).length) {
+        if ((step.texts && step.texts.length) || step.crop || step.point
+            || (step.point_rel && место.length)) {
             const parts = ['sel=[' + chain.map(args => `dict(${args})`).join(', ') + ']'];
             if (step.texts && step.texts.length) {
                 parts.push('text=[' + step.texts.map(t => JSON.stringify(t)).join(', ') + ']');
             }
             if (step.crop) parts.push(`img=${JSON.stringify(recAssetName(index || 0))}`);
             if (step.point) parts.push(`at=(${recNum(step.point[0])}, ${recNum(step.point[1])})`);
+            if (step.point_rel && место.length) {
+                parts.push(`at_rel=(${recNum(step.point_rel[0])}, ${recNum(step.point_rel[1])})`);
+            }
             return 'ctx.click_target(' + parts.concat(место).join(', ') + ')';
         }
         if (fallbacks.length) {
@@ -3067,6 +3103,7 @@ function recPayload(meta) {
             if (step.point) out.point = step.point;
             if (step.within) out.within = step.within;
             else if (step.near) out.near = step.near;
+            if ((step.within || step.near) && step.point_rel) out.point_rel = step.point_rel;
             if (step.crop && Object.keys(assets).length < REC_ASSETS_MAX) {
                 out.crop = recAssetName(index);
                 assets[out.crop] = step.crop;
@@ -3398,6 +3435,7 @@ function recAdopt(шаг, assets) {
         crop: (шаг.crop && assets[шаг.crop]) || null,
         within: шаг.within || undefined,
         near: шаг.near || undefined,
+        point_rel: шаг.point_rel || undefined,
         cropName: шаг.crop || null,   // по нему кроп находится после черновика
     };
     /* Запасные селекторы живут в alts: recFallbacks() собирает их оттуда, и

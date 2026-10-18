@@ -174,6 +174,7 @@ function repairPatchFromStep(step) {
     if (patch.sel && step && ('within' in step || 'near' in step)) {
         patch.within = step.within ? repairParseSel(step.within) : null;
         patch.near = step.near ? repairParseSel(step.near) : null;
+        patch.at_rel = (step.within || step.near) && step.point_rel ? step.point_rel.slice() : null;
     }
     return patch;
 }
@@ -217,6 +218,9 @@ function repairBuildStep(built, oldStep, cropName) {
         out.within = null;
         out.near = null;
     }
+    if ((built.within || built.near) && built.point_rel) out.point_rel = built.point_rel.slice();
+    /* «Листать, пока не найдётся» — про поведение шага, а не про цель: остаётся. */
+    if (oldStep && oldStep.scroll) out.scroll = Object.assign({}, oldStep.scroll);
     return out;
 }
 

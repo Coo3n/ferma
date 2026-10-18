@@ -157,9 +157,10 @@ def _call(step: dict):
         texts = step.get("texts") or []
         crop = step.get("crop")
         point = step.get("point")
+        point_rel = step.get("point_rel")
         # Место поиска — хвостом к любому из трёх вызовов, ко всей цепочке.
         место = [f"{f}=dict({step[f]})" for f in ("within", "near") if step.get(f)]
-        if texts or crop or point:
+        if texts or crop or point or point_rel:
             parts = ["sel=[" + ", ".join(f"dict({a})" for a in chain) + "]"]
             if texts:
                 parts.append("text=[" + ", ".join(literal(t) for t in texts) + "]")
@@ -167,6 +168,8 @@ def _call(step: dict):
                 parts.append(f"img={literal(crop)}")
             if point:
                 parts.append(f"at=({_num(point[0])}, {_num(point[1])})")
+            if point_rel:
+                parts.append(f"at_rel=({_num(point_rel[0])}, {_num(point_rel[1])})")
             return "ctx.click_target(" + ", ".join(parts + место) + ")"
         if len(chain) > 1:
             return "ctx.click_any(" + ", ".join([f"dict({a})" for a in chain] + место) + ")"

@@ -231,3 +231,55 @@ def test_починка_переносит_место_поиска_и_шлёт_�
     assert cleared.get("near") is None and patch2["near"] is None
     assert normalize_target(patch2) == patch2
     assert "near" not in steps.normalize_step(cleared)
+
+
+def test_точка_шага_записывается_от_места_и_прогон_попадает_в_тот_же_лайк():
+    """Слой «точка» с местом: смещение от ориентира, а не угол экрана."""
+    from test_scope import Ctx
+    dump = payload()
+    ivan_like = like_ids(dump)[1]
+    story_like = like_ids(dump)[3]
+    got = node(f"""
+    const a = recBuildClickStep(DUMP.nodes[{ivan_like}], DUMP);
+    const b = recBuildClickStep(DUMP.nodes[{story_like}], DUMP);
+    a.id = 1; REC.steps = [a]; REC.params = {{}};
+    const body = recPayload({{name: 'n'}});
+    console.log(JSON.stringify([a.near, a.point_rel, b.within, b.point_rel, body.steps[0],
+        recCode(a, 0), recAdopt(body.steps[0], {{}}).point_rel]));""", dump)
+    near, rel, within, rel2, step, code, back = got
+    assert near == 'text="Иван Петров"' and rel is not None and back == rel
+    assert within == 'resourceId="app:id/stories"' and all(0 <= c <= 1 for c in rel2)
+    norm = steps.normalize_step(step)
+    assert norm["point_rel"] == rel
+    src = codegen.render({"name": "n", "watch_popups": False}, {}, [norm])
+    assert src.strip().splitlines()[-1].split("  #")[0].strip() == code
+    # селектор и текст промахнулись — точка от «Иван Петров» всё равно его лайк
+    ctx = Ctx()
+    ctx.click_target(sel=[{"text": "нет"}], near={"text": "Иван Петров"}, at_rel=rel, timeout=0)
+    assert ctx.taps == [(0.07, 0.57)]
+    ctx = Ctx()
+    ctx.click_target(sel=[{"text": "нет"}], within={"resourceId": "app:id/stories"},
+                     at_rel=rel2, timeout=0)
+    assert ctx.taps == [(0.05, 0.975)]
+
+
+def test_везде_снимает_смещение_а_ориентир_пальцем_считает_своё():
+    from test_scope import Ctx
+    dump = payload()
+    likes = like_ids(dump)
+    oleg = next(n for n in dump["nodes"] if n["text"] == "Олег")
+    b = oleg["bounds"]
+    got = node(f"""
+    const s = recBuildClickStep(DUMP.nodes[{likes[2]}], DUMP);
+    s.id = 9; REC.steps = [s]; REC.dump = DUMP; REC.on = true;
+    recRender = () => {{}}; recSave = () => {{}};
+    recPickScope(9, -1);
+    const off = s.point_rel || null;
+    recScopeOnScreen(9);
+    recScopeTap({{type: 'tap', x: {(b[0] + b[2]) / 2}, y: {(b[1] + b[3]) / 2}}});
+    console.log(JSON.stringify([off, s.near, s.point_rel]));""", dump)
+    off, near, rel = got
+    assert off is None and near == 'text="Олег"' and rel is not None
+    ctx = Ctx()
+    ctx.click_target(sel=[{"text": "нет"}], near={"text": "Олег"}, at_rel=rel, timeout=0)
+    assert ctx.taps == [(0.07, 0.87)]

@@ -403,6 +403,26 @@ def _check_scope_target(step: dict) -> None:
                             f"«внутри»/«рядом с»: {args}")
 
 
+def _point_rel(raw, step: dict) -> list | None:
+    """Точка шага от места поиска: у «внутри» — доли рамки контейнера (0..1),
+    у «рядом с» — смещение от центра ориентира в долях экрана (-1..1).
+    Без места не бывает: от чего тогда отсчитывать."""
+    if raw in (None, []):
+        return None
+    if step["kind"] != "click":
+        raise StepError(f"поле point_rel допустимо только у click, не у {step['kind']}")
+    if not (step.get("within") or step.get("near")):
+        raise StepError("point_rel — точка от места поиска: нужен within или near")
+    try:
+        x, y = float(raw[0]), float(raw[1])
+    except (TypeError, ValueError, IndexError, KeyError):
+        raise StepError("point_rel — пара чисел [x, y]")
+    lo = 0 if step.get("within") else -1
+    if not (lo <= x <= 1 and lo <= y <= 1):
+        raise StepError("point_rel: у within доли рамки 0..1, у near смещение -1..1")
+    return [round(x, 4), round(y, 4)]
+
+
 def _param(kind: str, raw) -> str | None:
     if raw in (None, ""):
         return None
@@ -503,6 +523,9 @@ def normalize_step(raw) -> dict:
         step[field] = _scope(kind, raw.get(field), field)
     if scoped:
         _check_scope_target(step)
+    point_rel = _point_rel(raw.get("point_rel"), step)
+    if point_rel:
+        step["point_rel"] = point_rel
     _check_account(kind, step["args"])
     if kind == "loop":
         _check_loop(step["args"])
@@ -710,7 +733,9 @@ def schema() -> dict:
         # Необязательные поля click: строка селектора контейнера/ориентира.
         "click_scope": {"within": "искать цель только внутри этого элемента",
                         "near": "среди одинаковых нажать ближайший к этому элементу",
-                        "keys": list(_scope_keys()), "max_one": True},
+                        "keys": list(_scope_keys()), "max_one": True,
+                        "point_rel": "точка от места: у within доли рамки 0..1, "
+                                     "у near смещение от центра ориентира -1..1"},
         "until_on_fail": list(UNTIL_ON_FAIL),
         "finish_results": list(FINISH_RESULTS),
         "limits": {
