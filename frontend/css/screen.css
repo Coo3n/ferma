@@ -567,7 +567,9 @@ button.pult-tag-add {
    помещались в панель ~380px и обрезались на полуслове. */
 .pult-foot {
     display: grid;
-    grid-template-columns: var(--ctl) 1fr 1fr;
+    /* «Запустить» — по содержимому, «Записать сценарий» — всё остальное:
+       подпись длиннее и на Mac рисуется шире, в половине панели ей тесно. */
+    grid-template-columns: var(--ctl) auto 1fr;
     align-items: center;
     gap: var(--s2);
 }
@@ -576,3 +578,6 @@ button.pult-tag-add {
 .pult-foot > button:first-child { width: var(--ctl); padding: 0; font-size: 0; gap: 0; }
 .pult-foot > button.primary { min-height: var(--ctl); }
 .pult-foot > button { height: var(--ctl); }
+
+.pult-foot > button { overflow: hidden; text-overflow: ellipsis; padding-left: var(--s3); padding-right: var(--s3); }
+.pult-foot > button > span { overflow: hidden; text-overflow: ellipsis; }
