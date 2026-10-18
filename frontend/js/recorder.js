@@ -852,6 +852,95 @@ function recScopeHtml(step) {
         title="${esc(t('rec.scope_tap_hint'))}">${esc(t('rec.scope_ukazat'))}</button></div>`;
 }
 
+/* ------------------------------------------------ «листать, пока не найдётся»
+   Поле шага scroll {dir, max} — по выбору, по умолчанию выключено (владелец:
+   «не всегда нужно; человек не должен удивляться „что это“»). Панель только
+   предлагает его, сама не включает. */
+const REC_SCROLL_MAX = 10;     // = SCROLL_MAX в backend/farm/recorder/steps.py
+const REC_SCROLL_DEFAULT = 5;
+
+/* Предложить ли листание шагу index: перед этим нажатием записан свайп по
+   ленте (вертикальный, в том же блоке; паузы между ними не в счёт). Ответ —
+   'down' / 'up' (куда листал человек) или ''. Чистая функция. */
+function recScrollSuggest(steps, index) {
+    const step = steps[index];
+    if (!step || step.kind !== 'click' || !step.selector || step.scroll || step.scrollNo
+        || step.adopted) return '';
+    for (let i = index - 1; i >= 0; i--) {
+        const prev = steps[i];
+        if (prev.kind === 'sleep' && (prev.parent || null) === (step.parent || null)) continue;
+        if (prev.kind !== 'swipe' || (prev.parent || null) !== (step.parent || null)) return '';
+        const a = prev.args || {};
+        const dx = Number(a.x2) - Number(a.x1), dy = Number(a.y2) - Number(a.y1);
+        if (!isFinite(dx) || !isFinite(dy) || Math.abs(dy) < 0.1 || Math.abs(dy) <= Math.abs(dx)) {
+            return '';
+        }
+        /* Палец вверх — лента едет вниз, к следующим постам. */
+        return dy < 0 ? 'down' : 'up';
+    }
+    return '';
+}
+
+/* Значок в строке шага: включённое листание видно, не раскрывая шаг. */
+function recScrollBadge(step) {
+    if (step.kind !== 'click' || !step.scroll) return '';
+    const arrow = step.scroll.dir === 'up' ? '↑' : '↓';
+    return `<span class="rs-badge" title="${esc(t('rec.scroll_badge_hint', {n: step.scroll.max}))}">${
+        esc(t('rec.scroll_badge', {arrow, n: step.scroll.max}))}</span>`;
+}
+
+/* «Если не видно на экране: не листать / листать вниз / вверх, до N раз». */
+function recScrollEditor(step, index) {
+    if (step.kind !== 'click' || !step.selector) return '';
+    const sc = step.scroll || null;
+    const dir = sc ? sc.dir : '';
+    const opt = (v, label) => `<option value="${v}" ${dir === v ? 'selected' : ''}>${esc(label)}</option>`;
+    const counts = Array.from({length: REC_SCROLL_MAX}, (_, i) => i + 1).map(k =>
+        `<option value="${k}" ${sc && sc.max === k ? 'selected' : ''}>${k}</option>`).join('');
+    const tip = recScrollSuggest(REC.steps, index);
+    return `<div class="rs-flex rs-fail rs-scroll">
+    <span class="rs-fail-h">${esc(t('rec.scroll_h'))}:</span>
+    <select onchange="recSetScroll(${step.id}, 'dir', this.value)" aria-label="${esc(t('rec.scroll_h'))}">
+      ${opt('', t('rec.scroll_off'))}${opt('down', t('rec.scroll_down'))}${opt('up', t('rec.scroll_up'))}
+    </select>
+    ${sc ? `<label>${esc(t('rec.scroll_do'))}
+      <select onchange="recSetScroll(${step.id}, 'max', this.value)">${counts}</select>
+      ${esc(t('rec.scroll_raz'))}</label>` : ''}
+    <span class="rs-scroll-why">${esc(sc ? t('rec.scroll_why_on') : t('rec.scroll_why_off'))}</span>
+  </div>${tip ? `<div class="rs-scroll-tip">
+    <span>${esc(t('rec.scroll_tip'))}</span>
+    <button class="sm" onclick="recSetScroll(${step.id}, 'dir', '${tip}')">${
+        esc(tip === 'up' ? t('rec.scroll_tip_up') : t('rec.scroll_tip_down'))}</button>
+    <button class="sm ghost" onclick="recScrollNo(${step.id})">${esc(t('rec.scroll_tip_no'))}</button>
+  </div>` : ''}`;
+}
+
+function recSetScroll(id, field, value) {
+    const step = recFind(id);
+    if (!step || step.kind !== 'click') return;
+    if (field === 'dir') {
+        if (value === 'down' || value === 'up') {
+            step.scroll = {dir: value, max: (step.scroll && step.scroll.max) || REC_SCROLL_DEFAULT};
+        } else {
+            delete step.scroll;
+        }
+    } else if (field === 'max' && step.scroll) {
+        const n = Math.round(Number(value));
+        if (n >= 1 && n <= REC_SCROLL_MAX) step.scroll.max = n;
+    }
+    recRender();
+    recSave();
+}
+
+/* «Не надо» — подсказка у этого шага больше не появляется. */
+function recScrollNo(id) {
+    const step = recFind(id);
+    if (!step) return;
+    step.scrollNo = true;
+    recRender();
+    recSave();
+}
+
 function recNoteTap(payload) {
     const node = recHit(payload.x, payload.y);
     const target = node ? REC.dump.nodes[node.target] : null;
@@ -2308,17 +2397,18 @@ function recCode(step, index) {
         /* Место поиска — хвостом к любому из трёх вызовов (codegen: место). */
         const место = step.within ? [`within=dict(${step.within})`]
             : step.near ? [`near=dict(${step.near})`] : [];
+        if (step.scroll) место.push(`scroll_until=("${step.scroll.dir}", ${step.scroll.max})`);
         /* Зеркалит ветку click в farm/recorder/codegen.py: что здесь видно,
            то и попадёт в файл. Расхождение читалось бы как враньё. */
         if ((step.texts && step.texts.length) || step.crop || step.point
-            || (step.point_rel && место.length)) {
+            || (step.point_rel && (step.within || step.near))) {
             const parts = ['sel=[' + chain.map(args => `dict(${args})`).join(', ') + ']'];
             if (step.texts && step.texts.length) {
                 parts.push('text=[' + step.texts.map(t => JSON.stringify(t)).join(', ') + ']');
             }
             if (step.crop) parts.push(`img=${JSON.stringify(recAssetName(index || 0))}`);
             if (step.point) parts.push(`at=(${recNum(step.point[0])}, ${recNum(step.point[1])})`);
-            if (step.point_rel && место.length) {
+            if (step.point_rel && (step.within || step.near)) {
                 parts.push(`at_rel=(${recNum(step.point_rel[0])}, ${recNum(step.point_rel[1])})`);
             }
             return 'ctx.click_target(' + parts.concat(место).join(', ') + ')';
@@ -2626,7 +2716,8 @@ function recRow(step, index) {
    сам, если запасные уже выбраны: спрятать заданное — потерять его из виду. */
 function recStepBody(step, index) {
     const main = recThumb(step) + recAnchorEditor(step) + recBranchEditor(step)
-        + recValueEditor(step) + recBlockEditor(step) + recFlexEditor(step);
+        + recValueEditor(step) + recBlockEditor(step) + recScrollEditor(step, index)
+        + recFlexEditor(step);
     const busy = step.kind === 'click' && recFallbacks(step).length > 0;
     return main + `<details class="rs-more" ${busy ? 'open' : ''}>
       <summary>${esc(t('rec.dopolnitelno'))}</summary>
@@ -3104,6 +3195,7 @@ function recPayload(meta) {
             if (step.within) out.within = step.within;
             else if (step.near) out.near = step.near;
             if ((step.within || step.near) && step.point_rel) out.point_rel = step.point_rel;
+            if (step.scroll) out.scroll = {dir: step.scroll.dir, max: step.scroll.max};
             if (step.crop && Object.keys(assets).length < REC_ASSETS_MAX) {
                 out.crop = recAssetName(index);
                 assets[out.crop] = step.crop;
@@ -3436,6 +3528,7 @@ function recAdopt(шаг, assets) {
         within: шаг.within || undefined,
         near: шаг.near || undefined,
         point_rel: шаг.point_rel || undefined,
+        scroll: шаг.scroll ? {dir: шаг.scroll.dir, max: шаг.scroll.max} : undefined,
         cropName: шаг.crop || null,   // по нему кроп находится после черновика
     };
     /* Запасные селекторы живут в alts: recFallbacks() собирает их оттуда, и

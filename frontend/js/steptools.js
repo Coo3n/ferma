@@ -235,7 +235,7 @@ function recNew() {
 function recBadges(step) {
     if (!ST_FLEX.has(step.kind)) return '';
     const fail = stFailGet(step);
-    let html = '';
+    let html = typeof recScrollBadge === 'function' ? recScrollBadge(step) : '';
     if (fail.skip) {
         html += `<span class="rs-badge opt" title="${esc(t('rec.badge_skip_hint'))}">${esc(t('rec.badge_skip'))}</span>`;
     }

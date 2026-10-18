@@ -1042,6 +1042,15 @@
 /* Глобальные label/select — блок и на всю ширину; здесь фраза в одну строку. */
 .rs-fail > label { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
 .rs-fail select { width: auto; min-width: 0; flex: 0 0 auto; }
+/* «Если не видно на экране»: пояснение — отдельной строкой под фразой. */
+.rs-scroll-why { flex: 1 0 100%; color: var(--dim); }
+/* Подсказка «вы листали перед этим нажатием» — тихая, только предложение. */
+.rs-scroll-tip {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px;
+    padding: 6px 8px; border-radius: var(--r1); background: var(--panel2);
+    font-size: var(--fs-1); color: var(--text2);
+}
+.rs-scroll-tip > span { flex: 1 1 200px; }
 
 .rs-more { margin-top: 8px; }
 .rs-more > summary { cursor: pointer; color: var(--dim); font-size: var(--fs-2); }
