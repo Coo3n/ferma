@@ -121,7 +121,25 @@ function fakeData() {
   await shot('bulk-actions', () => bulkMenu());
   await shot('run-dialog', () => { closeModal(); openRunDialog({ scenario: 'vk_auth' }); }, 1800);
   await shot('pult', () => { closeModal(); S.selected.clear(); renderRunbar(); openDevice('R58N1003'); }, 2000);
-  await shot('builder', () => { recBegin(); }, 1500);
+  await shot('builder', () => {
+    recBegin();
+    /* Шаги из конструктора, а не пустой список: на снимке должно быть видно
+       строки-фразы, раскрытый шаг и «Если не получилось». */
+    const st = (id, kind, args, extra = {}) => ({ id, kind, args, param: null, note: '', ...extra });
+    REC.steps = [
+      st(1, 'launch_app', { package: 'com.vkontakte.android' }),
+      st(2, 'click', {}, { selector: { call: 'click', args: 'text="Новости"' },
+        alts: [{ call: 'click', args: 'text="Новости"', matches: 1 },
+               { call: 'click', args: 'resourceId="com.vkontakte.android:id/tab_news"', matches: 1 }], retries: 2 }),
+      st(3, 'swipe', { x1: 0.5, y1: 0.8, x2: 0.5, y2: 0.25 }),
+      st(4, 'sleep', { seconds: 3 }),
+      st(5, 'click', {}, { selector: { call: 'click', args: 'description="Нравится"' }, optional: true }),
+      st(6, 'key', { name: 'back' }),
+    ];
+    REC.nextId = 10; REC.open = 2; recRender();
+    /* Телефона в демо нет: плашка «не удалось снять экран» — шум для снимка. */
+    setTimeout(() => { $('recBanner').hidden = true; }, 1000);
+  }, 1500);
   await shot('scenarios', () => { recPause(); REC.builder = false; showView('scen'); }, 1500);
   await shot('runs', () => { showView('jobs'); pickJob('j3'); }, 1800);
   await shot('problems', () => showView('deviations'), 1500);
