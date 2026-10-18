@@ -292,8 +292,8 @@ const REC_KEYS = {
     POWER: 'Питание', DEL: 'Стереть', TAB: 'Tab', VOLUME_UP: 'Громче', VOLUME_DOWN: 'Тише',
 };
 
-/* Неизвестный пакет — имя из самого пакета: com.wildberries.ru.dev →
-   «Wildberries». Полный пакет остаётся в подсказке и в коде. */
+/* Неизвестный пакет — имя из самого пакета: com.example.app.dev →
+   «Example». Полный пакет остаётся в подсказке и в коде. */
 const REC_PKG_NOISE = new Set(['com', 'org', 'net', 'ru', 'io', 'app', 'apps', 'android',
     'mobile', 'dev', 'debug', 'release', 'client', 'lite', 'beta', 'main']);
 

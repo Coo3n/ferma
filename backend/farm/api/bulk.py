@@ -163,7 +163,7 @@ def _packages(serial: str) -> list[str]:
 @router.get("/packages")
 def bulk_packages(serials: str = Query(...)):
     """Какие приложения стоят на выбранных телефонах и на скольких из них —
-    чтобы выбрать «VK» из списка, а не вспоминать com.vkontakte.android."""
+    чтобы выбрать приложение из списка по имени, а не вспоминать его пакет."""
     targets = _online(serials.split(","))
     with ThreadPoolExecutor(max_workers=min(WORKERS, len(targets))) as pool_:
         lists = list(pool_.map(_packages, targets))

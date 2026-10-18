@@ -91,10 +91,10 @@ function fakeData() {
   await p.route('**/api/devices', r => json(r, D.devs));
   await p.route(/\/api\/devices\/[A-Z0-9]+\/(thumb|frame|stream)/, r =>
     r.fulfill({ body: screen(r.request().url().split('/')[5]), contentType: 'image/jpeg' }));
-  await p.route(/\/api\/devices\/[A-Z0-9]+\/packages/, r => json(r, ['com.vkontakte.android', 'com.instagram.android',
+  await p.route(/\/api\/devices\/[A-Z0-9]+\/packages/, r => json(r, ['com.example.app', 'com.instagram.android',
     'org.telegram.messenger', 'com.zhiliaoapp.musically', 'com.android.chrome']));
   await p.route(/\/api\/devices\/[A-Z0-9]+\/record$/, r => json(r, { recording: false }));
-  await p.route(/\/api\/devices\/[A-Z0-9]+$/, r => json(r, { ...D.devs[3], current_app: 'com.vkontakte.android' }));
+  await p.route(/\/api\/devices\/[A-Z0-9]+$/, r => json(r, { ...D.devs[3], current_app: 'com.example.app' }));
   await p.route(/\/api\/jobs(\?.*)?$/, r => json(r, D.jobs));
   await p.route(/\/api\/jobs\/[a-z0-9]+\/artifacts\//, r => r.fulfill({ body: screen('R58N1004'), contentType: 'image/jpeg' }));
   await p.route(/\/api\/jobs\/[a-z0-9]+$/, r => {
@@ -127,10 +127,10 @@ function fakeData() {
        строки-фразы, раскрытый шаг и «Если не получилось». */
     const st = (id, kind, args, extra = {}) => ({ id, kind, args, param: null, note: '', ...extra });
     REC.steps = [
-      st(1, 'launch_app', { package: 'com.vkontakte.android' }),
+      st(1, 'launch_app', { package: 'com.example.app' }),
       st(2, 'click', {}, { selector: { call: 'click', args: 'text="Новости"' },
         alts: [{ call: 'click', args: 'text="Новости"', matches: 1 },
-               { call: 'click', args: 'resourceId="com.vkontakte.android:id/tab_news"', matches: 1 }], retries: 2 }),
+               { call: 'click', args: 'resourceId="com.example.app:id/tab_news"', matches: 1 }], retries: 2 }),
       st(3, 'swipe', { x1: 0.5, y1: 0.8, x2: 0.5, y2: 0.25 }),
       st(4, 'sleep', { seconds: 3 }),
       st(5, 'click', {}, { selector: { call: 'click', args: 'description="Нравится"' }, optional: true }),

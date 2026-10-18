@@ -13,7 +13,7 @@ def test_схема_отдаёт_все_виды_шагов_и_блоки():
 
 def test_пример_из_документации_проходит_проверку():
     items = steps.normalize_steps([
-        {"kind": "launch_app", "args": {"package": "com.vkontakte.android"}},
+        {"kind": "launch_app", "args": {"package": "com.example.app"}},
         {"kind": "loop", "args": {"span": 3, "minutes": 10, "pause_min": 1, "pause_max": 3}},
         {"kind": "swipe", "args": {"x1": .5, "y1": .8, "x2": .5, "y2": .3}},
         {"kind": "chance", "args": {"span": 1, "percent": 15}},

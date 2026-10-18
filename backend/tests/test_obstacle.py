@@ -118,18 +118,18 @@ def test_частые_преграды_идут_первыми():
         content-desc="" class="android.widget.TextView" bounds="[0,0][200,80]"/>
   <node text="" resource-id="com.android.systemui:id/status_bar"
         content-desc="" class="android.view.View" bounds="[0,0][1080,80]"/>
-  <node text="Что-то пошло не так" resource-id="com.wildberries.ru.dev:id/errorTitle"
+  <node text="Что-то пошло не так" resource-id="com.example.app.dev:id/errorTitle"
         content-desc="" class="android.widget.TextView" bounds="[100,900][980,980]"/>
 </hierarchy>"""
 
 
 def test_системные_узлы_не_идут_в_условие():
-    """Найдено на живом WB: все пять кандидатов оказались из systemui.
+    """Найдено на живом приложении: все пять кандидатов оказались из systemui.
 
     Страж по com.android.systemui:id/status_bar срабатывал бы на каждом
     экране любого приложения — условие, которое всегда истинно, бесполезно.
     """
-    сл = obstacle.capture(СИСТЕМНЫЙ, 1080, 2340, package="com.wildberries.ru.dev")
+    сл = obstacle.capture(СИСТЕМНЫЙ, 1080, 2340, package="com.example.app.dev")
     все = str(сл["candidates"])
     assert "systemui" not in все, f"системный узел попал в условие: {все}"
     assert "errorTitle" in все, "узел приложения обязан остаться"
@@ -137,7 +137,7 @@ def test_системные_узлы_не_идут_в_условие():
 
 def test_часы_не_попадают_в_тексты():
     """«14:22» меняется каждую минуту — как признак экрана бесполезно."""
-    сл = obstacle.capture(СИСТЕМНЫЙ, 1080, 2340, package="com.wildberries.ru.dev")
+    сл = obstacle.capture(СИСТЕМНЫЙ, 1080, 2340, package="com.example.app.dev")
     assert "14:22" not in сл["texts"]
     assert "Что-то пошло не так" in сл["texts"]
 
@@ -159,7 +159,7 @@ def test_без_пакета_фильтр_не_ломается():
 
 
 def test_каркас_приложения_не_годится_в_условие():
-    """Найдено на живом WB: action_bar_root, mainContentRoot и ещё трое — все
+    """Найдено на живом приложении: action_bar_root, mainContentRoot и ещё трое — все
     ровно 100% экрана и присутствуют и на экране ошибки, и на рабочем
     каталоге. Условие по ним истинно всегда, преграду оно не опознаёт.
     """

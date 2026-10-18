@@ -189,7 +189,7 @@
 
 ```json
 [
-  {"kind": "launch_app", "args": {"package": "com.vkontakte.android"}},
+  {"kind": "launch_app", "args": {"package": "com.example.app"}},
   {"kind": "loop", "args": {"span": 3, "minutes": 10, "pause_min": 1, "pause_max": 3}},
   {"kind": "swipe", "args": {"x1": 0.5, "y1": 0.8, "x2": 0.5, "y2": 0.3}},
   {"kind": "chance", "args": {"span": 1, "percent": 15}},
@@ -207,7 +207,7 @@
 Сервер соберёт из этого:
 
 ```python
-ctx.launch_app("com.vkontakte.android")
+ctx.launch_app("com.example.app")
 for _ in ctx.loop(minutes=10, pause=(1, 3)):
     ctx.swipe(0.5, 0.8, 0.5, 0.3, 0.25)
     if ctx.chance(15):

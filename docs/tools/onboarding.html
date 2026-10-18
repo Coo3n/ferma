@@ -265,16 +265,16 @@ def action(serial: str, payload: dict = Body(...)):   <span class="c"># тело
 <section class="page">
     <h2>7. Сценарии и ctx</h2>
     <p>Сценарий — файл в <code>backend/scenarios/</code> с функцией <code>run(ctx)</code>. Записанные конструктором сценарии — такие же файлы, их можно читать и править.</p>
-<pre>NAME = "Листать ленту VK"
+<pre>NAME = "Листать ленту"
 PARAMS = {"minutes": {"label": "Минут на телефон", "type": "number", "default": 10}}
 
 def run(ctx):
-    ctx.launch_app("com.vkontakte.android", stop_first=True)
+    ctx.launch_app("com.example.app", stop_first=True)
     ctx.click(text="Лента", timeout=10)
     for _ in range(20):
         ctx.swipe(0.5, 0.75, 0.5, 0.3)
         ctx.sleep(3)
-        ctx.on_track("com.vkontakte.android")    <span class="c"># сторож: своё ли приложение, листается ли</span>
+        ctx.on_track("com.example.app")    <span class="c"># сторож: своё ли приложение, листается ли</span>
     ctx.home()</pre>
     <table>
         <tr><th>Команда</th><th>Что делает</th></tr>
