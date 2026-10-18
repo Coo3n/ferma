@@ -602,6 +602,46 @@ def _execute(job: Job) -> None:
         job.artifacts = sorted(str(p) for p in art_dir.glob("*") if p.is_file())
 
 
+# Пробный запуск: сначала один телефон, остальные — только если он прошёл.
+# План живёт на сервере, а не в окне браузера: раньше F5 во время проверки
+# терял его, и остальные телефоны молча так и не запускались.
+TRIAL_RUNNING = "running"   # проба идёт (или ждёт человека — видно по задаче)
+TRIAL_STARTED = "started"   # проба прошла — остальные поставлены сами
+TRIAL_FAILED = "failed"     # проба не прошла — остальные ждут решения
+TRIAL_FORCED = "forced"     # не прошла, но человек запустил остальных
+TRIAL_DROPPED = "dropped"   # человек решил остальных не запускать
+TRIAL_WAITING = (TRIAL_RUNNING, TRIAL_FAILED)
+
+
+@dataclass
+class Trial:
+    batch: str
+    job_id: str
+    serial: str
+    device_name: str
+    rest: list
+    scenario_key: str
+    params: dict
+    repeat: int = 1
+    state: str = TRIAL_RUNNING
+    started: int = 0    # сколько телефонов получили задачи после пробы
+    skipped: int = 0    # сколько пропущено: к моменту запуска не в сети
+    error: str = ""
+
+    def to_dict(self, job: Job | None) -> dict:
+        return {
+            "state": self.state,
+            "job": self.job_id,
+            "serial": self.serial,
+            "device_name": self.device_name,
+            "job_status": job.status if job else "",
+            "rest": len(self.rest),
+            "started": self.started,
+            "skipped": self.skipped,
+            "error": self.error,
+        }
+
+
 class Runner:
     WORKER_IDLE = 300   # с простоя, после которых поток устройства закрывается
 
@@ -614,6 +654,7 @@ class Runner:
         self._queues: dict[str, queue.Queue] = {}
         self._workers: dict[str, threading.Thread] = {}
         self._lock = threading.RLock()
+        self.trials: dict[str, Trial] = {}
 
     def submit(self, scenario_key: str, serials: list[str], params: dict | None = None,
                repeat: int = 1, start_step: int = 0, speed: float = 1.0,
@@ -675,6 +716,91 @@ class Runner:
             self._prune()   # раз на запуск: проход по журналу, а не по задаче
         return created
 
+    # ---------------------------------------------------------------- проба
+    def submit_trial(self, scenario_key: str, serials: list[str], params: dict | None = None,
+                     repeat: int = 1, trial_serial: str | None = None,
+                     batch: str | None = None) -> tuple[list[Job], Trial]:
+        """Пробный запуск: одна задача на `trial_serial`, остальные — после неё.
+
+        Все телефоны проверяются сразу (как в submit): неизвестный телефон
+        должен дать ошибку в ответ на нажатие, а не через минуту пробы.
+        """
+        serials = list(dict.fromkeys(serials))
+        if len(serials) < 2:
+            raise ValueError("для проверки на одном нужно хотя бы два телефона")
+        first = trial_serial if trial_serial in serials else serials[0]
+        for serial in serials:
+            if registry.get(serial) is None:
+                raise ValueError(f"устройство {serial} не подключено")
+        jobs = self.submit(scenario_key, [first], params, 1, batch=batch)
+        job = jobs[0]
+        trial = Trial(batch=job.batch, job_id=job.id, serial=first, device_name=job.device_name,
+                      rest=[s for s in serials if s != first], scenario_key=scenario_key,
+                      params=dict(params or {}), repeat=max(1, int(repeat or 1)))
+        with self._lock:
+            self.trials[job.batch] = trial
+            # Задача могла кончиться раньше, чем план лёг в словарь.
+            done = job.status in DONE
+        if done:
+            self._trial_settle(job)
+        return jobs, trial
+
+    def trial(self, batch: str) -> Trial | None:
+        return self.trials.get(batch)
+
+    def _trial_settle(self, job: Job) -> None:
+        """Проба закончилась: прошла — запустить остальных, нет — ждать решения."""
+        with self._lock:
+            trial = self.trials.get(job.batch)
+            if trial is None or trial.job_id != job.id or trial.state != TRIAL_RUNNING:
+                return
+            if job.status != PASSED:
+                trial.state = TRIAL_FAILED
+                log.info("проба %s не прошла (%s): остальные %d ждут", trial.batch,
+                         job.status, len(trial.rest))
+                return
+            trial.state = TRIAL_STARTED
+        self._trial_launch(trial)
+
+    def _trial_launch(self, trial: Trial) -> None:
+        """Остальные — в тот же batch: в «Запусках» это один запуск.
+        Пробному телефону досылаются недостающие повторы."""
+        online = [s for s in trial.rest
+                  if (d := registry.get(s)) is not None and d.online]
+        trial.skipped = len(trial.rest) - len(online)
+        try:
+            if online:
+                self.submit(trial.scenario_key, online, trial.params, trial.repeat,
+                            batch=trial.batch)
+            if trial.repeat > 1:
+                self.submit(trial.scenario_key, [trial.serial], trial.params,
+                            trial.repeat - 1, batch=trial.batch)
+            trial.started = len(online)
+        except (ValueError, TypeError) as e:
+            # Повторно не пробуем: часть задач уже могла встать, а двойной
+            # запуск хуже недозапуска. Причина видна в полосе запуска.
+            trial.error = str(e)
+            log.warning("проба %s: остальные не запущены: %s", trial.batch, e)
+
+    def trial_release(self, batch: str) -> Trial | None:
+        """«Всё равно запустить на остальных» — после непрошедшей пробы."""
+        with self._lock:
+            trial = self.trials.get(batch)
+            if trial is None or trial.state != TRIAL_FAILED:
+                return None
+            trial.state = TRIAL_FORCED
+        self._trial_launch(trial)
+        return trial
+
+    def trial_drop(self, batch: str) -> Trial | None:
+        """Остальных не запускать. Сама проба, если идёт, доигрывает."""
+        with self._lock:
+            trial = self.trials.get(batch)
+            if trial is None or trial.state not in TRIAL_WAITING:
+                return None
+            trial.state = TRIAL_DROPPED
+            return trial
+
     def cancel(self, job_id: str) -> bool:
         job = self.jobs.get(job_id)
         if job is None or job.status in DONE or job._cancel.is_set():
@@ -687,6 +813,8 @@ class Runner:
             job.status = CANCELLED
             job.finished_at = time.time()
             job.add_line("отменено до старта")
+            # Воркер такую задачу пропустит, итог пробы подводим здесь.
+            self._trial_settle(job)
         else:
             # Прервать чужой поток посреди шага нельзя, а показать, что отмена
             # принята, надо сразу: статус меняется здесь, до выхода сценария.
@@ -762,6 +890,7 @@ class Runner:
                 except ValueError:
                     pass
                 n += 1
+            self._prune_trials()
             return n
 
     def list_jobs(self, limit: int = 60, serial: str | None = None,
@@ -773,7 +902,7 @@ class Runner:
             job = self.jobs.get(jid)
             if job is None or (serial and job.serial != serial) or (batch and job.batch != batch):
                 continue
-            out.append(job.to_dict())
+            out.append(self.job_dict(job))
             if len(out) >= limit:
                 break
         return out
@@ -805,6 +934,14 @@ class Runner:
     def get(self, job_id: str) -> Job | None:
         return self.jobs.get(job_id)
 
+    def job_dict(self, job: Job, with_log: bool = False) -> dict:
+        """Словарь задачи и, если её запуск начинался с пробы, — ход пробы."""
+        d = job.to_dict(with_log=with_log)
+        trial = self.trials.get(job.batch) if job.batch else None
+        if trial is not None:
+            d["trial"] = trial.to_dict(self.jobs.get(trial.job_id))
+        return d
+
     def stats(self) -> dict:
         s = {QUEUED: 0, RUNNING: 0, HELD: 0, CANCELLING: 0,
              PASSED: 0, FAILED: 0, CANCELLED: 0}
@@ -827,6 +964,13 @@ class Runner:
                 continue
             keep.append(jid)
         self.order = keep
+        self._prune_trials()
+
+    def _prune_trials(self) -> None:
+        """План пробы нужен, пока в журнале есть задачи его запуска."""
+        живые = {job.batch for job in self.jobs.values()}
+        for batch in [b for b in self.trials if b not in живые]:
+            self.trials.pop(batch, None)
 
     # ------------------------------------------------------------------ воркеры
     def _queue_for(self, serial: str) -> queue.Queue:
@@ -859,6 +1003,7 @@ class Runner:
             if job is None or job.status != QUEUED:
                 continue
             _execute(job)
+            self._trial_settle(job)
 
 
 runner = Runner()
