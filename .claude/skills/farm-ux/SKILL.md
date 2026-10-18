@@ -81,7 +81,11 @@ Simultaneous identical actions on many phones = ban. Default ON: jitter modes of
 
 ## Copy
 
-Russian, lowercase toasts, short. Toast says result + count: «Установка: готово на 38, 2 с ошибкой — <первая ошибка>».
+Russian, lowercase toasts, short. Toast says result + count: «Установка: готово на 38, с ошибкой 2». Bulk results go through `bulkRun` (bulk.js): panel `#bulkResult` in «Действия» (or a small modal) — «Готово на 36 из 38», failed phones by name + reason in words (server `reason` code from `bulk.py:failure` → `BULK_REASONS`), «Повторить на 2»; buttons locked while running.
+
+## Keyboard on the fleet
+
+Grid = one Tab stop (roving tabindex, `fleetRove`); arrows/Home/End move, Space select, Enter open, i info, F2 rename, Esc clear selection. Buttons inside tiles stay `tabindex=-1` — add new tile actions as keys, not tab stops.
 
 ## Navigation
 

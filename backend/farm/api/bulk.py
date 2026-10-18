@@ -14,7 +14,8 @@ import shutil
 import tempfile
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import CancelledError, Future, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from pathlib import Path
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
@@ -42,18 +43,71 @@ def _online(serials: list[str]) -> list[str]:
     return out
 
 
-def _each(serials: list[str], fn) -> dict:
+# Причина сбоя — коротким кодом: браузер переводит его в слова («телефон
+# отключился», «мало места»), а сырой текст adb остаётся в подсказке.
+# Порядок важен: «device offline» в тексте таймаута — всё равно «не в сети».
+_REASONS = (
+    ("unauthorized", ("unauthorized",)),
+    ("offline", ("offline", "не в сети")),
+    ("not_found", ("not found", "no devices", "no emulators")),
+    ("timeout", ("таймаут", "timeout", "timed out")),
+    ("no_space", ("insufficient_storage", "no space left", "enospc")),
+    ("old_android", ("install_failed_older_sdk",)),
+    ("downgrade", ("install_failed_version_downgrade",)),
+    ("signature", ("install_failed_update_incompatible", "inconsistent_certificates",
+                   "install_failed_shared_user_incompatible")),
+    ("abi", ("no_matching_abis",)),
+    ("blocked", ("install_failed_user_restricted", "install_failed_aborted",
+                 "install_failed_verification_failure")),
+    ("bad_apk", ("install_parse_failed", "install_failed_invalid_apk", "not a valid zip")),
+    ("install_other", ("install_failed", "failure [")),
+    ("no_access", ("read-only file system", "permission denied")),
+)
+_INSTALL_CODE = re.compile(r"\b(INSTALL_(?:FAILED|PARSE_FAILED)_[A-Z_]+)")
+
+
+def failure(message: str) -> dict:
+    """{ok: False, error, reason[, code]} по тексту исключения."""
+    low = message.lower()
+    reason = next((code for code, needles in _REASONS if any(n in low for n in needles)), "other")
+    # Хвост важнее головы: у adb install суть («Failure [INSTALL_FAILED_…]»)
+    # в конце, после длинной команды с путём к файлу.
+    error = message if len(message) <= 300 else message[:110] + " … " + message[-180:]
+    out = {"ok": False, "error": error, "reason": reason}
+    m = _INSTALL_CODE.search(message)
+    if m:
+        out["code"] = m.group(1)
+    return out
+
+
+def _message(e: Exception) -> str:
+    # У HTTPException текст в detail; str() дал бы «409: …».
+    return str(getattr(e, "detail", None) or e)
+
+
+def _skipped(asked: list[str] | None, targets: list[str]) -> dict:
+    """Выбранные, но не в сети к моменту запроса, — тоже итог: иначе
+    «готово на 36» молча теряло бы двоих, и повторить их было бы нельзя."""
+    return {s: failure("не в сети") for s in dict.fromkeys(asked or []) if s not in targets}
+
+
+def _summary(results: dict) -> dict:
+    failed = sum(1 for r in results.values() if not r["ok"])
+    return {"ok": failed == 0, "done": len(results) - failed, "failed": failed, "results": results}
+
+
+def _each(serials: list[str], fn, asked: list[str] | None = None) -> dict:
     def one(serial):
         try:
             res = fn(serial)
             return serial, {"ok": True, **(res if isinstance(res, dict) else {})}
         except Exception as e:  # noqa: BLE001
-            return serial, {"ok": False, "error": str(e)[:300]}
+            return serial, failure(_message(e))
 
     with ThreadPoolExecutor(max_workers=min(WORKERS, len(serials))) as pool:
         results = dict(pool.map(one, serials))
-    failed = sum(1 for r in results.values() if not r["ok"])
-    return {"ok": failed == 0, "done": len(results) - failed, "failed": failed, "results": results}
+    results.update(_skipped(asked, serials))
+    return _summary(results)
 
 
 # ------------------------------------------------------------ разброс
@@ -71,21 +125,29 @@ MIN_GAP = 0.05          # между двумя жестами на одном �
 _queues: dict[str, queue.Queue] = {}
 _last_due: dict[str, float] = {}
 _queues_lock = threading.Lock()
+# Действие, которое очередь уже достала и ждёт его срока. Раньше аварийная
+# остановка его не видела: жест, спящий в разбросе, всё равно доходил.
+_sleeping: dict[str, Future] = {}
 
 
 def _worker(serial: str, q: queue.Queue) -> None:
     while True:
-        due, fn = q.get()
+        due, fn, fut = q.get()
+        _sleeping[serial] = fut
         wait = due - time.monotonic()
         if wait > 0:
             time.sleep(wait)
+        _sleeping.pop(serial, None)
+        if not fut.set_running_or_notify_cancel():
+            continue   # аварийная остановка успела отменить
         try:
-            fn(serial)
+            fut.set_result(fn(serial))
         except Exception as e:  # noqa: BLE001
             log.warning("%s: отложенное действие не выполнилось: %s", serial, e)
+            fut.set_exception(e)
 
 
-def _enqueue(serial: str, delay: float, fn) -> None:
+def _enqueue(serial: str, delay: float, fn) -> Future:
     now = time.monotonic()
     with _queues_lock:
         q = _queues.get(serial)
@@ -95,7 +157,9 @@ def _enqueue(serial: str, delay: float, fn) -> None:
                              name=f"bulk-{serial}").start()
         due = max(now + delay, _last_due.get(serial, 0.0) + MIN_GAP)
         _last_due[serial] = due
-    q.put((due, fn))
+    fut: Future = Future()
+    q.put((due, fn, fut))
+    return fut
 
 
 def drain_queues() -> int:
@@ -106,11 +170,37 @@ def drain_queues() -> int:
         for q in _queues.values():
             while True:
                 try:
-                    q.get_nowait()
+                    _due, _fn, fut = q.get_nowait()
                 except queue.Empty:
                     break
+                fut.cancel()   # массовое действие ждёт итог — скажем «остановлено»
+                n += 1
+        for fut in list(_sleeping.values()):
+            if fut.cancel():
                 n += 1
     return n
+
+
+# Сколько массовое действие с разбросом ждёт итог сверх самого разброса.
+QUEUED_WAIT = 60.0
+
+
+def _wait_queued(futures: dict[str, Future], hi: float) -> dict:
+    """Итог по каждому телефону из очередей: окно «Действия» показывает,
+    где не вышло и почему, а не «запланировано на 38»."""
+    deadline = time.monotonic() + hi + QUEUED_WAIT
+    results = {}
+    for s, fut in futures.items():
+        try:
+            res = fut.result(timeout=max(0.0, deadline - time.monotonic()))
+            results[s] = {"ok": True, **(res if isinstance(res, dict) else {})}
+        except CancelledError:
+            results[s] = {**failure("остановлено"), "reason": "stopped"}
+        except FutureTimeout:
+            results[s] = failure("таймаут: телефон не ответил")
+        except Exception as e:  # noqa: BLE001
+            results[s] = failure(_message(e))
+    return results
 
 
 @router.post("/action")
@@ -118,14 +208,15 @@ def bulk_action(serials: list[str] = Body(...), action: dict = Body(...),
                 jitter: list[float] | None = Body(None), lead: str | None = Body(None)):
     """Синхронно (lead задан): ведущий выполняет сразу, ведомые — в своих
     очередях, ответ не ждёт ведомых. jitter=[lo, hi] — разброс по ведомым.
-    Без lead — массовое действие: ждём всех и отдаём итог по каждому."""
+    Без lead — массовое действие: ждём всех (с разбросом — через те же
+    очереди) и отдаём итог по каждому, включая выпавших из сети."""
     handler = ACTIONS.get(action.get("type"))
     if handler is None:
         raise HTTPException(400, f"неизвестное действие: {action.get('type')}")
     targets = _online(serials)
     run = lambda s: handler(s, action)  # noqa: E731
     if lead is None and not jitter:
-        return _each(targets, run)
+        return _each(targets, run, serials)
 
     try:
         lo, hi = sorted(max(0.0, min(float(v), MAX_JITTER)) for v in (jitter or [0, 0])[:2])
@@ -133,8 +224,11 @@ def bulk_action(serials: list[str] = Body(...), action: dict = Body(...),
         # [5] или ["abc"] раньше падали распаковкой — 500 вместо понятного 400.
         raise HTTPException(400, "jitter: два числа [от, до] в секундах")
     followers = [s for s in targets if s != lead]
-    for s in followers:
-        _enqueue(s, random.uniform(lo, hi), run)
+    futures = {s: _enqueue(s, random.uniform(lo, hi), run) for s in followers}
+    if lead is None:
+        results = _wait_queued(futures, hi)
+        results.update(_skipped(serials, targets))
+        return _summary(results)
     result = _each([lead], run) if lead in targets else {"ok": True, "done": 0, "failed": 0, "results": {}}
     result["queued"] = len(followers)
     return result
@@ -193,7 +287,7 @@ def bulk_packages(serials: str = Query(...)):
 
 @router.post("/reboot")
 def bulk_reboot(serials: list[str] = Body(..., embed=True)):
-    return _each(_online(serials), lambda s: adb.raw(["reboot"], serial=s, timeout=30))
+    return _each(_online(serials), lambda s: adb.raw(["reboot"], serial=s, timeout=30), serials)
 
 
 @router.post("/group")
@@ -260,9 +354,15 @@ async def bulk_install(request: Request, serials: str = Query(...), name: str = 
     """Тело запроса — сам APK; serials через запятую."""
     targets = _online(serials.split(","))
     apk = await _upload(request, name)
+    def install(serial):
+        out = adb.raw(["install", "-r", "-g", str(apk)], serial=serial, timeout=INSTALL_TIMEOUT).strip()
+        # Старый adb пишет «Failure [INSTALL_FAILED_…]» с кодом выхода 0.
+        if "Failure [" in out or "INSTALL_FAILED" in out:
+            raise RuntimeError(out[-300:])
+        return {"output": out[-200:]}
+
     try:
-        return _each(targets, lambda s: {"output": adb.raw(
-            ["install", "-r", "-g", str(apk)], serial=s, timeout=INSTALL_TIMEOUT).strip()[-200:]})
+        return _each(targets, install, serials.split(","))
     finally:
         _discard(apk)
 
@@ -280,7 +380,7 @@ async def bulk_push(request: Request, serials: str = Query(...), name: str = Que
                            "-d", f"file://{dest}"])
 
     try:
-        result = _each(targets, push)
+        result = _each(targets, push, serials.split(","))
         result["path"] = dest
         return result
     finally:

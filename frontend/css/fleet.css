@@ -168,6 +168,32 @@
     color: var(--dim)
 }
 
+/* Место под подсказку держим всегда — без прыжка высоты; видна только
+   при клавиатурном фокусе на плитке. */
+.sect-keys {
+    margin-left: auto;
+    font-size: var(--fs-2);
+    color: var(--dim);
+    visibility: hidden;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+#view-fleet:has(.tile:focus-visible) .sect-keys {
+    visibility: visible;
+}
+
+/* Фокус плитки — то же зелёное кольцо, что у всего интерфейса, но со
+   скруглением самой плитки (база ставит --r1). */
+.tile:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--r3);
+    border-color: var(--line-hover);
+}
+
 
 /* ------------------------------------------------------------------ сетка */
 
