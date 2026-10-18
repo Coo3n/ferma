@@ -121,7 +121,7 @@ def resolve(ctx, sel=None, text=None, img=None, at=None, timeout: float = 10.0):
         if hit:
             return hit
     if img:
-        hit = _by_template(ctx, img)
+        hit = _by_template(ctx, img, at)
         if hit:
             return hit
     if at:
@@ -164,16 +164,25 @@ def _by_ocr(ctx, wanted):
     return Hit(found[1], found[2], "ocr", found[0]) if found else None
 
 
-def _by_template(ctx, img):
+def _by_template(ctx, img, at=None):
     if not tpl_mod.available():
         return None
     try:
         data, base_scale = ctx.asset(img)
         if not data:
             return None
-        found = tpl_mod.find(ctx.screen_bytes(), data, base_scale=base_scale)
+        # Место записи решает, какую из одинаковых иконок нажать.
+        if at:
+            found = tpl_mod.find(ctx.screen_bytes(), data, base_scale=base_scale,
+                                 near=(float(at[0]), float(at[1])), with_count=True)
+        else:
+            found = tpl_mod.find(ctx.screen_bytes(), data, base_scale=base_scale)
     except Exception:  # noqa: BLE001 — зрение не должно ронять шаг, как _by_ocr/_by_tree_text
         return None
     if found:
-        return Hit(found[0], found[1], "template", f"{img} score={found[2]:.2f}")
+        detail = f"{img} score={found[2]:.2f}"
+        if len(found) > 3 and found[3] > 1:
+            detail += f", похожих: {found[3]} — взято ближайшее к месту записи" if at \
+                else f", похожих: {found[3]}"
+        return Hit(found[0], found[1], "template", detail)
     return None

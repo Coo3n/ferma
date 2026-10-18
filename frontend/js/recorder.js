@@ -247,7 +247,10 @@ function recRefreshDump() {
 
 /* ------------------------------------------------------------------ шаги */
 
-/* Наименьший по площади узел под точкой — тот же критерий, что в инспекторе. */
+/* Наименьший по площади узел под точкой — тот же критерий, что в инспекторе.
+   При равной площади берётся более поздний в дампе: это вложенный узел с
+   теми же рамками (кнопка внутри обёртки) или то, что нарисовано поверх
+   (диалог над лентой). Раньше выигрывал первый — обёртка или то, что под. */
 function recHit(x, y, dump) {
     const src = dump || REC.dump;
     const nodes = (src && src.nodes) || [];
@@ -256,7 +259,7 @@ function recHit(x, y, dump) {
         const [x1, y1, x2, y2] = node.bounds;
         if (x < x1 || x > x2 || y < y1 || y > y2) continue;
         const area = (x2 - x1) * (y2 - y1);
-        if (area < bestArea) {
+        if (area <= bestArea) {
             bestArea = area;
             best = node;
         }
@@ -441,11 +444,34 @@ function recAutoPause() {
 /* Шаг click по узлу дампа — чистая часть recNoteTap, её же берёт починка шага
    (repair.js). Без id/param: их проставляет recPush. Селектор узла обязан быть
    кликабельным и не oversized — это проверяет вызывающий. */
+/* Пометка способа поиска словами — рядом с каждым вариантом в «Как искать».
+   Номер среди одинаковых («2-й из 3») — это и есть «нужен вот этот». */
+function recSelMark(alt) {
+    if (!alt || alt.matches == null) return '';
+    const parts = [alt.nth ? t('rec.sel_nth', {k: alt.nth[0], n: alt.nth[1]})
+        : alt.matches === 1 ? t('rec.sel_odin') : t('rec.sel_pohozhih', {n: alt.matches})];
+    if (alt.dynamic) parts.push(t('rec.sel_menyaetsya'));
+    return parts.join(' · ');
+}
+
+/* Предупреждение шага по выбранному способу. Шаг из файла (matches нет) —
+   дампа того экрана нет, предупреждать не о чем. */
+function recSelWarn(alt) {
+    if (!alt || alt.matches == null) return '';
+    const warns = [];
+    if (alt.nth) {
+        warns.push(t('rec.warn_nth', {k: alt.nth[0], n: alt.nth[1]}));
+    } else {
+        if (alt.matches !== 1) warns.push(t('rec.warn_mnogo', {n: alt.matches}));
+        if (alt.fragile) warns.push(t('rec.warn_hrupkiy'));
+    }
+    if (alt.dynamic) warns.push(t('rec.warn_menyaetsya'));
+    return warns.join('; ');
+}
+
 function recBuildClickStep(target, dump, point) {
     const selector = target.selectors[0];
-    const warns = [];
-    if (selector.matches !== 1) warns.push(`под это описание подходит ${selector.matches} элемента — шаг может нажать не то`);
-    if (selector.fragile) warns.push('элемент узнаётся ненадёжно — на другом телефоне может не найтись');
+    const warns = [recSelWarn(selector)].filter(Boolean);
     return {
         kind: 'click',
         args: {},
@@ -522,7 +548,7 @@ function recAnchorFeatures(dump) {
     const прочие = [];
     (dump.nodes || []).forEach(node => {
         const sel = (node.selectors || [])[0];
-        if (!sel || sel.call !== 'click' || sel.fragile || sel.matches !== 1) return;
+        if (!sel || sel.call !== 'click' || sel.fragile || sel.dynamic || sel.matches !== 1) return;
         /* Системная панель есть на любом экране — якорь на ней ничего не проверяет. */
         if (/com\.android\.systemui|android:id\//.test(sel.args)) return;
         const куда = sel.args.indexOf('resourceId=') === 0 ? строгие : прочие;
@@ -1527,7 +1553,10 @@ async function recAnchorHere() {
    локали селектор не совпадёт, а подпись кнопки чаще всего та же. */
 function recTexts(target) {
     const seen = [];
-    [target.text, target.description].forEach(raw => {
+    /* Счётчик или время («125», «12:45») к следующему прогону станет другим:
+       искать по нему текстом — найти чужой элемент или ничего. */
+    [target.textDynamic ? '' : target.text,
+        target.descriptionDynamic ? '' : target.description].forEach(raw => {
         const value = (raw || '').trim();
         if (value && seen.indexOf(value) < 0) seen.push(value);
     });
@@ -1870,7 +1899,7 @@ function recFallbacks(step) {
     if (Array.isArray(step.or)) return step.or.filter(args => args !== step.selector.args).slice(0, REC_OR_MAX);
     if (!step.alts) return [];
     return step.alts
-        .filter(alt => alt.call === 'click' && !alt.fragile && alt.args !== step.selector.args)
+        .filter(alt => alt.call === 'click' && !alt.fragile && !alt.dynamic && alt.args !== step.selector.args)
         .map(alt => alt.args)
         .slice(0, 3);
 }
@@ -1997,6 +2026,11 @@ function recFeatText(args) {
         if (k === 'resourceIdMatches') val = val.replace(/^\.\*\//, '').replace(/\$$/, '').replace(/\\(.)/g, '$1');
         if (k === 'resourceId' || k === 'resourceIdMatches') val = val.split('/').pop().replace(/_/g, ' ');
         if (k === 'className') val = val.split('.').pop();
+        /* instance считается с нуля: instance=1 — второй по счёту. */
+        if (k === 'instance' && /^\d+$/.test(val)) {
+            parts.push(t('rec.feat_nomer', {k: Number(val) + 1}));
+            return m;
+        }
         parts.push(`${REC_FEAT[k] || k} «${val}»`);
         return m;
     });
@@ -2021,13 +2055,18 @@ function recAlts(step) {
     const main = step.selector.args;
     const alts = step.alts || [];
     const picked = recFallbacks(step);
-    const mark = alt => alt.matches == null ? '' : (alt.matches === 1 ? '✓' : '⚠' + alt.matches);
-    const radios = alts.length > 1 ? alts.map((alt, index) => `
+    /* Координаты — не способ поиска, а последний слой шага (step.point):
+       основной селектор click обязан быть вызовом click, иначе сохранение
+       получит 400. Индекс в alts сохраняем — по нему recPickSelector
+       берёт вариант. */
+    const choices = alts.map((alt, index) => ({alt, index})).filter(c => c.alt.call === 'click');
+    const radios = choices.length > 1 ? choices.map(({alt, index}) => `
       <label><input type="radio" name="sel${step.id}" ${alt.args === main ? 'checked' : ''}
              onchange="recPickSelector(${step.id}, ${index})">
-        ${mark(alt)} <span title="${esc('ctx.' + alt.call + '(' + alt.args + ')')}">${esc(recFeatText(alt.args))}</span></label>`).join('') : `
+        <span title="${esc('ctx.' + alt.call + '(' + alt.args + ')')}">${esc(recFeatText(alt.args))}</span>
+        <span class="${alt.matches === 1 && !alt.dynamic ? 'rs-sel-ok' : 'rs-sel-bad'}">${esc(recSelMark(alt))}</span></label>`).join('') : `
       <span class="rs-feat">${esc(recFeatText(main))}</span>`;
-    const others = [...new Set([...alts.filter(a => a.call === 'click' && !a.fragile).map(a => a.args), ...picked])]
+    const others = [...new Set([...alts.filter(a => a.call === 'click' && !a.fragile && !a.dynamic).map(a => a.args), ...picked])]
         .filter(args => args !== main);
     const full = picked.length >= REC_OR_MAX;
     const checks = others.map(args => {
@@ -2404,11 +2443,10 @@ function recEditValue(id, value) {
 
 function recPickSelector(id, index) {
     const step = recFind(id);
-    const alt = step.alts[index];
+    const alt = step && (step.alts || [])[index];
+    if (!alt || alt.call !== 'click') return;
     step.selector = {call: alt.call, args: alt.args};
-    /* У шага из файла числа совпадений нет — предупреждать не о чем. */
-    step.warn = (alt.matches == null || alt.matches === 1)
-        ? '' : `под это описание подходит ${alt.matches} элемента — шаг может нажать не то`;
+    step.warn = recSelWarn(alt);
     recRender();
     recSave();
 }

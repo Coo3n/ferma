@@ -21,6 +21,9 @@ const ctx = {console, localStorage: {getItem: () => null, setItem: noop, removeI
     document: {querySelector: () => null, addEventListener: noop, getElementById: () => null,
                readyState: 'complete'},
     setTimeout, clearTimeout, Image: function () {}};
+/* t() из i18n.js: подсказки шага берутся из strings/ru.json. */
+const STR = JSON.parse(fs.readFileSync(process.argv[1] + '/../strings/ru.json', 'utf8'));
+ctx.t = (k, v) => (STR[k] || k).replace(/\{(\w+)\}/g, (m, n) => (v && v[n] != null ? v[n] : m));
 ctx.window = ctx;
 vm.createContext(ctx);
 for (const f of ['recorder', 'repair'])

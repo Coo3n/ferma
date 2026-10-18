@@ -97,6 +97,8 @@ def node_at(nodes: list[Node], x: float, y: float):
         x1, y1, x2, y2 = node.bounds
         if x < x1 or x > x2 or y < y1 or y > y2:
             continue
-        if best is None or node.area < best.area:
+        # <=: при равной площади — более поздний в дампе (вложенный с теми же
+        # рамками или нарисованный поверх), как recHit в recorder.js.
+        if best is None or node.area <= best.area:
             best = node
     return best

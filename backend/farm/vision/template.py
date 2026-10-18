@@ -33,8 +33,43 @@ def available() -> bool:
         return False
 
 
-def find(screen_png: bytes, template_png: bytes, base_scale: float = 1.0):
-    """(cx, cy, score) в нормализованных координатах — или None."""
+# Сколько лучших точек корреляции разбирать на отдельные совпадения. Больше
+# не нужно: на экране редко бывает больше десятка одинаковых иконок.
+MAX_PEAKS = 200
+
+
+def suppress(points, min_dx: float, min_dy: float) -> list:
+    """Точки (cx, cy, score) → по одной на место: соседние пики одной иконки
+    схлопываются в лучший. Чистая функция, без opencv."""
+    kept: list = []
+    for p in sorted(points, key=lambda p: -p[2]):
+        if all(abs(p[0] - q[0]) >= min_dx or abs(p[1] - q[1]) >= min_dy for q in kept):
+            kept.append(p)
+    return kept
+
+
+def pick(peaks, near=None):
+    """Какое из совпадений нажимать. Чистая функция, без opencv.
+
+    Одинаковых иконок на экране бывает несколько (лайки в ленте). Лучший
+    балл среди почти одинаковых — случайность сжатия JPEG, а не признак
+    нужной. Если известно место записи (`at` шага), берём ближайшее к нему —
+    это и есть «нужен вот этот». Без места — лучший балл, как раньше.
+    """
+    if not peaks:
+        return None
+    if near is None:
+        return max(peaks, key=lambda p: p[2])
+    return min(peaks, key=lambda p: (p[0] - near[0]) ** 2 + (p[1] - near[1]) ** 2)
+
+
+def find(screen_png: bytes, template_png: bytes, base_scale: float = 1.0,
+         near=None, with_count: bool = False):
+    """(cx, cy, score) в долях экрана — или None.
+
+    Похожих мест больше одного — выбор делает `pick` (ближайшее к `near`).
+    `with_count` добавляет четвёртым числом, сколько похожих мест нашлось.
+    """
     import cv2
     import numpy as np
 
@@ -42,17 +77,26 @@ def find(screen_png: bytes, template_png: bytes, base_scale: float = 1.0):
     original = cv2.imdecode(np.frombuffer(template_png, np.uint8), cv2.IMREAD_GRAYSCALE)
     if screen is None or original is None:
         return None
-    best = None
+    sh, sw = screen.shape[:2]
+    points = []
+    min_dx = min_dy = 1.0
     for scale in scales_for(base_scale):
         w = int(original.shape[1] * scale)
         h = int(original.shape[0] * scale)
-        if w < MIN_SIDE or h < MIN_SIDE or w > screen.shape[1] or h > screen.shape[0]:
+        if w < MIN_SIDE or h < MIN_SIDE or w > sw or h > sh:
             continue
         tpl = cv2.resize(original, (w, h), interpolation=cv2.INTER_AREA)
-        _, score, _, loc = cv2.minMaxLoc(cv2.matchTemplate(screen, tpl,
-                                                           cv2.TM_CCOEFF_NORMED))
-        if score >= THRESHOLD and (best is None or score > best[2]):
-            best = ((loc[0] + w / 2) / screen.shape[1],
-                    (loc[1] + h / 2) / screen.shape[0],
-                    float(score))
-    return best
+        res = cv2.matchTemplate(screen, tpl, cv2.TM_CCOEFF_NORMED)
+        ys, xs = np.where(res >= THRESHOLD)
+        if not len(xs):
+            continue
+        order = np.argsort(-res[ys, xs])[:MAX_PEAKS]
+        for i in order:
+            x, y = int(xs[i]), int(ys[i])
+            points.append(((x + w / 2) / sw, (y + h / 2) / sh, float(res[y, x])))
+        min_dx, min_dy = min(min_dx, w / 2 / sw), min(min_dy, h / 2 / sh)
+    peaks = suppress(points, min_dx, min_dy)
+    best = pick(peaks, near)
+    if not best:
+        return None
+    return (*best, len(peaks)) if with_count else best
