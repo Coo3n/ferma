@@ -33,14 +33,14 @@ PRESETS = [
     {
         "key": "stop_app",
         "title": "Закрыть приложение",
-        "desc": "Force-stop процесса",
+        "desc": "Полностью закрыть приложение",
         "inputs": [_PACKAGE],
         "steps": [{"kind": "stop_app", "args": {"package": "{package}"}}],
     },
     {
         "key": "restart_app",
         "title": "Перезапустить приложение",
-        "desc": "Force-stop, секунда паузы и запуск заново",
+        "desc": "Закрыть, подождать секунду и открыть снова",
         "inputs": [_PACKAGE],
         "steps": [
             {"kind": "stop_app", "args": {"package": "{package}"}},
@@ -51,7 +51,7 @@ PRESETS = [
     {
         "key": "clear_app",
         "title": "Сбросить данные приложения",
-        "desc": "pm clear — стирает данные и кэш, как после установки",
+        "desc": "Стирает данные и вход, как после установки",
         "inputs": [_PACKAGE],
         "steps": [{"kind": "shell", "args": {"cmd": "pm clear {package}"}}],
     },
@@ -151,8 +151,8 @@ PRESETS = [
     },
     {
         "key": "shell",
-        "title": "Команда adb shell",
-        "desc": "Произвольная команда на устройстве",
+        "title": "Своя команда",
+        "desc": "Для опытных: команда adb shell на телефоне",
         "inputs": [{"name": "cmd", "label": "Команда", "hint": "input keyevent 26"}],
         "steps": [{"kind": "shell", "args": {"cmd": "{cmd}"}}],
     },
