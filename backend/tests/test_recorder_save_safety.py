@@ -219,9 +219,12 @@ def test_инъекции_отвергаются(args):
 def test_все_рецепты_репозитория_проходят():
     import pathlib
     root = pathlib.Path(__file__).resolve().parent.parent / "scenarios"
-    n = 0
-    for f in root.glob("*_assets/recipe.json"):
+    # scenarios/ в .gitignore: в чистом клоне и в worktree рецептов нет, а
+    # оператор может удалить последний. Пустая папка — нечего проверять, а не
+    # поломка; падать надо на рецепте, который не проходит.
+    recipes = sorted(root.glob("*_assets/recipe.json"))
+    if not recipes:
+        pytest.skip("в scenarios/ нет записанных рецептов")
+    for f in recipes:
         for st in json.loads(f.read_text("utf-8"))["steps"]:
             steps.normalize_step(st)
-            n += 1
-    assert n
