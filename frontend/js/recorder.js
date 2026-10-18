@@ -2202,7 +2202,7 @@ function recRow(step, index) {
                 onclick="event.stopPropagation();recRunStep(${index})">${recIcon('play')}</button>
         <button class="sm ghost rs-more-btn" title="${esc(t('rec.m_esche'))}" aria-label="${esc(t('rec.m_esche'))}"
                 aria-haspopup="menu"
-                onclick="event.stopPropagation();recRowMenu(event, ${step.id}, ${index})">⋯</button>
+                onclick="event.stopPropagation();recRowMenu(event, ${step.id})">⋯</button>
       </span>
     </div>
     ${recMark(step, open)}
@@ -2235,7 +2235,12 @@ const REC_ROW_MENU = () => [
     [t('rec.m_udalit'), 'trash', (id) => recDelete(id), 'danger'],
 ];
 
+/* Открытое меню помнится по id шага (REC.menuFor), а не живёт только в
+   DOM: список пересобирается и без участия человека (селектор приехал с
+   опозданием, автосохранение), и меню, висящее на старой строке, пропадало
+   бы из-под мыши. recRender рисует его заново через recRowMenuShow. */
 function recRowMenuClose() {
+    REC.menuFor = null;
     document.querySelectorAll('.rs-menu').forEach(menu => menu.remove());
     document.removeEventListener('click', recRowMenuClose);
     document.removeEventListener('keydown', recRowMenuKey);
@@ -2245,10 +2250,25 @@ function recRowMenuKey(ev) {
     if (ev.key === 'Escape') recRowMenuClose();
 }
 
-function recRowMenu(ev, id, index) {
-    const had = ev.currentTarget.parentNode.querySelector('.rs-menu');
+function recRowMenu(ev, id) {
+    const again = REC.menuFor === id;
     recRowMenuClose();
-    if (had) return;
+    if (again) return;
+    REC.menuFor = id;
+    recRowMenuShow(true);
+    setTimeout(() => {
+        document.addEventListener('click', recRowMenuClose);
+        document.addEventListener('keydown', recRowMenuKey);
+    });
+}
+
+function recRowMenuShow(focus) {
+    const id = REC.menuFor;
+    const acts = id != null && document.querySelector(`#recSteps .rs[data-id="${id}"] .rs-acts`);
+    if (!acts) {
+        if (id != null) recRowMenuClose();   // шага больше нет — и меню не нужно
+        return;
+    }
     const menu = document.createElement('div');
     menu.className = 'rs-menu';
     menu.setAttribute('role', 'menu');
@@ -2261,16 +2281,13 @@ function recRowMenu(ev, id, index) {
         item.onclick = (e) => {
             e.stopPropagation();
             recRowMenuClose();
-            run(id, index);
+            /* Номер берём сейчас: за время открытого меню шаги могли сдвинуться. */
+            run(id, REC.steps.findIndex(step => step.id === id));
         };
         menu.appendChild(item);
     });
-    ev.currentTarget.parentNode.appendChild(menu);
-    menu.querySelector('button').focus();
-    setTimeout(() => {
-        document.addEventListener('click', recRowMenuClose);
-        document.addEventListener('keydown', recRowMenuKey);
-    });
+    acts.appendChild(menu);
+    if (focus) menu.querySelector('button').focus();
 }
 
 function recRender() {
@@ -2292,6 +2309,7 @@ function recRender() {
     const html = recSelBar() + REC.steps.map(recRow).join('');
     if (window.keepUi) keepUi(box, () => { box.innerHTML = html; });
     else box.innerHTML = html;
+    if (REC.menuFor != null) recRowMenuShow(false);
 }
 
 /* ------------------------------------------------------------------ правка */
