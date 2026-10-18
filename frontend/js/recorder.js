@@ -1445,7 +1445,7 @@ function grRender() {
         return html;
     }).join('');
     return `<div class="gr-canvas" style="width:${layout.width}px;height:${layout.height}px">
-      <svg class="gr-edges" width="${layout.width + 40}" height="${layout.height}">${grBlockFrames(layout)}${edges}</svg>
+      <svg class="gr-edges" width="${layout.width + 90}" height="${layout.height}">${grBlockFrames(layout)}${edges}</svg>
       ${nodes}
     </div>`;
 }
@@ -1548,8 +1548,33 @@ function grDragStart(ev, id) {
         });
     }
     let moved = false;
+    /* Холст прокручивается сам, если тащить к краю; сдвиг прокрутки входит в
+       смещение карточек — иначе они отставали бы от курсора. */
+    const view = $('recCanvas');
+    const scroll0 = view ? [view.scrollLeft, view.scrollTop] : [0, 0];
+    let lastEv = null, edgeTimer = 0;
+    const withScroll = e => {
+        const sx = view ? view.scrollLeft - scroll0[0] : 0, sy = view ? view.scrollTop - scroll0[1] : 0;
+        return {clientX: e.clientX + sx, clientY: e.clientY + sy};
+    };
+    function edgeScroll() {
+        edgeTimer = 0;
+        if (!view || !lastEv) return;
+        const r = view.getBoundingClientRect(), edge = 60;
+        const dx = lastEv.clientX < r.left + edge ? -12 : lastEv.clientX > r.right - edge ? 12 : 0;
+        const dy = lastEv.clientY < r.top + edge ? -12 : lastEv.clientY > r.bottom - edge ? 12 : 0;
+        if (!dx && !dy) return;
+        view.scrollLeft += dx;
+        view.scrollTop += dy;
+        last = step ? shift(withScroll(lastEv)) : at(withScroll(lastEv));
+        if (!frame) frame = requestAnimationFrame(paint);
+        edgeTimer = requestAnimationFrame(edgeScroll);
+    }
     function onMove(e) {
         if (Math.hypot(e.clientX - startX, e.clientY - startY) > 3) moved = true;
+        lastEv = e;
+        if (!edgeTimer) edgeTimer = requestAnimationFrame(edgeScroll);
+        e = withScroll(e);
         last = step ? shift(e) : at(e);
         if (!frame) frame = requestAnimationFrame(paint);
     }
@@ -1557,6 +1582,9 @@ function grDragStart(ev, id) {
         host.removeEventListener('pointermove', onMove);
         host.removeEventListener('pointerup', onUp);
         if (frame) cancelAnimationFrame(frame);
+        if (edgeTimer) cancelAnimationFrame(edgeTimer);
+        const raw = e;
+        e = Object.assign(withScroll(raw), {clientXRaw: raw.clientX, clientYRaw: raw.clientY});
         canvas.querySelectorAll('.gr-node.dragging').forEach(el => el.classList.remove('dragging'));
         /* Тащили за тело карточки — её click («открыть шаг») не нужен. */
         if (moved) {
@@ -1567,15 +1595,30 @@ function grDragStart(ev, id) {
         /* Бросили на другую карточку — это перестановка шагов, как в списке:
            порядок выполнения меняется, схема раскладывается заново. Бросили на
            пустое место — карточка просто стоит там, куда её поставили. */
-        const over = document.elementsFromPoint(e.clientX, e.clientY)
+        const over = document.elementsFromPoint(e.clientXRaw, e.clientYRaw)
             .map(el => el.closest && el.closest('.gr-node[data-id]'))
             .find(el => el && !movingIds.has(Number(el.dataset.id)));
         if (step && over) {
+            /* Перестановка — только если порядок шагов правда меняется.
+               Вложенные карточки стоят вплотную к соседним, и при отпускании
+               курсор почти всегда над соседом: «перестановка» на то же место
+               сбрасывала раскладку, и карточка прыгала назад, будто не
+               двигалась. Порядок тот же — карточка остаётся, куда поставили. */
             const r = over.getBoundingClientRect();
-            REC.steps.forEach(s => { delete s.pos; });
-            if (!recMovePack(moving, Number(over.dataset.id), e.clientY < r.top + r.height / 2)) recRender();
-            recSchemeSpine();
-            return;
+            const before = REC.steps.map(s => s.id).join();
+            const parents = REC.steps.map(s => s.parent ?? null).join();
+            const pos = new Map(REC.steps.map(s => [s.id, s.pos]));
+            const done = recMovePack(moving, Number(over.dataset.id), e.clientYRaw < r.top + r.height / 2);
+            const changed = done && (REC.steps.map(s => s.id).join() !== before
+                || REC.steps.map(s => s.parent ?? null).join() !== parents);
+            if (changed) {
+                REC.steps.forEach(s => { delete s.pos; });
+                recRender();
+                recSave();
+                recSchemeSpine();
+                return;
+            }
+            REC.steps.forEach(s => { s.pos = pos.get(s.id); });
         }
         if (step) {
             applyShift(shift(e));
@@ -3046,10 +3089,37 @@ function recDragStart(ev, id) {
     ev.dataTransfer.effectAllowed = 'move';
     /* Без setData часть браузеров не начинает перетаскивание вообще. */
     ev.dataTransfer.setData('text/plain', String(id));
-    for (const s of recDragBlock(id)) {
+    const pack = recDragBlock(id);
+    for (const s of pack) {
         const row = document.querySelector(`#recSteps .rs[data-id="${s.id}"]`);
         if (row) row.classList.add('dragging');
     }
+    /* Под курсором — вся пачка, а не одна строка: браузер по умолчанию рисует
+       только строку, за которую взялись, и казалось, что едет один шаг. */
+    if (pack.length > 1 && ev.dataTransfer.setDragImage) {
+        const ghost = document.createElement('div');
+        ghost.className = 'rs-ghost';
+        ghost.innerHTML = `<b>${esc(t('rec.tashchim_shagov', {n: pack.length}))}</b>`
+            + pack.slice(0, 4).map(s => `<span>${esc(recLabel(s))}</span>`).join('')
+            + (pack.length > 4 ? `<span class="dim">…</span>` : '');
+        document.body.appendChild(ghost);
+        ev.dataTransfer.setDragImage(ghost, 16, 16);
+        setTimeout(() => ghost.remove(), 0);
+    }
+}
+
+/* Длинный список: тащишь к верхнему/нижнему краю — список прокручивается
+   сам, тем быстрее, чем ближе к краю. Без этого шаг нельзя было перенести
+   дальше видимого экрана. */
+function recDragAutoScroll(ev) {
+    const box = $('recSteps');
+    if (!box || REC.drag == null) return;
+    const r = box.getBoundingClientRect();
+    const edge = 70;
+    let dy = 0;
+    if (ev.clientY < r.top + edge) dy = -(r.top + edge - ev.clientY);
+    else if (ev.clientY > r.bottom - edge) dy = ev.clientY - (r.bottom - edge);
+    if (dy) box.scrollTop += Math.max(-28, Math.min(28, dy * 0.4));
 }
 
 function recDragEnd(ev) {

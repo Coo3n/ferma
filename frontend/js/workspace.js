@@ -146,7 +146,10 @@ function mirrorRestore() {
     view.addEventListener('wheel', grWheel, {passive: false});
     view.addEventListener('pointerdown', grPanStart);
     const list = $('recSteps');
-    if (list) list.addEventListener('pointerdown', recListMarquee);
+    if (list) {
+        list.addEventListener('pointerdown', recListMarquee);
+        list.addEventListener('dragover', recDragAutoScroll);   // прокрутка у края при переносе
+    }
     /* Пробел зажат — левая кнопка двигает холст вместо рамки (GR_SPACE). */
     window.addEventListener('keydown', e => {
         if (e.code === 'Space' && e.target.closest && !e.target.closest('input, textarea, select, [contenteditable]')

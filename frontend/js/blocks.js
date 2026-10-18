@@ -686,14 +686,20 @@ function grBlockFrames(layout) {
         parts.push(`<rect class="gr-block-box gr-block-${head.kind}" x="${x1}" y="${y1}"
             width="${x2 - x1}" height="${y2 - y1}" rx="12"/>`);
         if (head.kind === 'chance' || head.kind === 'if_seen' || block.length < 2) return;   // пустому — без петли
+        /* Петля «назад, к началу круга» — снаружи рамки, прямыми отрезками со
+           скруглёнными углами: от последнего шага вправо, вверх по краю и к
+           заголовку блока. Дуга по рамкам пересекала края вложенных блоков, и
+           острие садилось на шаг внутри, а не на заголовок. Чем больше
+           циклов вложено внутрь, тем дальше вправо уходит внешняя петля —
+           петли не слипаются. */
         const last = layout.pos.get(block[block.length - 1].id);
-        const first = layout.pos.get(block[1].id);
-        /* Из нижней части последнего шага в верхнюю часть первого: при
-           одном шаге внутри стрелка всё равно читается как петля. */
-        const ax = x2 + 14;
-        const y0 = last.y + GR_NODE_H * 0.75, y1a = first.y + GR_NODE_H * 0.25;
-        parts.push(`<path class="gr-block-back gr-block-${head.kind}" d="M${last.x + layout.nodeW},${y0}
-            C${ax},${y0} ${ax},${y1a} ${first.x + layout.nodeW},${y1a}"
+        const top = layout.pos.get(head.id);
+        const nested = block.slice(1).filter(s => s.kind === 'loop' || s.kind === 'until').length;
+        const ax = x2 + 10 + Math.min(nested, 3) * 10;
+        const y0 = last.y + GR_NODE_H / 2, yt = top.y + GR_NODE_H / 2, r = 8;
+        const tx = top.x + layout.nodeW + 6;
+        parts.push(`<path class="gr-block-back gr-block-${head.kind}"
+            d="M${last.x + layout.nodeW},${y0} H${ax - r} Q${ax},${y0} ${ax},${y0 - r} V${yt + r} Q${ax},${yt} ${ax - r},${yt} H${tx}"
             marker-end="url(#grArrow-${head.kind})"/>`);
     });
     if (!parts.length) return '';
