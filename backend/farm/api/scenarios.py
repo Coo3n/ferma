@@ -37,7 +37,9 @@ def _structure(key: str) -> tuple[int | None, int | None]:
     шаги = рецепт.get("steps") or []
     ветки = sum(1 for шаг in шаги if шаг.get("kind") == "branch")
     # Заголовок повтора — рамка вокруг шагов, а не шаг: в счёт не идёт.
-    return sum(1 for шаг in шаги if шаг.get("kind") != "loop"), ветки
+    # Все строки списка, включая заголовки блоков: так нумерует конструктор
+    # и так считает прогресс запуска (step_total) — числа должны совпадать.
+    return len(шаги), ветки
 
 
 def _package_of(params: dict) -> str:

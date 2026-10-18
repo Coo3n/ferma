@@ -1324,7 +1324,8 @@ function recIcon(id) {
    чем сличить на холсте. */
 function grNode(step, xy, index, nodeW) {
     const [cls, iconId] = schIcon(step);
-    return `<div class="gr-node ${cls}" style="left:${xy.x}px;top:${xy.y}px;width:${nodeW}px" data-id="${step.id}">
+    const sel = REC.sel && REC.sel.has(step.id) ? 'sel' : '';
+    return `<div class="gr-node ${cls} ${sel}" style="left:${xy.x}px;top:${xy.y}px;width:${nodeW}px" data-id="${step.id}">
       <span class="gr-grip" title="Перетащите карточку" onpointerdown="grDragStart(event, ${step.id})">${grIcon('grip')}</span>
       <button class="gr-body" onclick="schOpenStep(${step.id})" title="Открыть шаг в списке">
         <span class="gr-n">${index + 1}</span>
@@ -1466,7 +1467,16 @@ function grDragStart(ev, id) {
     const baseLeft = host.offsetLeft, baseTop = host.offsetTop;
 
     host.setPointerCapture(ev.pointerId);
-    host.classList.add('dragging');
+
+    /* Едет то же, что в списке (recDragBlock): отмеченная галочками пачка,
+       если карточка в ней, иначе блок целиком — заголовок со всеми шагами
+       внутри. Раньше ехала одна карточка, и блок рассыпался по холсту. */
+    const moving = recDragBlock(id);
+    const movingIds = new Set(moving.map(s => s.id));
+    moving.forEach(s => {
+        const el = host.parentElement.querySelector(`.gr-node[data-id="${s.id}"]`);
+        if (el) el.classList.add('dragging');
+    });
 
     /* Курсор ходит по экрану, карточка живёт в координатах сюжета: на
        масштабе 50% сдвиг мыши на 100px обязан двигать её на 200. */
@@ -1488,10 +1498,28 @@ function grDragStart(ev, id) {
        текущее место каждого — двигается только тот, кого тянут. */
     const pinned = grLayout();
     REC.steps.forEach(st => {
-        if (st.pos || st === step) return;
+        if (st.pos || movingIds.has(st.id)) return;
         const xy = pinned.pos.get(st.id);
         if (xy) st.pos = [xy.x, xy.y];
     });
+    /* Пачка сдвигается целиком на одно смещение; за левый/верхний край не
+       уходит ни одна её карточка — форма группы сохраняется. */
+    const base = new Map(moving.map(s => {
+        const xy = pinned.pos.get(s.id) || {x: 0, y: 0};
+        return [s.id, [xy.x, xy.y]];
+    }));
+    const minX = Math.min(...[...base.values()].map(b => b[0]));
+    const minY = Math.min(...[...base.values()].map(b => b[1]));
+    const shift = e => [
+        Math.max(-minX, Math.round((e.clientX - startX) / zoom)),
+        Math.max(-minY, Math.round((e.clientY - startY) / zoom)),
+    ];
+    function applyShift(d) {
+        moving.forEach(s => {
+            const b = base.get(s.id);
+            s.pos = [b[0] + d[0], b[1] + d[1]];
+        });
+    }
 
     /* Шаги без сохранённой позиции стоят под предыдущим (grLayout), так
        что двигаются не только тащимая карточка и её ветки — раскладку
@@ -1507,9 +1535,9 @@ function grDragStart(ev, id) {
             place(host, {x: last[0], y: last[1]});
             return;
         }
-        step.pos = last;
+        applyShift(last);
         const layout = grLayout();
-        svg.innerHTML = grEdges(layout);
+        svg.innerHTML = grBlockFrames(layout) + grEdges(layout);
         canvas.querySelectorAll('.gr-node[data-id]').forEach(el =>
             place(el, layout.pos.get(Number(el.dataset.id))));
         layout.arms.forEach((list, parentId) => {
@@ -1518,16 +1546,16 @@ function grDragStart(ev, id) {
         });
     }
     function onMove(e) {
-        last = at(e);
+        last = step ? shift(e) : at(e);
         if (!frame) frame = requestAnimationFrame(paint);
     }
     function onUp(e) {
         host.removeEventListener('pointermove', onMove);
         host.removeEventListener('pointerup', onUp);
         if (frame) cancelAnimationFrame(frame);
-        host.classList.remove('dragging');
+        canvas.querySelectorAll('.gr-node.dragging').forEach(el => el.classList.remove('dragging'));
         if (step) {
-            step.pos = at(e);
+            applyShift(shift(e));
             recSave();
         }
         recSchemeSpine();
@@ -1727,6 +1755,8 @@ function recSetView(name) {
        что не влияют, читаются как сломанные. */
     const zoom = $('recZoom');
     if (zoom) zoom.hidden = name !== 'scheme';
+    const schSel = $('recSchemeSel');
+    if (schSel) schSel.innerHTML = name === 'scheme' ? recSelBar() : '';
     document.querySelectorAll('#recViewToggle .chip[data-view]').forEach(chip => {
         const on = chip.dataset.view === name;
         chip.classList.toggle('on', on);
@@ -1842,8 +1872,13 @@ function grWheel(ev) {
    гасит событие), поэтому проверка одна — что под курсором не она. */
 function grPanStart(ev) {
     const view = $('recCanvas');
-    if (!view || ev.button !== 0) return;
-    if (ev.target.closest('.gr-node')) return;
+    if (!view || (ev.button !== 0 && ev.button !== 1)) return;
+    if (ev.target.closest('.gr-node, .zoom, .selbar')) return;
+    /* Пустое место левой кнопкой — рамка выделения (как на ферме и в
+       графических редакторах). Двигать холст — зажатый пробел, средняя
+       кнопка или колесо/тачпад. */
+    if (ev.button === 0 && !GR_SPACE.down) return grMarquee(ev, view);
+    ev.preventDefault();
     const startX = ev.clientX, startY = ev.clientY;
     const baseLeft = view.scrollLeft, baseTop = view.scrollTop;
 
@@ -1861,6 +1896,75 @@ function grPanStart(ev) {
     }
     view.addEventListener('pointermove', onMove);
     view.addEventListener('pointerup', onUp);
+}
+
+/* Пробел зажат — левая кнопка двигает холст вместо рамки. */
+const GR_SPACE = {down: false};
+
+/* Рамка выделения: общий механизм для схемы и списка. rows(el) — элементы,
+   которые можно выделить, с data-id; пересечение считаем по экранным
+   прямоугольникам — масштаб холста и прокрутка в них уже учтены. Shift или
+   Ctrl/Cmd — добавить к выделенному, иначе выделение заменяется. */
+function recMarquee(ev, box, rows) {
+    const startX = ev.clientX, startY = ev.clientY;
+    const add = ev.shiftKey || ev.ctrlKey || ev.metaKey;
+    const before = new Set(REC.sel);
+    let mq = null, moved = false;
+    function rect(e) {
+        return {l: Math.min(startX, e.clientX), t: Math.min(startY, e.clientY),
+            r: Math.max(startX, e.clientX), b: Math.max(startY, e.clientY)};
+    }
+    function hits(r) {
+        return [...rows(box)].filter(el => {
+            const q = el.getBoundingClientRect();
+            return q.left < r.r && q.right > r.l && q.top < r.b && q.bottom > r.t;
+        });
+    }
+    function onMove(e) {
+        if (!moved && Math.hypot(e.clientX - startX, e.clientY - startY) < 4) return;
+        if (!moved) {
+            moved = true;
+            mq = document.createElement('div');
+            mq.className = 'marquee';
+            document.body.appendChild(mq);
+            document.body.classList.add('marqueeing');
+        }
+        const r = rect(e);
+        Object.assign(mq.style, {left: r.l + 'px', top: r.t + 'px', width: (r.r - r.l) + 'px', height: (r.b - r.t) + 'px'});
+        const on = new Set(hits(r).map(el => Number(el.dataset.id)));
+        rows(box).forEach(el => el.classList.toggle('mq-on', on.has(Number(el.dataset.id))));
+    }
+    function onUp(e) {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        if (!moved) return;
+        mq.remove();
+        document.body.classList.remove('marqueeing');
+        /* Отпустили над строкой — её click (раскрыть шаг) не нужен. */
+        const swallow = c => c.stopPropagation();
+        window.addEventListener('click', swallow, {capture: true, once: true});
+        setTimeout(() => window.removeEventListener('click', swallow, true), 0);
+        REC.sel = add ? before : new Set();
+        hits(rect(e)).forEach(el => REC.sel.add(Number(el.dataset.id)));
+        recRender();
+    }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+}
+
+function grMarquee(ev, view) {
+    ev.preventDefault();
+    recMarquee(ev, view, v => v.querySelectorAll('.gr-node[data-id]'));
+}
+
+/* Список: рамка тянется с полей строки (номер, пустое место справа от
+   подписи) и с пустого места под шагами — не с полей ввода, кнопок и ручки. */
+function recListMarquee(ev) {
+    if (ev.button !== 0) return;
+    if (ev.target.closest('input, select, textarea, button, a, label, .rs-grip, .rs-body, .selbar, .rs-empty, details')) return;
+    const box = $('recSteps');
+    if (!box) return;
+    recMarquee(ev, box, b => b.querySelectorAll('.rs[data-id]'));
 }
 
 /* Боковая часть дёргает сеть — не чаще раза в 400мс, даже если recRender()
@@ -2201,15 +2305,20 @@ function recAddPick(key) {
    заготовка, её заменяют записью («записать после этого шага») или
    удаляют. Рамку ставит recBlockWrap — те же проверки, что у выделения. */
 function recBlockNew(kind) {
-    const pause = recPush({kind: 'sleep', args: {seconds: 1}});
-    const headId = REC.nextId;
-    recBlockWrap(kind, [pause.id]);
-    if (pause.parent !== headId) {          // рамка не встала — заготовка не нужна
-        REC.steps = REC.steps.filter(s => s !== pause);
-        if (REC.insertAfter === pause.id) REC.insertAfter = null;
-        recRender();
-        recSave();
+    /* Пустая рамка, без паузы-заготовки: её приходилось удалять руками, а
+       удаление уносило весь блок. Внутри — подсказка «запишите сюда». */
+    const head = recPush({kind, args: BLOCK_KINDS[kind].defaults()});
+    if (kind === 'until' || kind === 'if_seen') head.any = [];
+    if (blockDepth(head) >= BLOCK_DEPTH_MAX) {
+        REC.steps = REC.steps.filter(s => s !== head);
+        toast(t('rec.slishkom_gluboko', {n: BLOCK_DEPTH_MAX}), 'bad');
+    } else {
+        REC.open = head.id;
+        REC.insertAfter = head.id;
+        toast(recFirstHint('block-' + kind, blockAddedHint(kind), t('rec.blok_dobavlen')));
     }
+    recRender();
+    recSave();
 }
 
 function recScenName(key) {
@@ -2692,7 +2801,7 @@ function recRow(step, index) {
        ondragstart="recDragStart(event, ${step.id})" ondragend="recDragEnd(event)"
        ondragover="recDragOver(event, ${step.id})" ondragleave="recDragLeave(event)"
        ondrop="recDrop(event, ${step.id})">
-    <div class="rs-head" onclick="recToggle(${step.id})">
+    <div class="rs-head" onclick="(event.shiftKey || event.ctrlKey || event.metaKey) ? recSelToggle(${step.id}, event) : recToggle(${step.id})">
       <span class="rs-grip" onmousedown="recDragOn(event)"
             title="${esc(t('rec.m_peretaschite'))}">${recIcon('grip')}</span>
       <input type="checkbox" class="rs-sel" aria-label="${esc(t('rec.m_vybrat', {n: index + 1}))}"
@@ -2711,7 +2820,7 @@ function recRow(step, index) {
       </span>
     </div>
     <div class="rs-body">${recMark(step, open)}${open ? recStepBody(step, index) : ''}</div>
-  </div>`;
+  </div>${blockEmptyRow(step)}`;
 }
 
 /* Раскрытый шаг: сверху то, что правят каждый день (картинка, имя экрана,
@@ -2812,6 +2921,9 @@ function recRender() {
        пропуска одинаковой разметки: поле с отвергнутым вводом обязано
        вернуться к сохранённому значению. */
     const html = recSelBar() + REC.steps.map(recRow).join('');
+    /* Схема: та же панель действий над выделенным — над холстом. */
+    const schSel = $('recSchemeSel');
+    if (schSel) schSel.innerHTML = REC.view === 'scheme' ? recSelBar() : '';
     if (window.keepUi) keepUi(box, () => { box.innerHTML = html; });
     else box.innerHTML = html;
     if (REC.menuFor != null) recRowMenuShow(false);
@@ -3300,6 +3412,7 @@ function recSaveForm() {
         toast('ещё нет ни одного шага', 'bad');
         return;
     }
+    if (!blockEmptyCheck()) return;
     if (REC.on) recPause();
 
     /* При правке форма не спрашивает заново то, что уже известно: она

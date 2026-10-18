@@ -145,6 +145,19 @@ function mirrorRestore() {
     if (!view) return;
     view.addEventListener('wheel', grWheel, {passive: false});
     view.addEventListener('pointerdown', grPanStart);
+    const list = $('recSteps');
+    if (list) list.addEventListener('pointerdown', recListMarquee);
+    /* Пробел зажат — левая кнопка двигает холст вместо рамки (GR_SPACE). */
+    window.addEventListener('keydown', e => {
+        if (e.code === 'Space' && e.target.closest && !e.target.closest('input, textarea, select, [contenteditable]')
+            && S.view === 'device' && REC.view === 'scheme') {
+            GR_SPACE.down = true;
+            e.preventDefault();
+        }
+    });
+    window.addEventListener('keyup', e => {
+        if (e.code === 'Space') GR_SPACE.down = false;
+    });
 })();
 
 /* Окно меняет размер — меняется и видимое место холста, от которого

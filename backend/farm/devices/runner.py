@@ -551,7 +551,8 @@ def _execute(job: Job) -> None:
         module = sc.module
         line_map = verified_line_map(sc)
         labels = _step_labels(sc)
-        job.step_total = len(labels)
+        # Без карты строк шаги не отслеживаются — «шаг 1/12» висел бы весь прогон.
+        job.step_total = len(labels) if line_map else 0
         if job.stop_step is not None:
             module = stepflow.module_from_step(sc, line_map, job.start_step, job.stop_step)
             job.add_line(f"проверка шагов {job.start_step + 1}–{job.stop_step}: "

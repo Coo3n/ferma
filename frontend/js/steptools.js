@@ -313,7 +313,7 @@ function recDup(id) {
 let stSelAnchor = null;
 
 function recSelToggle(id, ev) {
-    if (ev && ev.shiftKey && stSelAnchor != null) {
+    if (ev && ev.shiftKey && stSelAnchor != null && REC.steps.some(s => s.id === stSelAnchor)) {
         const a = REC.steps.findIndex(step => step.id === stSelAnchor);
         const b = REC.steps.findIndex(step => step.id === id);
         if (a >= 0 && b >= 0) {
@@ -330,6 +330,7 @@ function recSelToggle(id, ev) {
 
 function recSelClear() {
     REC.sel.clear();
+    stSelAnchor = null;
     recRender();
 }
 
@@ -740,10 +741,13 @@ function stRunNote() {
 function stRunSyncOptions() {
     const select = $('runFrom');
     if (!select) return;
-    const keep = select.value;
+    /* Помним шаг, а не позицию: вставили шаг выше — выбор не должен
+       молча переехать на соседний. */
+    const keepId = select.selectedOptions[0] && select.selectedOptions[0].dataset.id;
     select.innerHTML = REC.steps.map((step, i) =>
-        `<option value="${i}">${esc(stStepLabel(step, i))}</option>`).join('');
-    if (keep && Number(keep) < REC.steps.length) select.value = keep;
+        `<option value="${i}" data-id="${step.id}">${esc(stStepLabel(step, i))}</option>`).join('');
+    const at = keepId ? REC.steps.findIndex(s => String(s.id) === keepId) : -1;
+    if (at >= 0) select.value = String(at);
     stRunNote();
 }
 
@@ -813,6 +817,9 @@ function recRunShow(index) {
 async function stEnsureSaved() {
     if (!REC.edit) {
         REC.runAfterAt = Date.now();
+        /* Панель пересоберётся после сохранения и сбросит «с шага» и «только
+           этот» — запоминаем, что именно просили запустить. */
+        REC.runAfterSel = {from: ($('runFrom') || {}).value, only: !!($('runOnly') || {}).checked};
         recSaveForm();
         toast('сохраните сценарий — проверка начнётся сама', 'ok');
         return false;
@@ -852,6 +859,13 @@ async function recStayAfterSave(key, meta, wasEdit) {
     if (recRunAfterPending()) {
         REC.runAfterAt = 0;
         recRunOpen();
+        const want = REC.runAfterSel;
+        REC.runAfterSel = null;
+        if (want) {
+            if ($('runFrom') && want.from != null) $('runFrom').value = want.from;
+            if ($('runOnly')) $('runOnly').checked = want.only;
+            stRunNote();
+        }
         recRunGo();
     }
 }
@@ -897,6 +911,7 @@ async function recRunGo() {
 }
 
 async function recRunStart() {
+    if (!blockEmptyCheck()) return;
     const check = await recValidate();
     if (!check || !check.ok) {
         if (check) toast('в сценарии есть ошибки — запуск отменён', 'bad');
@@ -998,7 +1013,7 @@ function stRunRenderStatus() {
     const job = run.job;
     const total = job.step_total || REC.steps.length;
     const done = Math.max(0, job.step_index + (run.active ? 0 : 1));
-    const pct = total ? Math.min(100, Math.round(done / total * 100)) : 0;
+    const pct = job.status === 'passed' ? 100 : total ? Math.min(100, Math.round(done / total * 100)) : 0;
     const stale = run.stale
         ? '<div class="run-note">Сценарий изменён после запуска — подсветка шагов скрыта.</div>' : '';
     let head = '';
@@ -1009,7 +1024,7 @@ function stRunRenderStatus() {
         head = `<span class="run-step held-note"><svg class="ic"><use href="#i-alert"/></svg>
       ждёт вашего решения — полоса вверху</span>`;
     } else if (run.active) {
-        head = `<span class="run-step">${job.step_index >= 0
+        head = `<span class="run-step">${job.step_index >= 0 && !run.stale
             ? `шаг ${job.step_index + 1}/${total} · ${esc(job.step_label)}` : 'запуск…'}</span>
       <button class="sm ghost" onclick="cancelJob('${job.id}')">остановить</button>`;
     } else {
@@ -1050,9 +1065,12 @@ function stRunResult(job) {
        заставляя искать его в списке. Так сюжет проходят с паузой после
        каждого шага, как отладчик. */
     const run = REC.run;
-    if (job.status === 'passed' && run && run.only && run.from + 1 < REC.steps.length) {
-        const next = run.from + 1;
-        return `<span class="run-ok-txt">✓ шаг ${next} прошёл</span>
+    const fromStep = run && REC.steps[run.from];
+    /* Проверка заголовка блока прогоняет и шаги внутри — «следующий» идёт
+       за блоком, а не внутрь него (иначе те же шаги шли бы второй раз). */
+    const next = run ? run.from + (fromStep && blockIsHead(fromStep) ? blockOf(fromStep).length : 1) : 0;
+    if (job.status === 'passed' && run && run.only && !run.stale && next < REC.steps.length) {
+        return `<span class="run-ok-txt">✓ шаг ${run.from + 1} прошёл</span>
       <button class="sm primary" onclick="recRunStep(${next})">Следующий шаг: ${esc(recLabel(REC.steps[next]))}</button>`;
     }
     if (job.status === 'passed') {
@@ -1061,7 +1079,12 @@ function stRunResult(job) {
     }
     if (job.status === 'cancelled') return '<span>остановлен</span>';
     const info = job.error_info || {title: job.error || 'упал', hint: '', kind: 'other'};
-    const last = timeline.length ? timeline[timeline.length - 1] : null;
+    /* Журнал отсортирован по номеру шага (повторы в цикле сведены), поэтому
+       «последний» — это самый дальний шаг, а не упавший. Ищем упавший. После
+       правки списка номера из запуска уже не те — кнопки не показываем. */
+    const last = run && run.stale ? null
+        : (timeline.find(t => t.status === 'failed')
+            || (job.step_index >= 0 ? {i: job.step_index} : null));
     const shot = (job.artifacts || []).includes('99_failure.jpg')
         ? `<a target="_blank" href="/api/jobs/${job.id}/artifacts/99_failure.jpg">кадр падения</a>` : '';
     const buttons = last ? `<button class="sm" onclick="recRunShow(${last.i})">показать шаг ${last.i + 1}</button>
@@ -1081,7 +1104,7 @@ function stReportLink(job) {
 /* ------------------------------------------------- журнал задач (jobs.js) */
 
 function jobProgressHtml(job) {
-    if (!job.step_total || (job.status !== 'running' && job.status !== 'held')) return '';
+    if (!job.step_total || job.step_index < 0 || (job.status !== 'running' && job.status !== 'held')) return '';
     return ` <span class="jp">шаг ${Math.max(0, job.step_index) + 1}/${job.step_total}</span>`;
 }
 

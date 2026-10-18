@@ -401,5 +401,8 @@
   "rec.ili_tekstom": "или текстом",
   "rec.ne_zadano_v_zagolovke": "… — укажите, что искать",
   "device.smenit_telefon": "Сменить телефон",
-  "device.kakoy_telefon": "Какой телефон показать?"
+  "device.kakoy_telefon": "Какой телефон показать?",
+  "rec.blok_pustoy": "блок в шаге {n} пустой — добавьте в него шаги или уберите рамку",
+  "rec.blok_pustoy_hint": "Пусто — запишите шаги сюда или перетащите их в рамку",
+  "rec.zapisat_syuda": "Записать сюда"
 }

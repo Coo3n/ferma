@@ -1116,3 +1116,24 @@ body.rec-picking .stage, body.rec-picking #recLayer { cursor: crosshair; }
 /* Цветная полоса блока (3px) не должна сдвигать номер и подпись: строка с
    полосой теряет столько же внутреннего отступа слева. */
 .rs.rs-block, .rs.rs-depth-1, .rs.rs-depth-2, .rs.rs-depth-3 { padding-left: 7px; }
+
+/* Подсказка внутри пустого блока — не шаг: без номера, приглушённая, но с
+   рамкой своего блока, чтобы было видно, куда попадёт запись. */
+.rs.rs-empty {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    color: var(--dim);
+    font-size: var(--fs-2);
+    padding-top: var(--s2);
+    padding-bottom: var(--s2);
+}
+.rs.rs-empty.over-down { background: var(--panel2); }
+.rs.rs-empty { padding-left: var(--rs-lead, 92px); }
+
+/* Выделение на схеме и в списке: рамкой или Shift/Ctrl-кликом. */
+.gr-node.sel { border-color: var(--accent); background: var(--accent-dim); }
+.gr-node.mq-on, .rs.mq-on { background: var(--accent-dim); }
+#recSchemeSel:empty { display: none; }
+#recSchemeSel { position: sticky; top: 0; z-index: 6; }
+#recCanvas.panning { cursor: grabbing; }

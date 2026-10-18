@@ -84,8 +84,12 @@ function blockOf(step) {
 /* Порядок в списке — источник правды. Идём сверху, держим стек открытых
    блоков: шаг принадлежит блоку из стека — закрываем вложенные до него;
    нет — смотрим на следующий шаг: он внутри открытого блока — значит, этот
-   шаг вставлен в середину и тоже внутри; иначе шаг вне блоков. Пустые блоки
-   исчезают: рамка без шагов ничего не делает. */
+   шаг вставлен в середину и тоже внутри; иначе шаг вне блоков.
+
+   Пустой блок остаётся: удалить последний шаг внутри — не значит выбросить
+   рамку с её настройками (раньше она пропадала молча, а новый блок ради этого
+   создавался с паузой-заготовкой). Пустую рамку не пускает только сохранение
+   и запуск — blockEmptyCheck. */
 function recBlocksFix() {
     REC.steps.forEach(s => {
         if ('inLoop' in s) {             // черновики до блоков: повтор помечал inLoop
@@ -93,9 +97,7 @@ function recBlocksFix() {
             delete s.inLoop;
         }
     });
-    let changed = true;
-    while (changed) {
-        changed = false;
+    {
         const byId = blockById();
         const stack = [];
         REC.steps.forEach((step, i) => {
@@ -117,12 +119,36 @@ function recBlocksFix() {
             }
             if (blockIsHead(step)) stack.push(step.id);
         });
-        const empty = REC.steps.filter(s => blockIsHead(s) && !blockInside(s).length).map(s => s.id);
-        if (empty.length) {
-            REC.steps = REC.steps.filter(s => !empty.includes(s.id));
-            changed = true;
-        }
     }
+}
+
+/* Перед сохранением и запуском: пустой блок сервер не примет («хотя бы один
+   шаг»), а человеку нужно знать, какой именно. Раскрываем его и говорим. */
+function blockEmptyCheck() {
+    const head = REC.steps.find(s => blockIsHead(s) && !blockInside(s).length);
+    if (!head) return true;
+    REC.open = head.id;
+    recRender();
+    toast(t('rec.blok_pustoy', {n: REC.steps.indexOf(head) + 1}), 'bad');
+    return false;
+}
+
+/* Строка-подсказка внутри пустого блока: сюда пишется запись и бросаются шаги. */
+function blockEmptyRow(head) {
+    if (!blockIsHead(head) || blockInside(head).length) return '';
+    const depth = blockDepth(head) + 1;
+    return `<div class="rs rs-empty rs-depth-${depth} rs-in-${head.kind} rs-block-end"
+        ondragover="event.preventDefault();this.classList.add('over-down')"
+        ondragleave="this.classList.remove('over-down')"
+        ondrop="recDrop(event, ${head.id})">${esc(t('rec.blok_pustoy_hint'))}
+      <button class="sm ghost" onclick="recBlockRecordInto(${head.id})">${esc(t('rec.zapisat_syuda'))}</button></div>`;
+}
+
+/* «Записать сюда»: запись дописывает шаги внутрь пустого блока. */
+function recBlockRecordInto(id) {
+    REC.insertAfter = id;
+    recRender();
+    if (!REC.on && window.recStart) recStart();
 }
 
 /* Перестановка (стрелки, перетаскивание) может загнать блок с вложенными в
@@ -649,7 +675,7 @@ function grBlockFrames(layout) {
         const y2 = Math.max(...boxes.map(b => b.y)) + GR_NODE_H + pad;
         parts.push(`<rect class="gr-block-box gr-block-${head.kind}" x="${x1}" y="${y1}"
             width="${x2 - x1}" height="${y2 - y1}" rx="12"/>`);
-        if (head.kind === 'chance' || head.kind === 'if_seen') return;
+        if (head.kind === 'chance' || head.kind === 'if_seen' || block.length < 2) return;   // пустому — без петли
         const last = layout.pos.get(block[block.length - 1].id);
         const first = layout.pos.get(block[1].id);
         /* Из нижней части последнего шага в верхнюю часть первого: при
