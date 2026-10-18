@@ -2855,10 +2855,29 @@ function recMove(id, delta) {
    и селекты, и строка, которую можно схватить в любом месте, отняла бы у них
    выделение текста. HTML5 DnD стартует от ближайшего draggable-предка, кто бы
    ни был под курсором, — поэтому draggable включается на mousedown по ручке и
-   гасится по окончании. */
+   гасится по окончании.
+
+   Если тащат шаг, отмеченный галочкой среди нескольких выбранных (REC.sel),
+   едет вся пачка галочек сразу, а не один шаг под курсором — собирать сюжет
+   руками иначе было бы по одному шагу на бросок. */
 function recDragOn(ev) {
     const row = ev.target.closest('.rs');
     if (row) row.draggable = true;
+}
+
+/* Что едет при перетаскивании id: вся отметка галочками, если id в ней
+   состоит (плюс содержимое отмеченных блоков-заголовков — блок не рвём),
+   иначе как раньше — один шаг или его блок целиком. Порядок — как в
+   REC.steps, даже если отметка разбросана по списку не подряд. */
+function recDragBlock(id) {
+    if (REC.sel && REC.sel.size > 1 && REC.sel.has(id)) {
+        const ids = new Set(REC.sel);
+        for (const s of REC.steps) {
+            if (ids.has(s.id) && blockIsHead(s)) blockInside(s).forEach(c => ids.add(c.id));
+        }
+        return REC.steps.filter(s => ids.has(s.id));
+    }
+    return blockOf(recFind(id));
 }
 
 function recDragStart(ev, id) {
@@ -2866,18 +2885,18 @@ function recDragStart(ev, id) {
     ev.dataTransfer.effectAllowed = 'move';
     /* Без setData часть браузеров не начинает перетаскивание вообще. */
     ev.dataTransfer.setData('text/plain', String(id));
-    ev.target.closest('.rs').classList.add('dragging');
+    for (const s of recDragBlock(id)) {
+        const row = document.querySelector(`#recSteps .rs[data-id="${s.id}"]`);
+        if (row) row.classList.add('dragging');
+    }
 }
 
 function recDragEnd(ev) {
     REC.drag = null;
     const row = ev.target.closest('.rs');
-    if (row) {
-        row.draggable = false;
-        row.classList.remove('dragging');
-    }
+    if (row) row.draggable = false;
     document.querySelectorAll('#recSteps .rs')
-        .forEach(el => el.classList.remove('over-up', 'over-down'));
+        .forEach(el => el.classList.remove('dragging', 'over-up', 'over-down'));
 }
 
 /* Куда уронить — выше или ниже цели, по половине её высоты. Это не
@@ -2885,6 +2904,7 @@ function recDragEnd(ev) {
    после, и первое перетаскивание всегда получается не туда. */
 function recDragOver(ev, id) {
     if (REC.drag == null || REC.drag === id) return;
+    if (recDragBlock(REC.drag).some(s => s.id === id)) return;   // над своей же пачкой
     ev.preventDefault();
     ev.dataTransfer.dropEffect = 'move';
     const row = ev.currentTarget;
@@ -2905,11 +2925,10 @@ function recDrop(ev, id) {
     row.classList.remove('over-up', 'over-down');
     if (REC.drag == null || REC.drag === id) return;
 
-    const from = REC.steps.findIndex(step => step.id === REC.drag);
-    if (from < 0) return;
-    const block = blockOf(REC.steps[from]);   // блок переезжает целиком
+    const block = recDragBlock(REC.drag);
     if (block.some(s => s.id === id)) return;
-    REC.steps.splice(from, block.length);
+    const blockIds = new Set(block.map(s => s.id));
+    REC.steps = REC.steps.filter(s => !blockIds.has(s.id));
     /* Цель ищем ПОСЛЕ изъятия: индексы за вырезанным шагом сдвинулись, и
        поиск до splice ставил бы шаг на позицию мимо на единицу. */
     const to = REC.steps.findIndex(s => s.id === id);
@@ -2917,6 +2936,11 @@ function recDrop(ev, id) {
     REC.steps.splice(выше ? to : to + 1, 0, ...block);
     /* Бросили под строку блока — значит, в блок. */
     blockPlace(block[0], !выше && (blockIsHead(цель) || цель.parent != null));
+    /* В пачке бывает несколько «корней» — шагов, чей родитель остался не в
+       пачке (выбрали вразнобой пару шагов верхнего уровня, или вытащили шаг
+       из чужого блока). Все они садятся туда же, куда встал первый. */
+    const корень = block[0].parent ?? null;
+    for (const s of block) if (!blockIds.has(s.parent)) s.parent = корень;
     REC.drag = null;
     recRender();
     recSave();
