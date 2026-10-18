@@ -142,8 +142,6 @@ function recSync() {
     /* Кнопка, которая ничего не сделает, должна об этом говорить заранее. */
     const нечего = !REC.steps.length;
     disableWithReason($('btnRecCode'), нечего, 'Сначала запишите хотя бы один шаг');
-    disableWithReason($('btnRecAnchor'), !S.active,
-        'Сначала откройте телефон');
     disableWithReason($('btnRecBranch'), !S.active,
         'Сначала откройте телефон');
     disableWithReason($('btnRecSave'), нечего, 'Сначала запишите хотя бы один шаг');
@@ -1665,34 +1663,68 @@ async function recLibOpen() {
             return;
         }
     }
-    $('mTitle').textContent = 'Библиотека шагов';
-    $('mBody').innerHTML = recLogicHtml() + '<div class="lib">' + REC.lib.map((preset, index) => `
-      <div class="li" onclick="recLibPick(${index})">
-        <b>${esc(preset.title)}</b><span>${esc(preset.desc)}</span>
-      </div>`).join('') + '</div>';
-    $('mActs').innerHTML = '<span class="sp"></span>'
-        + '<button class="sm" onclick="closeModal()">Закрыть</button>';
+    $('mTitle').textContent = t('device.dobavit_shag');
+    $('mBody').innerHTML = addStepHtml(addStepPlan(recAddCtx()), REC.lib);
+    $('mActs').innerHTML = `<span class="sp"></span>
+        <button class="sm" onclick="closeModal()">${esc(t('modal.zakryt'))}</button>`;
+    $('modal').querySelector('.sheet').classList.add('wide');
     openModal();
 }
 
 /* ------------------------------------------------------------ логика */
 
-/* Шаги, меняющие ход сценария, — не действия на телефоне, поэтому их не
-   записать с экрана. Встают туда же, куда встала бы запись: в конец или
-   после выбранного шага (recPush). */
-const REC_LOGIC = () => [
-    {key: 'if_seen', icon: 'eye-off', title: t('rec.l_esli'), desc: t('rec.l_esli_d')},
-    {key: 'if_not', icon: 'eye-off', title: t('rec.l_esli_net'), desc: t('rec.l_esli_net_d')},
-    {key: 'break', icon: 'stop', title: t('rec.vyyti_iz_povtora'), desc: t('rec.l_break_d')},
-    {key: 'finish', icon: 'check', title: t('rec.l_finish'), desc: t('rec.l_finish_d')},
-    {key: 'call', icon: 'layers', title: t('rec.l_call'), desc: t('rec.l_call_d')},
-];
+/* Куда встанет новый шаг — туда же, куда встала бы запись (recPush): в
+   конец сюжета или за шагом «записать после этого». Отсюда — глубина и
+   «внутри повтора» для выбора в addStepPlan. */
+function recAddCtx() {
+    const prev = REC.insertAfter ? recFind(REC.insertAfter) : null;
+    const probe = {parent: prev ? (blockIsHead(prev) ? prev.id : (prev.parent ?? null)) : null};
+    return {
+        sel: REC.sel ? REC.sel.size : 0,
+        depth: blockChain(probe).length,
+        depthMax: BLOCK_DEPTH_MAX,
+        inLoop: recBreakInLoop(probe),
+        phone: !!S.active,
+    };
+}
 
-function recLogicHtml() {
-    return `<div class="lib-k">${esc(t('rec.logika'))}</div><div class="lib lib-logic">` + REC_LOGIC().map(item => `
-      <div class="li" onclick="recLogicPick('${item.key}')">
-        <b>${recIcon(item.icon)} ${esc(item.title)}</b><span>${esc(item.desc)}</span>
-      </div>`).join('') + `</div><div class="lib-k">${esc(t('rec.deystviya'))}</div>`;
+function recAddPick(key) {
+    if (key === 'anchor') {
+        closeModal();
+        recAnchorHere();
+        return;
+    }
+    if (BLOCK_KINDS[key] || key === 'if_not') {
+        const kind = key === 'if_not' ? 'if_seen' : key;
+        if (REC.sel && REC.sel.size) recSelBlock(kind);
+        else recBlockNew(kind);
+        if (key === 'if_not') {
+            const head = recFind(REC.open);
+            if (head && head.kind === 'if_seen') {
+                head.args.negate = true;
+                recRender();
+                recSave();
+            }
+        }
+        closeModal();
+        return;
+    }
+    recLogicPick(key);
+}
+
+/* Новый блок без выделения. Блоку нужен хотя бы один шаг внутри — пауза-
+   заготовка, её заменяют записью («записать после этого шага») или
+   удаляют. Рамку ставит recBlockWrap — те же проверки, что у выделения. */
+function recBlockNew(kind) {
+    const pause = recPush({kind: 'sleep', args: {seconds: 1}});
+    const headId = REC.nextId;
+    recBlockWrap(kind, [pause.id]);
+    if (pause.parent !== headId) {          // рамка не встала — заготовка не нужна
+        REC.steps = REC.steps.filter(s => s !== pause);
+        if (REC.insertAfter === pause.id) REC.insertAfter = null;
+        recRender();
+        recSave();
+    }
 }
 
 function recScenName(key) {
@@ -1701,27 +1733,14 @@ function recScenName(key) {
 }
 
 function recLogicPick(key) {
-    if (key === 'if_seen' || key === 'if_not') {
-        /* Блоку нужен хотя бы один шаг внутри — пауза-заготовка, её
-           заменяют записью («записать после этого шага») или удаляют. */
-        const head = recPush({kind: 'if_seen', args: {negate: key === 'if_not', timeout: 3}, any: []});
-        const pause = recPush({kind: 'sleep', args: {seconds: 1}});
-        pause.parent = head.id;
-        head.parent = head.parent ?? null;
-        REC.open = head.id;
-        closeModal();
-        recRender();
-        recSave();
-        toast(t('rec.blok_dobavlen_esli'));
-        return;
-    }
     if (key === 'break') {
-        recPush({kind: 'break', args: {}});
+        const step = recPush({kind: 'break', args: {}});
         closeModal();
-        if (!recBreakInLoop(REC.steps[REC.steps.length - 1])) toast(t('rec.break_vne'), 'bad');
+        if (!recBreakInLoop(step)) toast(t('rec.break_vne'), 'bad');
         return;
     }
     if (key === 'finish') {
+        $('modal').querySelector('.sheet').classList.remove('wide');
         $('mTitle').textContent = t('rec.l_finish');
         $('mBody').innerHTML = `<div class="row"><label>${esc(t('rec.kak'))}</label>
             <select id="logFinRes" class="grow">
@@ -1770,6 +1789,7 @@ function recLibPick(index) {
         recLibAdd(preset, {});
         return;
     }
+    $('modal').querySelector('.sheet').classList.remove('wide');
     $('mTitle').textContent = preset.title;
     $('mBody').innerHTML = preset.inputs.map(input => `
       <div class="row"><label>${esc(input.label)}</label>
@@ -1780,7 +1800,7 @@ function recLibPick(index) {
                onkeydown="if(event.key==='Enter')recLibSubmit(${index})">
       </div>`).join('')
         + (preset.inputs.some(i => i.packages) ? '<datalist id="libPkgs"></datalist>' : '');
-    $('mActs').innerHTML = '<button class="sm" onclick="recLibOpen()">← библиотека</button>'
+    $('mActs').innerHTML = `<button class="sm" onclick="recLibOpen()">← ${esc(t('rec.dob_nazad'))}</button>`
         + '<span class="sp"></span>'
         + `<button class="primary" onclick="recLibSubmit(${index})">Добавить</button>`;
     const first = $('lib_' + preset.inputs[0].name);

@@ -952,10 +952,34 @@
 .gr-node.chance { border-color: var(--warn-line); }
 .gr-node.until { border-color: var(--busy-line); }
 
-/* Раздел «Логика» в библиотеке шагов: подзаголовки разделов и значок у
-   названия — логика не действие на телефоне, её видно по иконке. */
-.lib-k { color: var(--dim); font-size: var(--fs-2); margin: var(--s2) 0 var(--s1); }
-.lib-logic .li b { display: inline-flex; align-items: center; gap: var(--s1); }
+/* «Добавить шаг» (addstep.js): разделы по тому, что хотят сделать, в
+   каждом — крупные карточки «значок + название + одна строка». Карточка —
+   кнопка: Tab и Enter работают, выключенная говорит причину вместо
+   подсказки. */
+.addpick-g { margin-bottom: var(--s4); }
+.addpick-g:last-child { margin-bottom: 0; }
+.addpick-g h4 {
+    display: flex; align-items: center; gap: var(--s2);
+    margin: 0 0 var(--s2); font-size: var(--fs-4); font-weight: 600;
+}
+.addpick-g h4 .ic { color: var(--dim); }
+.addpick-hint, .addpick-note { margin: 0 0 var(--s2); color: var(--dim); font-size: var(--fs-2); }
+.addpick-note { color: var(--text); }
+.addpick-grid {
+    display: grid; gap: var(--s2);
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+.addpick-card {
+    align-items: flex-start; gap: var(--s3); min-height: 64px;
+    padding: var(--s3); text-align: left; white-space: normal;
+    background: var(--panel3); border: 1px solid transparent; border-radius: var(--r2);
+}
+.addpick-card:hover:not(:disabled) { border-color: var(--line-hover); }
+.addpick-ic { flex: none; display: inline-flex; color: var(--accent); padding-top: 2px; }
+.addpick-ic .ic { width: var(--icon-lg); height: var(--icon-lg); }
+.addpick-tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.addpick-tx b { font-size: var(--fs-3); font-weight: 600; }
+.addpick-tx span { color: var(--dim); font-size: var(--fs-2); line-height: 1.35; }
 
 /* ------------------------------------------------ строка «Список-фразы»
 

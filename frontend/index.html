@@ -339,13 +339,6 @@
                         <details class="recmore" id="recMore">
                             <summary class="btn sm ghost" data-t="device.esche">Ещё</summary>
                             <div class="recmore-pop" onclick="if(event.target.closest('button'))$('recMore').open=false">
-                                <button class="sm ghost" id="btnRecAnchor" onclick="recAnchorHere()"
-                                        title="Сценарий проверит, что дошёл до этого экрана" data-t-title="device.stsenariy_proverit_chto_doshel">
-                                    <svg class="ic" aria-hidden="true">
-                                        <use href="#i-crosshair"/>
-                                    </svg>
-                                    <span data-t="device.proverka_ekrana">Убедиться, что экран тот</span>
-                                </button>
                                 <button class="sm ghost" id="btnRecBranch" onclick="recBranchHere()"
                                         title="Если на экране то-то — выполнить блок" data-t-title="device.esli_na_ekrane_to">
                                     <svg class="ic" aria-hidden="true">
@@ -910,6 +903,7 @@
 <script src="js/stepfail.js"></script>
 <script src="js/steptools.js"></script>
 <script src="js/blocks.js"></script>
+<script src="js/addstep.js"></script>
 <script src="js/workspace.js"></script>
 <script src="js/bulk.js"></script>
 <script src="js/rundialog.js"></script>
