@@ -389,5 +389,15 @@
   "schedule.raspisanie": "Расписание",
   "schedule.raspisanie_zapuskov": "Расписание запусков",
   "schedule.vse_zapuski": "Все запуски",
-  "schedule.zapuski": "Запуски"
+  "schedule.zapuski": "Запуски",
+  "device.spisok": "Список",
+  "device.shema": "Схема",
+  "rec.ukazat_na_ekrane": "Указать на экране",
+  "rec.ukazat_na_ekrane_podskazka": "Нажмите, затем нажмите на нужный элемент на экране телефона",
+  "rec.nazhmite_na_ekrane_tsel": "нажмите на экране то, что ищем — телефон это нажатие не получит. Esc — отмена",
+  "rec.ekran_ne_razobran": "не удалось разобрать экран — попробуйте ещё раз",
+  "rec.element_ne_raspoznan": "этот элемент не распознаётся — укажите другой или впишите текст",
+  "rec.tsel_vybrana": "цель: {chto}",
+  "rec.ili_tekstom": "или текстом",
+  "rec.ne_zadano_v_zagolovke": "… — укажите, что искать"
 }

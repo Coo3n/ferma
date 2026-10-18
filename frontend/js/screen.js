@@ -30,7 +30,7 @@ function heldHere() {
 }
 
 function canInteract() {
-    return !!(window.REC && REC.on) || heldHere() || !!S.liveControl
+    return !!(window.REC && (REC.on || REC.blockPick != null)) || heldHere() || !!S.liveControl
         || pultLive();
 }
 
@@ -210,6 +210,8 @@ async function act(payload) {
     /* «Указать на экране» в конструкторе: нажатие выбирает ориентир шага и
        на телефон не уходит. */
     if (window.REC && REC.on && REC.scopePick && window.recScopeTap && recScopeTap(payload)) return;
+    /* То же для цели блока «пока не найдёшь» / «если на экране» — и без записи. */
+    if (window.REC && REC.blockPick != null && window.recBlockPickTap && await recBlockPickTap(payload)) return;
     try {
         const result = await (syncRoute(payload)
             || post(`/api/devices/${S.active}/action`, payload));
