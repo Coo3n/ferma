@@ -57,3 +57,35 @@ def test_runsafe_helpers():
     res = subprocess.run([node, "-e", SCRIPT, str(JS / "rundialog.js"), str(JS / "jobs.js")],
                          capture_output=True, text=True)
     assert res.returncode == 0, res.stderr
+
+
+RACE = r"""
+const fs = require('fs'), vm = require('vm'), assert = require('assert');
+const posts = [];
+let release;
+const gate = new Promise(r => { release = r; });
+const ctx = {window: {}, t: k => k, esc: s => String(s), toast: () => {},
+    S: {devices: [{serial: 'a', online: true}, {serial: 'b', online: true}], hidden: new Set(), view: 'fleet'},
+    api: async () => { await gate; return [{id: 'j1', status: 'passed'}]; },
+    post: async (url, body) => { posts.push(body); return {}; },
+    setInterval: () => 1, clearInterval: () => {}};
+vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(process.argv[1], 'utf8'), ctx);
+vm.runInContext(`RD_TRIALS.set('b1', {batch: 'b1', job: 'j1', first: 'a', rest: ['b'],
+    scenario: 'vk', params: {}, repeat: 1, stage: 'run'});`, ctx);
+(async () => {
+    // два тика разом — сеть медленнее интервала опроса
+    const one = vm.runInContext('rdTrialTick()', ctx);
+    const two = vm.runInContext('rdTrialTick()', ctx);
+    release();
+    await Promise.all([one, two]);
+    assert.strictEqual(posts.length, 1, 'остальные запущены ' + posts.length + ' раз');
+})().catch(e => { console.error(e); process.exit(1); });
+"""
+
+
+def test_пробный_не_запускает_остальных_дважды():
+    node = require_node()
+    res = subprocess.run([node, "-e", RACE, str(JS / "rundialog.js")],
+                         capture_output=True, text=True)
+    assert res.returncode == 0, res.stderr

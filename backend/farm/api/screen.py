@@ -147,6 +147,9 @@ def action(serial: str, payload: dict = Body(...)):
         result = handler(serial, payload)
     except KeyError as e:
         raise HTTPException(400, f"не хватает поля {e}")
+    except (ValueError, TypeError) as e:
+        # «x: "abc"», неизвестная клавиша — ошибка запроса, а не сервера.
+        raise HTTPException(400, str(e))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, str(e))
     return result or {"ok": True}

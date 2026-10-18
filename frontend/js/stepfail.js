@@ -22,3 +22,12 @@ function stFailSet(step, value) {
         else delete step.optional;
     }
 }
+
+/* Варианты «пробовать N раз» для выпадающего списка. Рецепт мог прийти с
+   числом вне ST_FAIL_TRIES (старое поле «повторов» давало 1..5): без него в
+   списке браузер показывал «1», а шаг на деле пробовал пять раз. */
+function stFailTriesOptions(current) {
+    const list = ST_FAIL_TRIES.slice();
+    if (!list.includes(current)) list.push(current);
+    return list.sort((a, b) => a - b);
+}

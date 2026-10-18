@@ -94,6 +94,10 @@ def switch_to_tcpip(serial: str, port: int = Body(config.NETWORK_PORT, embed=Tru
     После этого USB можно отсоединить: подключение держит сторож.
     """
     device = _require_device(serial)
+    # До `adb tcpip`: иначе команда уходила на телефон, а адрес с таким
+    # портом потом отвергал net.add — 500 после того, как adbd уже дёрнули.
+    if not 0 < port <= 65535:
+        raise HTTPException(400, "порт: от 1 до 65535")
     if adb.is_network_serial(serial):
         raise HTTPException(400, "устройство уже подключено по сети")
     if not device.online:

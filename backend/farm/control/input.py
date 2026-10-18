@@ -1,6 +1,7 @@
 """Ввод: касания, жесты, текст, аппаратные клавиши."""
 from __future__ import annotations
 
+import re
 import shlex
 import time
 
@@ -92,12 +93,18 @@ def _input_text(serial: str, value: str) -> None:
         raise adb.AdbError(msg) from None
 
 
+# Имя клавиши уходит в sh телефона (`input keyevent …`): «KEYCODE_HOME; reboot»
+# раньше проходило проверку префикса и исполнялось целиком.
+_KEYCODE_RE = re.compile(r"KEYCODE_[A-Z0-9_]{1,40}")
+
+
 def _keycode(name: str) -> str:
+    name = str(name or "")
     code = KEYCODES.get(name.lower())
     if code:
         return code
-    if name.upper().startswith("KEYCODE_"):
-        return name
+    if _KEYCODE_RE.fullmatch(name.upper()):
+        return name.upper()
     raise ValueError(f"неизвестная клавиша: {name}")
 
 
