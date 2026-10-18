@@ -1150,3 +1150,6 @@ body.rec-picking .stage, body.rec-picking #recLayer { cursor: crosshair; }
 
 .addpick-card.compact { min-height: 0; padding: var(--s2) var(--s3); align-items: center; }
 .addpick-card.compact .addpick-ic .ic { width: var(--icon-md); height: var(--icon-md); }
+
+/* Выделенное берут за любое место и тащат группой. */
+.rs.sel .rs-head, .gr-node.sel { cursor: grab; }

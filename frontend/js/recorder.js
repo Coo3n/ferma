@@ -1325,8 +1325,10 @@ function recIcon(id) {
 function grNode(step, xy, index, nodeW) {
     const [cls, iconId] = schIcon(step);
     const sel = REC.sel && REC.sel.has(step.id) ? 'sel' : '';
-    return `<div class="gr-node ${cls} ${sel}" style="left:${xy.x}px;top:${xy.y}px;width:${nodeW}px" data-id="${step.id}">
-      <span class="gr-grip" title="Перетащите карточку" onpointerdown="grDragStart(event, ${step.id})">${grIcon('grip')}</span>
+    /* Выделенную карточку можно тащить за любое место — едет вся группа. */
+    return `<div class="gr-node ${cls} ${sel}" style="left:${xy.x}px;top:${xy.y}px;width:${nodeW}px" data-id="${step.id}"
+      ${sel ? `onpointerdown="if(!event.target.closest('.gr-try'))grDragStart(event, ${step.id})"` : ''}>
+      <span class="gr-grip" title="Перетащите карточку" onpointerdown="event.stopPropagation();grDragStart(event, ${step.id})">${grIcon('grip')}</span>
       <button class="gr-body" onclick="schOpenStep(${step.id})" title="Открыть шаг в списке">
         <span class="gr-n">${index + 1}</span>
         ${grIcon(iconId)}<span class="gr-label">${esc(schLabel(step))}</span>
@@ -1545,7 +1547,9 @@ function grDragStart(ev, id) {
             list.forEach((xy, i) => place(els[i], xy));
         });
     }
+    let moved = false;
     function onMove(e) {
+        if (Math.hypot(e.clientX - startX, e.clientY - startY) > 3) moved = true;
         last = step ? shift(e) : at(e);
         if (!frame) frame = requestAnimationFrame(paint);
     }
@@ -1554,6 +1558,12 @@ function grDragStart(ev, id) {
         host.removeEventListener('pointerup', onUp);
         if (frame) cancelAnimationFrame(frame);
         canvas.querySelectorAll('.gr-node.dragging').forEach(el => el.classList.remove('dragging'));
+        /* Тащили за тело карточки — её click («открыть шаг») не нужен. */
+        if (moved) {
+            const swallow = c => c.stopPropagation();
+            window.addEventListener('click', swallow, {capture: true, once: true});
+            setTimeout(() => window.removeEventListener('click', swallow, true), 0);
+        }
         /* Бросили на другую карточку — это перестановка шагов, как в списке:
            порядок выполнения меняется, схема раскладывается заново. Бросили на
            пустое место — карточка просто стоит там, куда её поставили. */
@@ -1976,6 +1986,14 @@ function grMarquee(ev, view) {
    подписи) и с пустого места под шагами — не с полей ввода, кнопок и ручки. */
 function recListMarquee(ev) {
     if (ev.button !== 0) return;
+    /* Взялись за уже выделенную строку (не за поле и не за кнопку) — это
+       перенос всей выделенной группы, а не новая рамка: строку делаем
+       перетаскиваемой, дальше работает обычный recDragStart/recDrop. */
+    const selRow = ev.target.closest('.rs.sel[data-id]');
+    if (selRow && !ev.target.closest('input, select, textarea, button, a, label, .rs-body, details')) {
+        selRow.draggable = true;
+        return;
+    }
     if (ev.target.closest('input, select, textarea, button, a, label, .rs-grip, .rs-body, .selbar, .rs-empty, details')) return;
     const box = $('recSteps');
     if (!box) return;

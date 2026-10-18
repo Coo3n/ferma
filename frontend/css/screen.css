@@ -561,3 +561,18 @@ button.pult-tag-add {
 }
 
 .tile .metrics .tagchip[role="button"] { cursor: pointer; }
+
+/* Низ пульта: «Управление» — значком (подсказка у кнопки), «Запустить» и
+   «Записать сценарий» — двумя равными кнопками. Втроём с подписями они не
+   помещались в панель ~380px и обрезались на полуслове. */
+.pult-foot {
+    display: grid;
+    grid-template-columns: var(--ctl) 1fr 1fr;
+    align-items: center;
+    gap: var(--s2);
+}
+.pult-foot > .sp { display: none; }
+.pult-foot > button { justify-content: center; white-space: nowrap; min-width: 0; }
+.pult-foot > button:first-child { width: var(--ctl); padding: 0; font-size: 0; gap: 0; }
+.pult-foot > button.primary { min-height: var(--ctl); }
+.pult-foot > button { height: var(--ctl); }
