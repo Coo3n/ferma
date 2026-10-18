@@ -233,27 +233,44 @@ function recNew() {
 /* -------------------------------------------- необязательность и повторы */
 
 function recBadges(step) {
+    if (!ST_FLEX.has(step.kind)) return '';
+    const fail = stFailGet(step);
     let html = '';
-    if (step.optional) {
-        html += '<span class="rs-badge opt" title="Не вышло — пропускается">можно пропустить</span>';
+    if (fail.skip) {
+        html += `<span class="rs-badge opt" title="${esc(t('rec.badge_skip_hint'))}">${esc(t('rec.badge_skip'))}</span>`;
     }
-    if (step.retries) {
-        html += `<span class="rs-badge retry" title="Повторов при неудаче">↻${step.retries}</span>`;
+    if (fail.tries > 1) {
+        html += `<span class="rs-badge retry" title="${esc(t('rec.badge_tries_hint', {n: fail.tries}))}">×${fail.tries}</span>`;
     }
     return html;
 }
 
+/* «Если не нашёл» — одна фраза вместо «необязательный» + «повторов»:
+   оператору нужен ответ «что будет, если не вышло», а не два флага. */
 function recFlexEditor(step) {
     if (!ST_FLEX.has(step.kind)) return '';
-    const options = [0, 1, 2, 3, 5].map(n =>
-        `<option value="${n}" ${Number(step.retries || 0) === n ? 'selected' : ''}>${n || 'нет'}</option>`).join('');
-    return `<div class="rs-flex">
-    <label class="kb" title="Не вышло — шаг пропускается">
-      <input type="checkbox" ${step.optional ? 'checked' : ''}
-             onchange="recSetFlex(${step.id}, 'optional', this.checked)">
-      необязательный</label>
-    <label>повторов <select onchange="recSetFlex(${step.id}, 'retries', this.value)">${options}</select></label>
+    const fail = stFailGet(step);
+    const tries = ST_FAIL_TRIES.map(n =>
+        `<option value="${n}" ${fail.tries === n ? 'selected' : ''}>${n}</option>`).join('');
+    return `<div class="rs-flex rs-fail">
+    <span class="rs-fail-h">${esc(t('rec.nenashel'))}:</span>
+    <label>${esc(t('rec.nenashel_probovat'))}
+      <select onchange="recSetFail(${step.id}, 'tries', this.value)">${tries}</select>
+      ${esc(t('rec.nenashel_raz'))}</label>
+    <select onchange="recSetFail(${step.id}, 'skip', this.value === '1')"
+            aria-label="${esc(t('rec.nenashel'))}">
+      <option value="0" ${fail.skip ? '' : 'selected'}>${esc(t('rec.nenashel_stop'))}</option>
+      <option value="1" ${fail.skip ? 'selected' : ''}>${esc(t('rec.nenashel_skip'))}</option>
+    </select>
   </div>`;
+}
+
+function recSetFail(id, field, value) {
+    const step = recFind(id);
+    if (!step || !ST_FLEX.has(step.kind)) return;
+    stFailSet(step, {[field]: value});
+    recRender();
+    recSave();
 }
 
 /* Предпросмотр строки зеркалит codegen._flexible. */
@@ -269,15 +286,6 @@ window.recCode = function (step, index) {
     }
     return code;
 };
-
-function recSetFlex(id, field, value) {
-    const step = recFind(id);
-    if (!step || !ST_FLEX.has(step.kind)) return;
-    if (field === 'optional') step.optional = !!value;
-    else step.retries = Math.max(0, Math.min(5, Number(value) || 0));
-    recRender();
-    recSave();
-}
 
 /* ----------------------------------------------------------------- дубли */
 

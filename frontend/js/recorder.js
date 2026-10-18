@@ -85,7 +85,7 @@ window.REC = {
     lastAt: 0,
     timer: null,
     drag: null,       // id шага, который тащат мышью
-    view: 'scheme',   // 'scheme' | 'list' — схема сюжета или список шагов
+    view: 'list',     // 'scheme' | 'list'; схема скрыта — список-фразы читаются проще графа
     schemeTimer: null,
     zoom: 1,          // масштаб холста схемы, см. grZoomSet()
 };
@@ -106,11 +106,9 @@ function recOpen(keepSteps) {
     REC.builder = true;
     showView('device');
     if (!keepSteps) recRestore();
-    /* Правка входит через Список: банер тут же говорит «шаги можно удалять,
-       переставлять и дописывать» — а удаление и перестановка живут в строках
-       Списка, Схема лишь показывает готовый хребет. Обычная запись и
-       обучение отводу (REC.teach) остаются на Схеме — так и задумано. */
-    recSetView(REC.edit ? 'list' : 'scheme');
+    /* Список — единственный вид: схема-граф путала операторов, а всё, что
+       она умела показать (блоки, развилки), список рисует рамками. */
+    recSetView('list');
     recRender();
     recSync();
 }
@@ -942,8 +940,8 @@ function grEdges(layout) {
 function recEmptySteps() {
     return emptyBig({
         art: 'steps',
-        title: 'Шагов пока нет',
-        text: 'Нажмите «Запись» и кликайте по экрану или добавьте «Шаг».',
+        title: t('rec.pusto_title'),
+        text: t('rec.pusto_text'),
     });
 }
 
@@ -1389,14 +1387,25 @@ function grPanStart(ev) {
 /* Боковая часть дёргает сеть — не чаще раза в 400мс, даже если recRender()
    зовётся на каждый клик подряд: иначе активная запись била бы по
    /api/detours с той же частотой, что и по экрану устройства. */
+/* Панель «Всплывающие окна» живёт под списком, а не на схеме: грузим её,
+   только пока она открыта — закрытую никто не читает. */
 function recSchemeRefresh() {
-    if (REC.view !== 'scheme') return;
+    const side = $('recSide');
+    if (!side || !side.open) return;
     clearTimeout(REC.schemeTimer);
     REC.schemeTimer = setTimeout(recSchemeSideLoad, REC_REFRESH_MS);
 }
 
+function recSideOpen() {
+    const side = $('recSide');
+    if (!side) return;
+    side.open = true;
+    recSchemeSideLoad();
+    side.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+}
+
 async function recSchemeSideLoad() {
-    const side = document.querySelector('#recScheme .sch-side-wrap');
+    const side = document.querySelector('#recSide .sch-side-wrap');
     if (!side) return;
     let карта = {rules: [], obstacles: []};
     try {
@@ -2146,45 +2155,101 @@ function recThumb(step) {
     return `<div class="rs-thumb"><img src="${step.shot}" alt="">${frame}</div>`;
 }
 
+/* Главное в строке — проверить шаг; остальное (записать после, дублировать,
+   двигать, удалить) живёт в «⋯»: семь иконок без подписей подряд читались
+   как шум, а корзина рядом со стрелкой «вниз» ловила промахи. */
 function recRow(step, index) {
     const open = REC.open === step.id;
-    return `<div class="rs ${open ? 'open' : ''} ${REC.sel && REC.sel.has(step.id) ? 'sel' : ''} ${blockRowClass(step)}"
+    const sel = REC.sel && REC.sel.has(step.id);
+    return `<div class="rs ${open ? 'open' : ''} ${sel ? 'sel' : ''} ${blockRowClass(step)}"
        data-id="${step.id}"
        ondragstart="recDragStart(event, ${step.id})" ondragend="recDragEnd(event)"
        ondragover="recDragOver(event, ${step.id})" ondragleave="recDragLeave(event)"
        ondrop="recDrop(event, ${step.id})">
     <div class="rs-head" onclick="recToggle(${step.id})">
       <span class="rs-grip" onmousedown="recDragOn(event)"
-            title="Перетащите, чтобы переставить шаг">${recIcon('grip')}</span>
-      <input type="checkbox" class="rs-sel" aria-label="Выбрать шаг ${index + 1}"
-             ${REC.sel && REC.sel.has(step.id) ? 'checked' : ''}
+            title="${esc(t('rec.m_peretaschite'))}">${recIcon('grip')}</span>
+      <input type="checkbox" class="rs-sel" aria-label="${esc(t('rec.m_vybrat', {n: index + 1}))}"
+             ${sel ? 'checked' : ''}
              onclick="event.stopPropagation();recSelToggle(${step.id}, event)">
       <span class="rs-n">${index + 1}</span>
       ${grIcon(schIcon(step)[1])}
       <span class="rs-label">${esc(recLabel(step))}</span>
       ${recBadges(step)}
       <span class="rs-acts">
-        <button class="sm ghost" title="Записать новые шаги сразу после этого"
-                onclick="event.stopPropagation();recRecordAfter(${step.id})">${recIcon('plus')}</button>
-        <button class="sm ghost" title="Проверить только этот шаг на телефоне"
-                onclick="event.stopPropagation();recRunStep(${index})">${recIcon('crosshair')}</button>
-        <button class="sm ghost" title="Запустить сценарий с этого шага до конца"
-                onclick="event.stopPropagation();recRunFrom(${index})">${recIcon('play')}</button>
-        <button class="sm ghost" title="Дублировать шаг"
-                onclick="event.stopPropagation();recDup(${step.id})">${recIcon('copy')}</button>
-        <button class="sm ghost" title="Выше"
-                onclick="event.stopPropagation();recMove(${step.id},-1)">${recIcon('up')}</button>
-        <button class="sm ghost" title="Ниже"
-                onclick="event.stopPropagation();recMove(${step.id},1)">${recIcon('down')}</button>
-        <button class="sm danger" title="Удалить"
-                onclick="event.stopPropagation();recDelete(${step.id})">${recIcon('trash')}</button>
+        <button class="sm ghost" title="${esc(t('rec.m_proverit'))}" aria-label="${esc(t('rec.m_proverit'))}"
+                onclick="event.stopPropagation();recRunStep(${index})">${recIcon('play')}</button>
+        <button class="sm ghost rs-more-btn" title="${esc(t('rec.m_esche'))}" aria-label="${esc(t('rec.m_esche'))}"
+                aria-haspopup="menu"
+                onclick="event.stopPropagation();recRowMenu(event, ${step.id}, ${index})">⋯</button>
       </span>
     </div>
-    ${open ? `<div class="rs-code">${esc(recCode(step, index))}</div>` : ''}
     ${recMark(step, open)}
-    ${open ? recThumb(step) + recAlts(step) + recAnchorEditor(step)
-        + recBranchEditor(step) + recBlockEditor(step) + recValueEditor(step) + recFlexEditor(step) : ''}
+    ${open ? recStepBody(step, index) : ''}
   </div>`;
+}
+
+/* Раскрытый шаг: сверху то, что правят каждый день (картинка, имя экрана,
+   ветки развилки, значение, блок, «если не нашёл»), ниже под
+   «Дополнительно» — код строки и запасные признаки «как искать». Раскрыт
+   сам, если запасные уже выбраны: спрятать заданное — потерять его из виду. */
+function recStepBody(step, index) {
+    const main = recThumb(step) + recAnchorEditor(step) + recBranchEditor(step)
+        + recValueEditor(step) + recBlockEditor(step) + recFlexEditor(step);
+    const busy = step.kind === 'click' && recFallbacks(step).length > 0;
+    return main + `<details class="rs-more" ${busy ? 'open' : ''}>
+      <summary>${esc(t('rec.dopolnitelno'))}</summary>
+      <div class="rs-code">${esc(recCode(step, index))}</div>
+      ${recAlts(step)}
+    </details>`;
+}
+
+/* Подписи — t() прямо здесь, а не ключи: test_strings ищет ключи по t('…'). */
+const REC_ROW_MENU = () => [
+    [t('rec.m_zapisat_posle'), 'plus', (id) => recRecordAfter(id)],
+    [t('rec.m_zapustit_otsyuda'), 'play', (id, index) => recRunFrom(index)],
+    [t('rec.m_dublirovat'), 'copy', (id) => recDup(id)],
+    [t('rec.m_vyshe'), 'up', (id) => recMove(id, -1)],
+    [t('rec.m_nizhe'), 'down', (id) => recMove(id, 1)],
+    [t('rec.m_udalit'), 'trash', (id) => recDelete(id), 'danger'],
+];
+
+function recRowMenuClose() {
+    document.querySelectorAll('.rs-menu').forEach(menu => menu.remove());
+    document.removeEventListener('click', recRowMenuClose);
+    document.removeEventListener('keydown', recRowMenuKey);
+}
+
+function recRowMenuKey(ev) {
+    if (ev.key === 'Escape') recRowMenuClose();
+}
+
+function recRowMenu(ev, id, index) {
+    const had = ev.currentTarget.parentNode.querySelector('.rs-menu');
+    recRowMenuClose();
+    if (had) return;
+    const menu = document.createElement('div');
+    menu.className = 'rs-menu';
+    menu.setAttribute('role', 'menu');
+    REC_ROW_MENU().forEach(([label, icon, run, kind]) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'rs-menu-i ' + (kind || '');
+        item.setAttribute('role', 'menuitem');
+        item.innerHTML = recIcon(icon) + `<span>${esc(label)}</span>`;
+        item.onclick = (e) => {
+            e.stopPropagation();
+            recRowMenuClose();
+            run(id, index);
+        };
+        menu.appendChild(item);
+    });
+    ev.currentTarget.parentNode.appendChild(menu);
+    menu.querySelector('button').focus();
+    setTimeout(() => {
+        document.addEventListener('click', recRowMenuClose);
+        document.addEventListener('keydown', recRowMenuKey);
+    });
 }
 
 function recRender() {
@@ -2197,6 +2262,7 @@ function recRender() {
         box.innerHTML = recEmptySteps();
         return;
     }
+    box.classList.toggle('has-sel', !!(REC.sel && REC.sel.size));
     box.innerHTML = recSelBar() + REC.steps.map(recRow).join('');
 }
 
@@ -2207,11 +2273,15 @@ function recToggle(id) {
     recRender();
 }
 
+/* Без «Вы уверены?»: подтверждение на каждое удаление приучает жать «Да»
+   не читая. Ошибку чинит «Вернуть» в тосте — та же отмена, что Ctrl+Z. */
 function recDelete(id) {
+    const index = REC.steps.findIndex(step => step.id === id);
     REC.steps = REC.steps.filter(step => step.id !== id);
     recPrune();
     recRender();
     recSave();
+    if (index >= 0) toast(t('rec.shag_udalen', {n: index + 1}), '', {label: t('rec.vernut'), onClick: recUndo});
 }
 
 function recMove(id, delta) {

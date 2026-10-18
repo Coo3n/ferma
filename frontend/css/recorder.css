@@ -956,3 +956,111 @@
    названия — логика не действие на телефоне, её видно по иконке. */
 .lib-k { color: var(--dim); font-size: var(--fs-2); margin: var(--s2) 0 var(--s1); }
 .lib-logic .li b { display: inline-flex; align-items: center; gap: var(--s1); }
+
+/* ------------------------------------------------ строка «Список-фразы»
+
+   Галочка выделения нужна, когда выделяют, а не всегда: в покое двадцать
+   квадратиков по левому краю спорили с номерами шагов. Видна на наведении,
+   с клавиатуры и пока что-то уже выделено (has-sel ставит recRender). */
+.rs-head > .rs-sel { opacity: 0; transition: opacity var(--fast) var(--ease); }
+.rs:hover .rs-sel,
+.rs-sel:focus-visible,
+.rs.sel .rs-sel,
+#recSteps.has-sel .rs-sel { opacity: 1; }
+
+.rs-more-btn { font-size: 16px; line-height: 1; }
+
+.rs-menu {
+    position: absolute;
+    right: var(--s2);
+    top: calc(100% + 4px);
+    z-index: 30;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    padding: 4px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--r2);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .55);   /* как у всплывашек overlays.css */
+}
+
+.rs-menu-i {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--r1);
+    background: none;
+    color: var(--text);
+    font-size: var(--fs-3);
+    text-align: left;
+    cursor: pointer;
+}
+
+.rs-menu-i:hover, .rs-menu-i:focus-visible { background: var(--panel3); }
+.rs-menu-i.danger { color: var(--bad); }
+.rs-menu-i::before { content: none; }
+/* Открытое меню держит кнопки строки видимыми: мышь уходит из строки
+   в меню, и без этого оно гасло бы вместе с .rs-acts. */
+.rs-acts:has(.rs-menu) { opacity: 1; }
+/* Меню торчит из строки вниз: без этого его обрезал бы соседний шаг. */
+.rs-acts { z-index: 2; }
+
+/* «Если не нашёл» — одна фраза в строку. */
+.rs-fail { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.rs-fail-h { font-weight: 600; }
+/* Глобальные label/select — блок и на всю ширину; здесь фраза в одну строку. */
+.rs-fail > label { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+.rs-fail select { width: auto; min-width: 0; flex: 0 0 auto; }
+
+.rs-more { margin-top: 8px; }
+.rs-more > summary { cursor: pointer; color: var(--dim); font-size: var(--fs-2); }
+.rs-more[open] > summary { margin-bottom: 6px; }
+
+/* «Ещё» во втором ряду панели записи: редкие действия и настройки записи.
+   summary сам выглядит как ghost-кнопка — отдельной кнопки-открывашки нет,
+   details закрывается сам и не держит состояния в JS. */
+.recmore { position: relative; }
+.recmore > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 4px 10px;
+    border-radius: var(--r1);
+    color: var(--dim);
+    font-size: var(--fs-2);
+    font-weight: 500;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+.recmore > summary::-webkit-details-marker { display: none; }
+.recmore > summary::after { content: "▾"; font-size: 10px; }
+.recmore > summary:hover,
+.recmore[open] > summary { background: var(--panel3); color: var(--text); }
+
+.recmore-pop {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 4px);
+    z-index: 40;
+    min-width: 240px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--r2);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .55);
+}
+.recmore-pop > button { justify-content: flex-start; color: var(--text); }
+.recmore-pop > hr { width: 100%; border: 0; border-top: 1px solid var(--line-soft); margin: 4px 0; }
+.recmore-pop > label { padding: 6px 10px; }
+
+/* Подвал «Всплывающие окна» теперь под списком шагов, а не на холсте. */
+.rec-side { max-height: 30vh; }

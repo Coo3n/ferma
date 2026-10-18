@@ -29,10 +29,11 @@ const ctx = {esc, S: {view: 'device'}, REC, document: doc, window: {}, console,
     recSubmit: async () => {}, recModeOff: () => {}, recTeachSubmit: async () => {}};
 ctx.window = ctx;
 vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), ctx);
 vm.runInContext(fs.readFileSync(process.argv[1], 'utf8')
     + ';this.h={stLcs,stDiffSteps,stGestureSvg,stHist,stHistNote,stHistReset,recUndo,recRedo,'
     + 'recDup,recSelToggle,recSelOptional,recSelPause,recSelDelete,recSelBar,recBadges,'
-    + 'recFlexEditor,recSetFlex,jobStepsHtml,jobProgressHtml,stSig}', ctx);
+    + 'recFlexEditor,recSetFail,jobStepsHtml,jobProgressHtml,stSig}', ctx);
 const h = ctx.h;
 const J = x => JSON.parse(JSON.stringify(x));
 const step = (id, kind, args = {}, extra = {}) => ({id, kind, args, param: null, note: '', ...extra});
@@ -99,17 +100,20 @@ assert.deepStrictEqual(J(REC.steps.map(s => s.kind)), ['sleep', 'tap']);
 assert.strictEqual(h.recSelBar(), '');
 REC.sel = new Set([2]); assert(h.recSelBar().includes('<b>1</b> выбрано'));
 
-// --- гибкость шага
+// --- «Если не получилось» (гибкость шага)
 const k = step(9, 'key', {name: 'b'}, {optional: true, retries: 2});
-assert(h.recBadges(k).includes('можно пропустить') && h.recBadges(k).includes('↻2'));
+assert(h.recBadges(k).includes('rec.badge_skip') && h.recBadges(k).includes('×3'));
 assert.strictEqual(h.recBadges(step(1, 'key')), '');
 assert.strictEqual(h.recFlexEditor(step(1, 'sleep', {seconds: 1})), '');
-assert(h.recFlexEditor(k).includes('selected'));
+const fe = h.recFlexEditor(k);
+assert(fe.includes('<option value="3" selected>') && fe.includes('<option value="1" selected>'), fe);
 REC.steps = [step(5, 'sleep', {seconds: 1}), k];
-h.recSetFlex(5, 'optional', true);
+h.recSetFail(5, 'skip', true);
 assert(!REC.steps[0].optional, 'sleep нельзя сделать необязательным');
-h.recSetFlex(9, 'retries', '9');
+h.recSetFail(9, 'tries', '9');
 assert.strictEqual(REC.steps[1].retries, 5);
+h.recSetFail(9, 'skip', false);
+assert.strictEqual('optional' in REC.steps[1], false);
 
 // --- журнал задач
 assert.strictEqual(h.jobStepsHtml({}), '');
@@ -125,7 +129,7 @@ console.log('ok');
 
 def test_steptools_helpers():
     node = require_node()
-    result = subprocess.run([node, "-e", SCRIPT, str(ROOT / "steptools.js")],
+    result = subprocess.run([node, "-e", SCRIPT, str(ROOT / "steptools.js"), str(ROOT / "stepfail.js")],
                             capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr + result.stdout
     assert result.stdout.strip() == "ok"

@@ -312,37 +312,18 @@
                     </div>
 
                     <div class="recbar-row sub">
-                        <div class="chips" id="recViewToggle">
-                            <button class="chip on" data-view="scheme" aria-pressed="true"
-                                    onclick="recSetView('scheme')" data-t="device.shema">Схема
-                            </button>
-                            <button class="chip" data-view="list" aria-pressed="false"
-                                    onclick="recSetView('list')" data-t="device.spisok">Список
-                            </button>
-                        </div>
-                        
+                        <!-- Второй ряд — только то, что жмут при правке:
+                             добавить шаг и отмена. Проверка экрана, развилка,
+                             код, изменения и настройки записи нужны редко и
+                             ушли в «Ещё»: двадцать кнопок в два ряда читались
+                             как приборная панель, а не как редактор. -->
                         <button class="sm" onclick="recLibOpen()"
-                                title="Добавить шаг вручную" data-t="device.shag" data-t-title="device.dobavit_shag_vruchnuyu">
+                                title="Добавить шаг вручную" data-t-title="device.dobavit_shag_vruchnuyu">
                             <svg class="ic" aria-hidden="true">
                                 <use href="#i-plus"/>
                             </svg>
-                            Шаг
+                            <span data-t="device.dobavit_shag">Добавить шаг</span>
                         </button>
-                        <button class="sm" id="btnRecAnchor" onclick="recAnchorHere()"
-                                title="Сценарий проверит, что дошёл до этого экрана" data-t="device.proverka_ekrana" data-t-title="device.stsenariy_proverit_chto_doshel">
-                            <svg class="ic" aria-hidden="true">
-                                <use href="#i-crosshair"/>
-                            </svg>
-                            Проверка экрана
-                        </button>
-                        <button class="sm" id="btnRecBranch" onclick="recBranchHere()"
-                                title="Если на экране то-то — выполнить блок" data-t="device.razvilka" data-t-title="device.esli_na_ekrane_to">
-                            <svg class="ic" aria-hidden="true">
-                                <use href="#i-branch"/>
-                            </svg>
-                            Развилка
-                        </button>
-                        <span class="recbar-sep" aria-hidden="true"></span>
                         <button class="sm ghost" id="btnRecUndo" onclick="recUndo()"
                                 title="Отменить (Ctrl/⌘+Z)" aria-label="Отменить" disabled data-t-title="device.otmenit_ctrl_z" data-t-aria-label="device.otmenit">
                             <svg class="ic" aria-hidden="true">
@@ -355,36 +336,56 @@
                                 <use href="#i-redo"/>
                             </svg>
                         </button>
-                        <button class="sm ghost" id="btnRecDiff" onclick="recDiff()" hidden
-                                title="Отличия от сохранённой версии" data-t="device.izmeneniya" data-t-title="device.otlichiya_ot_sohranennoy_versii">
-                            <svg class="ic" aria-hidden="true">
-                                <use href="#i-diff"/>
-                            </svg>
-                            Изменения
-                        </button>
-                        <button class="sm ghost" id="btnRecCode" onclick="recPreview()"
-                                title="Показать код сценария" aria-label="Код сценария" data-t-title="device.pokazat_kod_stsenariya" data-t-aria-label="device.kod_stsenariya">
-                            <svg class="ic" aria-hidden="true">
-                                <use href="#i-code"/>
-                            </svg>
-                        </button>
-
-                        <span class="recbar-sep" aria-hidden="true"></span>
-
-                        <!-- Настройка записи, а не действие: ставится один раз
-                             до старта. В ряду с «Запись» и «Сохранить» она
-                             занимала место наравне с кнопками, которые жмут
-                             постоянно, и роняла ряд в перенос на 1280px. -->
-                        <label class="kb"
-                               title="Паузы между действиями станут шагами «Подождать»" data-t="device.pauzy" data-t-title="device.pauzy_mezhdu_deystviyami_stanut">
-                            <input type="checkbox" id="recPauses" onchange="REC.pauses=this.checked">
-                            паузы
-                        </label>
-                        <label class="kb"
-                               title="Ставить проверку экрана перед первым действием на каждом новом экране" data-t="device.avto_proverki" data-t-title="device.avto_proverki_podskazka">
-                            <input type="checkbox" id="recAutoAnchor" onchange="recAutoAnchorSet(this.checked)">
-                            авто-проверки
-                        </label>
+                        <details class="recmore" id="recMore">
+                            <summary class="btn sm ghost" data-t="device.esche">Ещё</summary>
+                            <div class="recmore-pop" onclick="if(event.target.closest('button'))$('recMore').open=false">
+                                <button class="sm ghost" id="btnRecAnchor" onclick="recAnchorHere()"
+                                        title="Сценарий проверит, что дошёл до этого экрана" data-t-title="device.stsenariy_proverit_chto_doshel">
+                                    <svg class="ic" aria-hidden="true">
+                                        <use href="#i-crosshair"/>
+                                    </svg>
+                                    <span data-t="device.proverka_ekrana">Убедиться, что экран тот</span>
+                                </button>
+                                <button class="sm ghost" id="btnRecBranch" onclick="recBranchHere()"
+                                        title="Если на экране то-то — выполнить блок" data-t-title="device.esli_na_ekrane_to">
+                                    <svg class="ic" aria-hidden="true">
+                                        <use href="#i-branch"/>
+                                    </svg>
+                                    <span data-t="device.razvilka">Если на экране…</span>
+                                </button>
+                                <button class="sm ghost" onclick="recSideOpen()">
+                                    <svg class="ic" aria-hidden="true">
+                                        <use href="#i-shield"/>
+                                    </svg>
+                                    <span data-t="device.vsplyvayuschie_okna_i_pomehi">Если выскочило окно</span>
+                                </button>
+                                <button class="sm ghost" id="btnRecDiff" onclick="recDiff()" hidden
+                                        title="Отличия от сохранённой версии" data-t-title="device.otlichiya_ot_sohranennoy_versii">
+                                    <svg class="ic" aria-hidden="true">
+                                        <use href="#i-diff"/>
+                                    </svg>
+                                    <span data-t="device.izmeneniya">Изменения</span>
+                                </button>
+                                <button class="sm ghost" id="btnRecCode" onclick="recPreview()"
+                                        title="Показать код сценария" data-t-title="device.pokazat_kod_stsenariya">
+                                    <svg class="ic" aria-hidden="true">
+                                        <use href="#i-code"/>
+                                    </svg>
+                                    <span data-t="device.kod_stsenariya">Код сценария</span>
+                                </button>
+                                <hr>
+                                <label class="kb"
+                                       title="Паузы между действиями станут шагами «Подождать»" data-t-title="device.pauzy_mezhdu_deystviyami_stanut">
+                                    <input type="checkbox" id="recPauses" onchange="REC.pauses=this.checked">
+                                    <span data-t="device.pauzy">паузы</span>
+                                </label>
+                                <label class="kb"
+                                       title="Ставить проверку экрана перед первым действием на каждом новом экране" data-t-title="device.avto_proverki_podskazka">
+                                    <input type="checkbox" id="recAutoAnchor" onchange="recAutoAnchorSet(this.checked)">
+                                    <span data-t="device.avto_proverki">сверять экран сам</span>
+                                </label>
+                            </div>
+                        </details>
 
                         <!-- Масштаб холста: развилка на пять веток шире любой
                              панели, и без «вписать» её концы уходили за край. -->
@@ -421,7 +422,7 @@
                     <div class="runbar" id="recRun" hidden></div>
                 </div>
 
-                <div class="sch" id="recScheme">
+                <div class="sch" id="recScheme" hidden>
                     <!-- Холст прокручивается и масштабируется сам, .sch-spine
                          несёт размер сюжета: панель вокруг него не ездит. -->
                         <div class="zoom zoom-float" id="recZoom">
@@ -448,12 +449,12 @@
                     <div class="sch-view" id="recCanvas">
                         <div class="sch-spine"></div>
                     </div>
-                    <details class="sch-foot" id="recSide">
-                        <summary data-t="device.vsplyvayuschie_okna_i_pomehi">Всплывающие окна и помехи</summary>
+                </div>
+                <div class="scroll" id="recSteps"></div>
+                    <details class="sch-foot rec-side" id="recSide" ontoggle="recSchemeRefresh()">
+                        <summary data-t="device.vsplyvayuschie_okna_i_pomehi">Если выскочило окно</summary>
                         <div class="sch-side-wrap"></div>
                     </details>
-                </div>
-                <div class="scroll" id="recSteps" hidden></div>
             </div>
 
             <!-- Границу двигают мышью: сколько места отдать графу, а сколько
@@ -906,6 +907,7 @@
 <script src="js/device-tools.js"></script>
 <script src="js/recorder.js"></script>
 <script src="js/repair.js"></script>
+<script src="js/stepfail.js"></script>
 <script src="js/steptools.js"></script>
 <script src="js/blocks.js"></script>
 <script src="js/workspace.js"></script>
