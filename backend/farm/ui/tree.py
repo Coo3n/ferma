@@ -27,6 +27,7 @@ class Node:
     cls: str
     clickable: bool
     children: list[int] = field(default_factory=list)
+    package: str = ""
 
     @property
     def area(self) -> float:
@@ -80,6 +81,7 @@ def parse(xml: str, width: int, height: int) -> list[Node]:
                 description=(element.get("content-desc") or "").strip(),
                 cls=(element.get("class") or "").strip(),
                 clickable=element.get("clickable") == "true",
+                package=(element.get("package") or "").strip(),
             ))
             if parent_id is not None:
                 nodes[parent_id].children.append(own_id)

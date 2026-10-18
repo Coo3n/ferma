@@ -82,12 +82,14 @@ class Hit:
         object.__setattr__(self, "y", min(max(self.y, 0.0), 1.0))
 
 
-def resolve(ctx, sel=None, text=None, img=None, at=None, timeout: float = 10.0):
+def resolve(ctx, sel=None, text=None, img=None, at=None, timeout: float = 10.0,
+            within=None, near=None):
     """Первый сработавший слой.
 
     Дерево (селекторы и текст) крутится до таймаута — экран может дорисоваться.
     Зрение пробуется по разу: оно дорогое, а повторный снимок того же экрана
-    ничего не добавит.
+    ничего не добавит. within/near сужают только слой селекторов (ищется по
+    дампу, ctx.find_scoped); текст, картинка и точка их не знают.
     """
     sel = list(sel or ())
     text = list(text or ())
@@ -97,7 +99,12 @@ def resolve(ctx, sel=None, text=None, img=None, at=None, timeout: float = 10.0):
     deadline = time.time() + timeout
     while sel or text:   # без этих слоёв круг только жёг бы процессор
         ctx.check_cancel()
-        for s in sel:
+        if sel and (within or near):
+            node, _ = ctx.find_scoped(sel, within, near, timeout=0)
+            if node is not None:
+                b = node.bounds
+                return Hit((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, "selector", str(sel))
+        for s in sel if not (within or near) else ():
             el = ctx.find(timeout=1.0, **s)
             if el is not None:
                 center = _center(el, ctx.size)

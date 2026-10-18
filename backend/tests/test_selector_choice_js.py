@@ -69,7 +69,7 @@ def test_как_искать_показывает_все_способы_нажа
     const step = {{id: 7, kind: 'click', args: {{}}, selector: {{call: 'click', args: 'resourceId="app:id/like", instance=1'}},
                   alts: {LIKES}}};
     console.log(JSON.stringify(recAlts(step)));""")
-    assert html.count('type="radio"') == 4
+    assert html.count('name="sel7"') == 4
     assert "0.1, 0.4" not in html
     assert "2-й из 3 похожих" in html and "похожих: 3" in html and "текст меняется" in html
 

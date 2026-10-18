@@ -16,7 +16,7 @@ from typing import Any, Callable
 
 from . import adb, config, control, deviations as dv, guards, obstacle, resolve
 from .devices import pool as u2pool
-from .ui import tree
+from .ui import scope, tree
 
 log = logging.getLogger("farm.ctx")
 
@@ -41,6 +41,7 @@ ESCAPE_STEPS = (
 # ожидания uiautomator2 отмену не спросить, и задача висела бы до конца
 # таймаута после нажатия «отменить».
 FIND_SLICE = 1.0
+LOOP_PAUSE_SCOPED = 0.5   # пауза между дампами при поиске «внутри»/«рядом с»
 
 ESCAPE_ROUNDS = 2
 ESCAPE_PROBE = 0.4      # сек на поиск кнопки выхода
@@ -178,7 +179,7 @@ def normalize_target(raw) -> dict:
         return {}
     if not isinstance(raw, dict):
         raise ValueError("цель должна быть объектом")
-    лишние = set(raw) - {"sel", "text", "img", "at"}
+    лишние = set(raw) - {"sel", "text", "img", "at", "within", "near"}
     if лишние:
         raise ValueError(f"неизвестные поля цели: {', '.join(sorted(map(str, лишние)))}")
     out: dict = {}
@@ -209,6 +210,18 @@ def normalize_target(raw) -> dict:
         if not ok:
             raise ValueError("at — две доли экрана от 0 до 1")
         out["at"] = [float(c) for c in v]
+    # Место поиска: словарь — заменить, None — снять (у нового шага его нет).
+    for поле in ("within", "near"):
+        if поле in raw:
+            v = raw[поле]
+            if v is not None:
+                if not isinstance(v, dict):
+                    raise ValueError(f"{поле} — словарь селектора или null")
+                _check_sel([v])
+                чужие = set(v) - set(scope.ANCHOR_KEYS)
+                if чужие:
+                    raise ValueError(f"{поле}: признак «{sorted(чужие)[0]}» не подходит")
+            out[поле] = v
     # цель из одних пустых частей resolve не разберёт (сырой ValueError в задаче)
     if not (out.get("sel") or out.get("text") or out.get("img") or out.get("at")):
         raise ValueError("цель пуста: нужен sel, text, img или at")
@@ -476,12 +489,16 @@ class DeviceContext:
             if time.time() >= end:
                 return None
 
-    def click(self, timeout: float = 10, scroll: bool = True, **selector) -> None:
+    def click(self, timeout: float = 10, scroll: bool = True,
+              within: dict | None = None, near: dict | None = None, **selector) -> None:
         """Найти и нажать. Не нашлось на экране — проскроллить к элементу.
 
         Падает с понятным сообщением, если элемента нет и после прокрутки.
         Или не падает, а ждёт человека — см. `_stuck`.
+        within/near — где искать среди одинаковых (см. `_click_scoped`).
         """
+        if within or near:
+            return self._click_scoped((selector,), within, near, timeout)
         беда = f"не найден элемент {selector} за {timeout} с"
         while True:
             self.check_cancel()
@@ -503,13 +520,17 @@ class DeviceContext:
                 return
             self.fail(беда)
 
-    def click_any(self, *selectors: dict, timeout: float = 10) -> None:
+    def click_any(self, *selectors: dict, timeout: float = 10,
+                  within: dict | None = None, near: dict | None = None) -> None:
         """Цепочка селекторов из конструктора: нажимается первый найденный.
 
         Запасные селекторы спасают на другой прошивке или локали, где
         основной не совпал. Общий timeout делится на быстрые круги по всем
         кандидатам, затем последняя попытка — прокрутка к каждому.
+        within/near применяются к каждому варианту цепочки.
         """
+        if within or near:
+            return self._click_scoped(selectors, within, near, timeout)
         беда = f"не найден ни один из селекторов {list(selectors)} за {timeout} с"
         while True:
             self.check_cancel()
@@ -546,6 +567,79 @@ class DeviceContext:
                     self._click_el(el)
                     return True
         return False
+
+    # ------------------------------------------------ «внутри» и «рядом с»
+    def find_scoped(self, selectors, within: dict | None = None,
+                    near: dict | None = None, timeout: float = 10):
+        """Узел первого из селекторов, найденный внутри контейнера / ближайший
+        к ориентиру, и причина промаха ("within", "near", "target").
+
+        Ищется по дампу (farm/ui/scope.py): u2 не умеет «ближайший к», а одна
+        логика на оба случая проще проверяется. Хотя бы один дамп снимается и
+        при timeout=0.
+        """
+        end = time.time() + timeout
+        причина = "target"
+        while True:
+            self.check_cancel()
+            try:
+                w, h = self.size
+                nodes = tree.parse(self.dump_hierarchy(), w, h)
+            except StepFailed:
+                raise
+            except Exception:  # noqa: BLE001 — дамп не снялся, следующий круг
+                nodes = []
+            for sel in selectors:
+                try:
+                    node, why = scope.pick(nodes, dict(sel), within, near)
+                except scope.ScopeError as e:
+                    self.fail(str(e))
+                if node is not None:
+                    return node, ""
+                if why != "target":
+                    причина = why
+            if time.time() >= end:
+                return None, причина
+            time.sleep(min(LOOP_PAUSE_SCOPED, max(0.0, end - time.time())))
+
+    def _scope_miss(self, selectors, within, near, timeout, причина: str) -> str:
+        что = list(selectors) if len(selectors) > 1 else dict(selectors[0])
+        if причина == "within":
+            return (f"не найдено место поиска {within} за {timeout} с — "
+                    f"внутри него искать {что}")
+        if причина == "near":
+            return f"не найден ориентир {near} за {timeout} с — рядом с ним искать {что}"
+        где = f"внутри {within}" if within else f"рядом с {near}"
+        return f"не найден элемент {что} {где} за {timeout} с"
+
+    def _click_scoped(self, selectors, within, near, timeout: float) -> None:
+        while True:
+            self.check_cancel()
+            self._settle()
+            node, why = self.find_scoped(selectors, within, near, timeout)
+            if node is None and self._rescue():
+                node, why = self.find_scoped(selectors, within, near, 5)
+            if node is not None:
+                self._tap_node(node)
+                return
+            беда = self._scope_miss(selectors, within, near, timeout, why)
+            решение = self._stuck(беда)
+            if решение == HOLD_RETRY:
+                continue
+            if решение == HOLD_SKIP:
+                return
+            self.fail(беда)
+
+    def _tap_node(self, node) -> None:
+        """Нажать узел дампа: в центр, в человечном режиме — в случайную точку."""
+        x1, y1, x2, y2 = node.bounds
+        if self.human:
+            self.check_cancel()
+            self._pre_action()
+            x, y = control.humanize.point_in(x1, y1, x2, y2)
+            control.humanize.tap(self.serial, x, y)
+            return
+        self.tap((x1 + x2) / 2, (y1 + y2) / 2)
 
     def _scroll_to(self, **selector):
         """Прокрутить список к элементу — экран мог оказаться меньше макета."""
@@ -634,7 +728,8 @@ class DeviceContext:
         return path.read_bytes(), base
 
     def click_target(self, sel=None, text=None, img=None, at=None,
-                     timeout: float = 10) -> None:
+                     timeout: float = 10, within: dict | None = None,
+                     near: dict | None = None) -> None:
         """Клик по многослойной цели: селекторы → текст → OCR → шаблон → точка.
 
         После «повторить» человек мог приложить исправленную цель: заменяются
@@ -643,17 +738,19 @@ class DeviceContext:
         локальных переменных — следующий click_target получит свои аргументы.
         """
         def _беда():
+            где = (f" внутри {within}" if within else "") + (f" рядом с {near}" if near else "")
             return (f"цель не найдена ни одним слоем: "
-                    f"sel={sel} text={text} img={img} at={at}")
+                    f"sel={sel} text={text} img={img} at={at}{где}")
         беда = _беда()
         while True:
             self.check_cancel()
             self._settle()
+            место = {k: v for k, v in (("within", within), ("near", near)) if v}
             hit = resolve.resolve(self, sel=sel, text=text, img=img, at=at,
-                                  timeout=timeout)
+                                  timeout=timeout, **место)
             if hit is None and self._rescue():
                 hit = resolve.resolve(self, sel=sel, text=text, img=img, at=at,
-                                      timeout=5)
+                                      timeout=5, **место)
             if hit is not None and hit.layer == "point":
                 # Ни один слой, кроме сохранённых координат, цель не нашёл:
                 # тап уйдёт «в то место, где она была». Спрашиваем ДО тапа —
@@ -682,6 +779,8 @@ class DeviceContext:
                     text = патч.get("text", text)
                     img = патч.get("img", img)
                     at = патч.get("at", at)
+                    within = патч.get("within", within)
+                    near = патч.get("near", near)
                     беда = _беда()
                     self.log(f"цель заменена человеком: {', '.join(патч)}")
                 continue

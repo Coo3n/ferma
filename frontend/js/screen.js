@@ -207,6 +207,9 @@ async function act(payload) {
         toast('телефон не выбран', 'bad');
         return;
     }
+    /* «Указать на экране» в конструкторе: нажатие выбирает ориентир шага и
+       на телефон не уходит. */
+    if (window.REC && REC.on && REC.scopePick && window.recScopeTap && recScopeTap(payload)) return;
     try {
         const result = await (syncRoute(payload)
             || post(`/api/devices/${S.active}/action`, payload));

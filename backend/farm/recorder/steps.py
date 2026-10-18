@@ -357,6 +357,52 @@ def _selector(kind: str, raw) -> dict | None:
     return {"call": "click", "args": args, "fallbacks": extra[:MAX_FALLBACKS]}
 
 
+# «Внутри» и «рядом с»: где искать цель среди одинаковых (farm/ui/scope.py).
+# Строка того же вида, что селектор, но ключи — только устойчивые надписи и
+# id: регулярка и номер по счёту место поиска не удержат.
+SCOPE_FIELDS = {"within": "«внутри»", "near": "«рядом с»"}
+SCOPE_VALUE_MAX = 200
+SCOPE_KEYS_MAX = 3
+_SCOPE_TEXT_KEYS = ("text", "textContains", "textStartsWith", "description",
+                    "descriptionContains", "descriptionStartsWith")
+
+
+def _scope(kind: str, raw, field: str) -> str | None:
+    if raw in (None, ""):
+        return None
+    from ..ui import scope, selectors
+    что = SCOPE_FIELDS[field]
+    if kind != "click":
+        raise StepError(f"поле {field} ({что}) допустимо только у click, не у {kind}")
+    _check_kwargs(raw, что)
+    sel = scope.parse_args(raw)
+    if len(sel) > SCOPE_KEYS_MAX:
+        raise StepError(f"{что}: не больше {SCOPE_KEYS_MAX} признаков")
+    for key, value in sel.items():
+        if key not in scope.ANCHOR_KEYS:
+            raise StepError(f"{что}: признак «{key}» не подходит — "
+                            f"допустимы {', '.join(scope.ANCHOR_KEYS)}")
+        if not isinstance(value, str) or not value.strip():
+            raise StepError(f"{что}: «{key}» должно быть непустой строкой")
+        if len(value) > SCOPE_VALUE_MAX:
+            raise StepError(f"{что}: «{key}» длиннее {SCOPE_VALUE_MAX} символов")
+        if key in _SCOPE_TEXT_KEYS and selectors.is_dynamic(value):
+            raise StepError(f"{что}: надпись «{value}» меняется сама (время, счётчик, "
+                            f"ник) — выберите постоянную")
+    return raw
+
+
+def _check_scope_target(step: dict) -> None:
+    """С «внутри»/«рядом с» цель ищется по дампу: ключи должны быть понятны ферме."""
+    from ..ui import scope
+    sel = step["selector"]
+    for args in [sel["args"], *sel["fallbacks"]]:
+        bad = set(scope.parse_args(args)) - scope.TARGET_KEYS
+        if bad:
+            raise StepError(f"признак «{sorted(bad)[0]}» нельзя сочетать с "
+                            f"«внутри»/«рядом с»: {args}")
+
+
 def _param(kind: str, raw) -> str | None:
     if raw in (None, ""):
         return None
@@ -417,7 +463,9 @@ def normalize_step(raw) -> dict:
     """Проверенный шаг ровно с ключами kind, args, selector, param, note,
     texts, crop, point, any, arms, report, pos. texts/crop/point — запасные
     слои резолвера цели у click, arms и report — только у branch, pos —
-    позиция карточки на холсте «Схемы», не участвует в генерации кода."""
+    позиция карточки на холсте «Схемы», не участвует в генерации кода.
+    within/near (место поиска click), optional и retries появляются, только
+    когда заданы."""
     if not isinstance(raw, dict):
         raise StepError("шаг должен быть объектом")
     kind = raw.get("kind")
@@ -448,6 +496,13 @@ def normalize_step(raw) -> dict:
     retries = _retries(kind, raw.get("retries"))
     if retries:
         step["retries"] = retries
+    scoped = [f for f in SCOPE_FIELDS if raw.get(f) not in (None, "")]
+    if len(scoped) > 1:
+        raise StepError("у шага может быть что-то одно: «внутри» или «рядом с»")
+    for field in scoped:
+        step[field] = _scope(kind, raw.get(field), field)
+    if scoped:
+        _check_scope_target(step)
     _check_account(kind, step["args"])
     if kind == "loop":
         _check_loop(step["args"])
@@ -633,6 +688,11 @@ def check_params(params: dict, steps: list) -> None:
             raise StepError(f"параметр «{name}» не описан")
 
 
+def _scope_keys():
+    from ..ui import scope
+    return scope.ANCHOR_KEYS
+
+
 def schema() -> dict:
     """Машиночитаемое описание рецепта — для внешних помощников (ИИ), которые
     собирают или правят сценарий и отправляют его в /api/recorder/validate и
@@ -647,6 +707,10 @@ def schema() -> dict:
         "parametrizable": sorted(PARAMETRIZABLE),
         "flexible": sorted(FLEXIBLE),
         "account_fields": sorted(ACCOUNT_FIELDS),
+        # Необязательные поля click: строка селектора контейнера/ориентира.
+        "click_scope": {"within": "искать цель только внутри этого элемента",
+                        "near": "среди одинаковых нажать ближайший к этому элементу",
+                        "keys": list(_scope_keys()), "max_one": True},
         "until_on_fail": list(UNTIL_ON_FAIL),
         "finish_results": list(FINISH_RESULTS),
         "limits": {

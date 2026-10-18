@@ -157,6 +157,8 @@ def _call(step: dict):
         texts = step.get("texts") or []
         crop = step.get("crop")
         point = step.get("point")
+        # Место поиска — хвостом к любому из трёх вызовов, ко всей цепочке.
+        место = [f"{f}=dict({step[f]})" for f in ("within", "near") if step.get(f)]
         if texts or crop or point:
             parts = ["sel=[" + ", ".join(f"dict({a})" for a in chain) + "]"]
             if texts:
@@ -165,10 +167,10 @@ def _call(step: dict):
                 parts.append(f"img={literal(crop)}")
             if point:
                 parts.append(f"at=({_num(point[0])}, {_num(point[1])})")
-            return "ctx.click_target(" + ", ".join(parts) + ")"
+            return "ctx.click_target(" + ", ".join(parts + место) + ")"
         if len(chain) > 1:
-            return "ctx.click_any(" + ", ".join(f"dict({a})" for a in chain) + ")"
-        return f"ctx.click({chain[0]})"
+            return "ctx.click_any(" + ", ".join([f"dict({a})" for a in chain] + место) + ")"
+        return f"ctx.click({', '.join([chain[0]] + место)})"
     if kind == "expect":
         chain = ", ".join(f"dict({a})" for a in step["any"])
         return f'ctx.expect_screen({literal(args["name"])}, any=[{chain}])'

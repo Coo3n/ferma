@@ -169,6 +169,12 @@ function repairPatchFromStep(step) {
        отвергает (400 «пустая цель»), а патч без ключей вообще не шлётся */
     if (texts.length) patch.text = texts;
     else if (Object.keys(patch).length) patch.text = [];
+    /* Место поиска: у шага оно есть (или снято — null) — шлём оба ключа, чтобы
+       ждущий запуск не остался со старым ориентиром. */
+    if (patch.sel && step && ('within' in step || 'near' in step)) {
+        patch.within = step.within ? repairParseSel(step.within) : null;
+        patch.near = step.near ? repairParseSel(step.near) : null;
+    }
     return patch;
 }
 
@@ -201,6 +207,16 @@ function repairBuildStep(built, oldStep, cropName) {
     if (built.point) out.point = built.point.slice();
     if (cropName) out.crop = cropName;
     if (oldStep && oldStep.pos) out.pos = oldStep.pos;
+    /* «Внутри»/«рядом с» подбираются заново по живому экрану в
+       recBuildClickStep. Старое место не переносится: новая цель другая, и
+       чаще всего шаг упал как раз потому, что пропал ориентир. Снятое место —
+       null: по нему патч снимает его и у ждущего запуска. */
+    if (built.within) out.within = built.within;
+    else if (built.near) out.near = built.near;
+    else if (oldStep && (oldStep.within || oldStep.near)) {
+        out.within = null;
+        out.near = null;
+    }
     return out;
 }
 

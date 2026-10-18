@@ -470,9 +470,20 @@ function recSelWarn(alt) {
 }
 
 function recBuildClickStep(target, dump, point) {
-    const selector = target.selectors[0];
-    const warns = [recSelWarn(selector)].filter(Boolean);
-    return {
+    let selector = target.selectors[0];
+    const nodes = (dump && dump.nodes) || [];
+    /* Похожих несколько — сначала «где искать» («рядом с «Иван Петров»»),
+       а не номер среди одинаковых: номер ломается, как только лента сдвинется.
+       Номер остаётся последним средством со своим предупреждением. */
+    let scopes = [];
+    if (nodes.length && !(selector.matches === 1 && !selector.fragile && !selector.dynamic)) {
+        const base = target.selectors.find(a => a.call === 'click' && !a.fragile
+            && !a.dynamic && !a.oversized && a.matches > 1);
+        if (base) scopes = recScopeSuggest(nodes, target, base.args);
+        if (scopes.length) selector = target.selectors.find(a => a.args === scopes[0].base) || selector;
+    }
+    const warns = scopes.length ? [] : [recSelWarn(selector)].filter(Boolean);
+    const step = {
         kind: 'click',
         args: {},
         selector: {call: selector.call, args: selector.args},
@@ -484,6 +495,331 @@ function recBuildClickStep(target, dump, point) {
         point: point || recPoint(target.bounds),
         warn: warns.join('; '),
     };
+    if (scopes.length) {
+        step.scopes = scopes;
+        step[scopes[0].kind] = scopes[0].args;
+        step.scopeMatches = 1;
+    }
+    return step;
+}
+
+/* ------------------------------------------------ «внутри» и «рядом с»
+   Чистая логика над узлами дампа (id, parent, bounds, text, resourceId,
+   description, class). Зеркалит farm/ui/scope.py — тот же выбор делает прогон;
+   tests/test_scope_js.py сверяет обе стороны. */
+
+/* `resourceId="a", instance=1` → {resourceId: 'a', instance: 1}; не
+   разобралось целиком — null. */
+function recParseArgs(args) {
+    if (typeof args !== 'string' || !args.trim()) return null;
+    const re = /\s*(\w+)\s*=\s*("(?:[^"\\]|\\.)*"|-?\d+|True|False)\s*(,|$)/y;
+    const out = {};
+    let pos = 0;
+    while (pos < args.length) {
+        re.lastIndex = pos;
+        const m = re.exec(args);
+        if (!m) return null;
+        const raw = m[2];
+        out[m[1]] = raw[0] === '"' ? raw.slice(1, -1).replace(/\\(.)/g, '$1')
+            : raw === 'True' ? true : raw === 'False' ? false : Number(raw);
+        pos = re.lastIndex;
+        if (m[3] === '' && pos < args.length) return null;
+    }
+    return Object.keys(out).length ? out : null;
+}
+
+const REC_MATCH = {
+    text: (n, v) => (n.text || '') === v,
+    textContains: (n, v) => (n.text || '').includes(v),
+    textStartsWith: (n, v) => (n.text || '').startsWith(v),
+    description: (n, v) => (n.description || '') === v,
+    descriptionContains: (n, v) => (n.description || '').includes(v),
+    descriptionStartsWith: (n, v) => (n.description || '').startsWith(v),
+    resourceId: (n, v) => (n.resourceId || '') === v,
+    className: (n, v) => (n['class'] || '') === v,
+    clickable: (n, v) => !!n.clickable === !!v,
+};
+const REC_MATCH_RE = {resourceIdMatches: 'resourceId', textMatches: 'text',
+    descriptionMatches: 'description', classNameMatches: 'class'};
+
+/* Узлы под селектор в порядке дерева; instance — номер среди них. null —
+   ключ, который по дампу не проверить. */
+function recSelFind(nodes, sel, among) {
+    const pool = among || nodes;
+    const keys = Object.keys(sel).filter(k => k !== 'instance');
+    for (const k of keys) if (!REC_MATCH[k] && !REC_MATCH_RE[k]) return null;
+    const found = pool.filter(n => keys.every(k => {
+        if (REC_MATCH[k]) return REC_MATCH[k](n, sel[k]);
+        try {
+            return new RegExp('^(?:' + sel[k] + ')$', 's').test(n[REC_MATCH_RE[k]] || '');
+        } catch (e) {
+            return false;
+        }
+    }));
+    if ('instance' in sel) {
+        const k = Number(sel.instance);
+        return found[k] ? [found[k]] : [];
+    }
+    return found;
+}
+
+/* id предков узла от него самого до корня. */
+function recChain(nodes, node) {
+    const out = [node.id];
+    let cur = node;
+    while (cur.parent != null && nodes[cur.parent] && out.length < 200) {
+        cur = nodes[cur.parent];
+        out.push(cur.id);
+    }
+    return out;
+}
+
+function recInside(nodes, node, box) {
+    return node.id !== box.id && recChain(nodes, node).includes(box.id);
+}
+
+function recCommonDepth(nodes, a, b) {
+    const ca = recChain(nodes, a).reverse(), cb = recChain(nodes, b).reverse();
+    let d = 0;
+    while (d < ca.length && d < cb.length && ca[d] === cb[d]) d++;
+    return d;
+}
+
+function recCenter(n) {
+    return [(n.bounds[0] + n.bounds[2]) / 2, (n.bounds[1] + n.bounds[3]) / 2];
+}
+
+/* Кандидаты по близости к ориентиру: глубже общий предок, затем ближе. */
+function recClosest(nodes, found, anchor) {
+    const [ax, ay] = recCenter(anchor);
+    return found.filter(n => n.id !== anchor.id).map(n => {
+        const [x, y] = recCenter(n);
+        return {n, d: recCommonDepth(nodes, n, anchor), r: (x - ax) ** 2 + (y - ay) ** 2};
+    }).sort((a, b) => (b.d - a.d) || (a.r - b.r));
+}
+
+/* Какой узел нажмёт прогон: args цели, scope {within} или {near} строками. */
+function recScopePick(nodes, args, scope) {
+    const sel = recParseArgs(args);
+    if (!sel) return null;
+    let among = null;
+    if (scope && scope.within) {
+        const box = (recSelFind(nodes, recParseArgs(scope.within) || {}) || [])[0];
+        if (!box) return null;
+        among = nodes.filter(n => recInside(nodes, n, box));
+    }
+    let found = recSelFind(nodes, sel, among) || [];
+    if (scope && scope.near) {
+        const anchor = (recSelFind(nodes, recParseArgs(scope.near) || {}) || [])[0];
+        if (!anchor) return null;
+        found = recClosest(nodes, found, anchor).map(c => c.n);
+    }
+    return found[0] || null;
+}
+
+function recCount(nodes, key, value) {
+    return nodes.filter(n => (n[key] || '') === value).length;
+}
+
+function recIdName(rid) {
+    return String(rid || '').split('/').pop().replace(/_/g, ' ');
+}
+
+/* Устойчивый уникальный признак ориентира: надпись, подпись, id. */
+function recAnchorArgs(nodes, n) {
+    if (n.text && !n.textDynamic && recCount(nodes, 'text', n.text) === 1) {
+        return {args: 'text=' + JSON.stringify(n.text), name: n.text};
+    }
+    if (n.description && !n.descriptionDynamic && recCount(nodes, 'description', n.description) === 1) {
+        return {args: 'description=' + JSON.stringify(n.description), name: n.description};
+    }
+    if (n.resourceId && recCount(nodes, 'resourceId', n.resourceId) === 1) {
+        return {args: 'resourceId=' + JSON.stringify(n.resourceId), name: recIdName(n.resourceId)};
+    }
+    return null;
+}
+
+/* Контейнер узнаётся по id или подписи — надпись внутри него у разных
+   постов своя, а у самого контейнера её обычно нет. */
+function recContainerArgs(nodes, n) {
+    if (n.resourceId && recCount(nodes, 'resourceId', n.resourceId) === 1) {
+        return {args: 'resourceId=' + JSON.stringify(n.resourceId),
+            name: n.description || recIdName(n.resourceId)};
+    }
+    if (n.description && !n.descriptionDynamic && recCount(nodes, 'description', n.description) === 1) {
+        return {args: 'description=' + JSON.stringify(n.description), name: n.description};
+    }
+    return null;
+}
+
+/* Наш узел среди совпавших: сама цель или её подписанный потомок (по нему
+   selectors.py строит селектор безымянной кнопки). */
+function recOurs(nodes, found, target) {
+    return found.find(n => n.id === target.id || recInside(nodes, n, target)) || null;
+}
+
+/* Подсказки «где искать» для неоднозначной цели: до одной «внутри» и одной
+   «рядом с», каждая оставляет на экране ровно один подходящий элемент.
+   base — селектор цели, к которому они относятся. */
+function recScopeSuggest(nodes, target, args) {
+    const sel = recParseArgs(args);
+    if (!sel || 'instance' in sel || !target) return [];
+    const found = recSelFind(nodes, sel);
+    if (!found || found.length < 2) return [];
+    const ours = recOurs(nodes, found, target);
+    if (!ours) return [];
+    const out = [];
+    const up = recChain(nodes, ours);
+    /* «внутри»: наименьший предок с уникальным id, где совпадение одно. */
+    for (const id of up.slice(1)) {
+        const box = nodes[id];
+        if (found.filter(n => recInside(nodes, n, box)).length !== 1) break;
+        const c = recContainerArgs(nodes, box);
+        if (c) {
+            out.push({kind: 'within', args: c.args, name: c.name, base: args});
+            break;
+        }
+    }
+    /* «рядом с»: ближайший уникальный устойчивый узел, чей общий с целью
+       предок не содержит других совпадений. */
+    let best = null;
+    const [ox, oy] = recCenter(ours);
+    for (const n of nodes) {
+        if (up.includes(n.id) || recInside(nodes, n, ours) || found.includes(n)) continue;
+        const a = recAnchorArgs(nodes, n);
+        if (!a) continue;
+        const ranked = recClosest(nodes, found, n);
+        if (!ranked.length || ranked[0].n !== ours) continue;
+        if (ranked[1] && ranked[1].d === ranked[0].d) continue;
+        const [x, y] = recCenter(n);
+        const d = ranked[0].d, r = (x - ox) ** 2 + (y - oy) ** 2;
+        if (!best || d > best.d || (d === best.d && r < best.r)) best = {d, r, a};
+    }
+    if (best) out.push({kind: 'near', args: best.a.args, name: best.a.name, base: args});
+    return out;
+}
+
+/* Сколько элементов остаются неразличимыми, если искать так. 1 — однозначно. */
+function recScopeCount(nodes, args, scope) {
+    const sel = recParseArgs(args);
+    if (!sel) return null;
+    if (scope.within) {
+        const box = (recSelFind(nodes, recParseArgs(scope.within) || {}) || [])[0];
+        if (!box) return 0;
+        return (recSelFind(nodes, sel, nodes.filter(n => recInside(nodes, n, box))) || []).length;
+    }
+    const anchor = (recSelFind(nodes, recParseArgs(scope.near) || {}) || [])[0];
+    const ranked = anchor ? recClosest(nodes, recSelFind(nodes, sel) || [], anchor) : [];
+    return ranked.length ? ranked.filter(c => c.d === ranked[0].d).length : 0;
+}
+
+/* Пометка места поиска словами — как у способов: «✓ один на экране». */
+function recSelScopeMark(step) {
+    const m = step.scopeMatches;
+    if (m == null) return '';
+    return m === 1 ? t('rec.sel_odin') : t('rec.sel_pohozhih', {n: m});
+}
+
+function recScopeLabel(kind, name) {
+    return kind === 'within' ? t('rec.scope_vnutri', {name}) : t('rec.scope_ryadom', {name});
+}
+
+function recScopeName(args) {
+    const sel = recParseArgs(args) || {};
+    const k = Object.keys(sel)[0];
+    if (!k) return String(args || '');
+    return k === 'resourceId' ? recIdName(sel[k]) : String(sel[k]);
+}
+
+/* Основа для места поиска: способ без номера по счёту. */
+function recScopeBase(step) {
+    const plain = (step.alts || []).find(a => a.call === 'click' && !a.fragile && !a.dynamic
+        && !a.oversized && a.matches > 1);
+    if (plain) return plain.args;
+    return String(step.selector.args).replace(/,\s*instance=\d+/, '');
+}
+
+function recPickScope(id, index) {
+    const step = recFind(id);
+    if (!step || step.kind !== 'click') return;
+    delete step.within;
+    delete step.near;
+    step.scopeMatches = null;
+    const s = index >= 0 ? (step.scopes || [])[index] : null;
+    if (s) {
+        step.selector = {call: 'click', args: s.base};
+        step[s.kind] = s.args;
+        step.scopeMatches = 1;
+        step.warn = '';
+    } else {
+        step.warn = recSelWarn((step.alts || []).find(a => a.args === step.selector.args));
+    }
+    recRender();
+    recSave();
+}
+
+/* «Указать на экране»: следующее нажатие по зеркалу не уходит на телефон, а
+   выбирает ориентир для шага id. */
+function recScopeOnScreen(id) {
+    REC.scopePick = id;
+    toast(t('rec.scope_tap_hint'));
+}
+
+/* Перехват нажатия по зеркалу (screen.js, act). true — нажатие забрано. */
+function recScopeTap(payload) {
+    if (!REC.scopePick || !payload || payload.type !== 'tap') return false;
+    const step = recFind(REC.scopePick);
+    REC.scopePick = null;
+    if (!step || step.kind !== 'click' || !step.selector) return true;
+    const nodes = (REC.dump && REC.dump.nodes) || [];
+    const hit = recHit(payload.x, payload.y);
+    let a = null;
+    for (const n of hit ? [hit, nodes[hit.target]] : []) {
+        a = n ? recAnchorArgs(nodes, n) : null;
+        if (a) break;
+    }
+    if (!a) {
+        toast(t('rec.scope_ne_godit'), 'bad');
+        return true;
+    }
+    const base = recScopeBase(step);
+    delete step.within;
+    step.selector = {call: 'click', args: base};
+    step.near = a.args;
+    step.scopeMatches = recScopeCount(nodes, base, {near: a.args});
+    step.warn = step.scopeMatches === 1 ? '' : t('rec.warn_mnogo', {n: step.scopeMatches});
+    recRender();
+    recSave();
+    return true;
+}
+
+/* Блок «где искать» в «Как искать»: везде / подсказки / свой ориентир. */
+function recScopeHtml(step) {
+    const alt = (step.alts || []).find(a => a.args === step.selector.args);
+    const ambiguous = !!alt && alt.matches != null && (alt.matches !== 1 || !!alt.nth);
+    const scopes = step.scopes || [];
+    if (!ambiguous && !scopes.length && !step.within && !step.near) return '';
+    const cur = step.within ? ['within', step.within] : step.near ? ['near', step.near] : null;
+    const radio = (checked, index, label, mark) => `
+      <label><input type="radio" name="scope${step.id}" ${checked ? 'checked' : ''}
+             onchange="recPickScope(${step.id}, ${index})">
+        <span>${esc(label)}</span>${mark ? `<span class="rs-sel-ok">${esc(mark)}</span>` : ''}</label>`;
+    let html = radio(!cur, -1, t('rec.scope_vezde'), '');
+    let shown = false;
+    scopes.forEach((s, i) => {
+        const on = !!cur && cur[0] === s.kind && cur[1] === s.args;
+        shown = shown || on;
+        html += radio(on, i, recScopeLabel(s.kind, s.name), t('rec.sel_odin'));
+    });
+    if (cur && !shown) {
+        const mark = recSelScopeMark(step);
+        html += `<label><input type="radio" name="scope${step.id}" checked disabled>
+          <span title="${esc(cur[1])}">${esc(recScopeLabel(cur[0], recScopeName(cur[1])))}</span>
+          ${mark ? `<span class="${step.scopeMatches === 1 ? 'rs-sel-ok' : 'rs-sel-bad'}">${esc(mark)}</span>` : ''}</label>`;
+    }
+    return `<span class="rs-alts-k">${esc(t('rec.scope_gde'))}</span>${html}
+      <div><button class="sm" onclick="recScopeOnScreen(${step.id})"
+        title="${esc(t('rec.scope_tap_hint'))}">${esc(t('rec.scope_ukazat'))}</button></div>`;
 }
 
 function recNoteTap(payload) {
@@ -1937,6 +2273,9 @@ function recCode(step, index) {
     if (step.kind === 'click') {
         const fallbacks = recFallbacks(step);
         const chain = [step.selector.args].concat(fallbacks);
+        /* Место поиска — хвостом к любому из трёх вызовов (codegen: место). */
+        const место = step.within ? [`within=dict(${step.within})`]
+            : step.near ? [`near=dict(${step.near})`] : [];
         /* Зеркалит ветку click в farm/recorder/codegen.py: что здесь видно,
            то и попадёт в файл. Расхождение читалось бы как враньё. */
         if (recLayers(step).length) {
@@ -1946,12 +2285,12 @@ function recCode(step, index) {
             }
             if (step.crop) parts.push(`img=${JSON.stringify(recAssetName(index || 0))}`);
             if (step.point) parts.push(`at=(${recNum(step.point[0])}, ${recNum(step.point[1])})`);
-            return 'ctx.click_target(' + parts.join(', ') + ')';
+            return 'ctx.click_target(' + parts.concat(место).join(', ') + ')';
         }
         if (fallbacks.length) {
-            return 'ctx.click_any(' + chain.map(args => `dict(${args})`).join(', ') + ')';
+            return 'ctx.click_any(' + chain.map(args => `dict(${args})`).concat(место).join(', ') + ')';
         }
-        return `ctx.click(${step.selector.args})`;
+        return `ctx.click(${[step.selector.args].concat(место).join(', ')})`;
     }
 
     const key = REC_VALUE_KEY[step.kind];
@@ -2072,6 +2411,7 @@ function recAlts(step) {
         <span title="${esc(args)}">${esc(recFeatText(args))}</span></label>`;
     }).join('');
     return `<div class="rs-alts">${esc(t('rec.kak_iskat_dvoetochie'))}${radios}
+      ${recScopeHtml(step)}
       <span class="rs-alts-k">${esc(t('rec.ili_tak'))}</span>${checks}
       ${full ? `<span class="dim">${esc(t('rec.ili_maks', {n: REC_OR_MAX}))}</span>` : `<div class="rs-or-add">
         <select id="orKind${step.id}" aria-label="${esc(t('rec.kak_iskat'))}">${REC_OR_KINDS.map(k =>
@@ -2468,6 +2808,10 @@ function recPickSelector(id, index) {
     if (!alt || alt.call !== 'click') return;
     step.selector = {call: alt.call, args: alt.args};
     step.warn = recSelWarn(alt);
+    /* Место поиска подбиралось к прежнему способу — с другим оно врёт. */
+    delete step.within;
+    delete step.near;
+    step.scopeMatches = null;
     recRender();
     recSave();
 }
@@ -2721,6 +3065,8 @@ function recPayload(meta) {
         if (step.kind === 'click') {
             if (step.texts && step.texts.length) out.texts = step.texts;
             if (step.point) out.point = step.point;
+            if (step.within) out.within = step.within;
+            else if (step.near) out.near = step.near;
             if (step.crop && Object.keys(assets).length < REC_ASSETS_MAX) {
                 out.crop = recAssetName(index);
                 assets[out.crop] = step.crop;
@@ -3049,6 +3395,8 @@ function recAdopt(шаг, assets) {
            рецепте, ни в payload. */
         report: шаг.kind === 'branch' ? шаг.report !== false : undefined,
         crop: (шаг.crop && assets[шаг.crop]) || null,
+        within: шаг.within || undefined,
+        near: шаг.near || undefined,
         cropName: шаг.crop || null,   // по нему кроп находится после черновика
     };
     /* Запасные селекторы живут в alts: recFallbacks() собирает их оттуда, и
