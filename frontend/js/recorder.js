@@ -900,13 +900,13 @@ function recScrollEditor(step, index) {
     const tip = recScrollSuggest(REC.steps, index);
     return `<div class="rs-flex rs-fail rs-scroll">
     <span class="rs-fail-h">${esc(t('rec.scroll_h'))}</span>
-    <select onchange="recSetScroll(${step.id}, 'dir', this.value)" aria-label="${esc(t('rec.scroll_h'))}">
+    <select onchange="recSetScroll(${step.id}, 'dir', this.value)" aria-label="${esc(t('rec.scroll_h'))}"
+            title="${esc(sc ? t('rec.scroll_why_on') : t('rec.scroll_why_off'))}">
       ${opt('', t('rec.scroll_off'))}${opt('down', t('rec.scroll_down'))}${opt('up', t('rec.scroll_up'))}
     </select>
     ${sc ? `<label>${esc(t('rec.scroll_do'))}
       <select onchange="recSetScroll(${step.id}, 'max', this.value)">${counts}</select>
       ${esc(t('rec.scroll_raz'))}</label>` : ''}
-    <span class="rs-scroll-why">${esc(sc ? t('rec.scroll_why_on') : t('rec.scroll_why_off'))}</span>
   </div>${tip ? `<div class="rs-scroll-tip">
     <span>${esc(t('rec.scroll_tip'))}</span>
     <button class="sm" onclick="recSetScroll(${step.id}, 'dir', '${tip}')">${
@@ -2846,11 +2846,15 @@ function recStepBody(step, index) {
     const main = recThumb(step) + recAnchorEditor(step) + recBranchEditor(step)
         + recValueEditor(step) + recBlockEditor(step) + recScrollEditor(step, index)
         + recFlexEditor(step);
-    const busy = step.kind === 'click' && recFallbacks(step).length > 0;
-    return main + `<details class="rs-more" ${busy ? 'open' : ''}>
-      <summary>${esc(t('rec.dopolnitelno'))}</summary>
-      <div class="rs-code">${esc(recCode(step, index))}</div>
+    /* «Дополнительно» закрыто всегда: запасные способы — для того, кто их
+       ищет, остальным в раскрытом шаге нужны только его настройки. Что внутри
+       уже задано — видно по числу в заголовке. Код строки — последним и
+       мелко: его читает тот, кто правит файл руками. */
+    const extra = step.kind === 'click' ? recFallbacks(step).length : 0;
+    return main + `<details class="rs-more">
+      <summary>${esc(t('rec.dopolnitelno'))}${extra ? ` · ${esc(t('rec.zapasnyh', {n: extra}))}` : ''}</summary>
       ${recAlts(step)}
+      <div class="rs-code">${esc(recCode(step, index))}</div>
     </details>`;
 }
 
@@ -2859,6 +2863,12 @@ const REC_ROW_MENU = () => [
     [t('rec.m_zapisat_posle'), 'plus', (id) => recRecordAfter(id)],
     [t('rec.m_zapustit_otsyuda'), 'play', (id, index) => recRunFrom(index)],
     [t('rec.m_dublirovat'), 'copy', (id) => recDup(id)],
+    /* «Обернуть в блок» живёт здесь, а не строкой из четырёх кнопок в каждом
+       раскрытом шаге: нужно редко, а место в шаге — для его настроек. */
+    [t('rec.m_v_povtor'), 'rotate', (id) => recBlockWrap('loop', [id])],
+    [t('rec.m_v_poka'), 'search', (id) => recBlockWrap('until', [id])],
+    [t('rec.m_v_esli'), 'eye', (id) => recBlockWrap('if_seen', [id])],
+    [t('rec.m_v_inogda'), 'dice', (id) => recBlockWrap('chance', [id])],
     [t('rec.m_vyshe'), 'up', (id) => recMove(id, -1)],
     [t('rec.m_nizhe'), 'down', (id) => recMove(id, 1)],
     [t('rec.m_udalit'), 'trash', (id) => recDelete(id), 'danger'],

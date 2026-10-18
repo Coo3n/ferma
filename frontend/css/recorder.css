@@ -769,18 +769,15 @@
     container: build / inline-size;
 }
 
+/* На 1280 колонка уже 900px. Подпись остаётся у «Добавить шаг», «Не править»
+   и у состояния записи — без них человек не понимает, что жать и пишется ли
+   запись; значками становятся только второстепенные кнопки. */
 @container build (max-width: 900px) {
-    #recState {
-        display: none !important;
-    }
-
     #btnRecPause,
-    #btnRecModeOff,
     #btnRecAnchor,
     #btnRecBranch,
     #btnRecDiff,
     #btnMirror,
-    .recbar-row button[onclick="recLibOpen()"],
     .recbar-row button[onclick="devToolsOpen()"] {
         font-size: 0;
         gap: 0;
@@ -790,7 +787,6 @@
     }
 
     #btnRecPause span,
-    #btnRecModeOff span,
     #btnMirror span {
         font-size: 0;
     }
@@ -861,11 +857,18 @@
 .rs-block-until, .rs-in-until { --blk: var(--busy-line); --blk-dim: var(--busy-dim); }
 .rs-block-if_seen, .rs-in-if_seen { --blk: var(--line-hover); --blk-dim: var(--panel2); }
 
+/* Заголовок блока — без заливки: три цветных полосы во всю ширину спорили
+   с шагами и читались как тревога. Блок видно по цветной линии слева и
+   значку своего цвета; подпись — обычная, чуть плотнее. */
 .rs.rs-block {
-    background: var(--blk-dim);
+    background: transparent;
     border-left: 3px solid var(--blk);
     border-bottom-color: transparent;
 }
+.rs.rs-block .rs-head > .ic { color: var(--blk-c, var(--blk)); }
+.rs-block-loop { --blk-c: var(--accent); }
+.rs-block-chance { --blk-c: var(--warn); }
+.rs-block-until { --blk-c: var(--busy); }
 
 .rs.rs-block .rs-label { font-weight: 600; }
 
@@ -1140,3 +1143,10 @@ body.rec-picking .stage, body.rec-picking #recLayer { cursor: crosshair; }
 #recSchemeSel { position: sticky; top: 0; z-index: 6; }
 #recCanvas.panning { cursor: grabbing; }
 .rs-block-offer > .dim:first-child { min-width: 150px; }
+
+/* Цель блока — слово в кавычках, обычным шрифтом (не моноширинным кодом). */
+.blk-target { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 10px;
+    border-radius: var(--pill); background: var(--panel2); font-size: var(--fs-2); }
+
+.addpick-card.compact { min-height: 0; padding: var(--s2) var(--s3); align-items: center; }
+.addpick-card.compact .addpick-ic .ic { width: var(--icon-md); height: var(--icon-md); }

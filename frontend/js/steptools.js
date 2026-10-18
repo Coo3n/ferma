@@ -339,37 +339,41 @@ function recSelAll() {
     recRender();
 }
 
+/* Панель над выделенными шагами — один ряд: главное (обернуть в блок,
+   дублировать, удалить) на виду, редкое (необязательные, повторы, паузы,
+   выбрать все) — под «Ещё». Три ряда кнопок с десятком разных слов читались
+   как приборная панель. */
 function recSelBar() {
     if (!REC.sel.size) return '';
     const retries = [0, 1, 2, 3, 5].map(n =>
-        `<option value="${n}">${n ? 'повторов: ' + n : 'без повторов'}</option>`).join('');
-    return `<div class="selbar" role="toolbar" aria-label="Действия над выбранными шагами">
+        `<option value="${n}">${n ? t('rec.sel_povtorov', {n}) : t('rec.sel_bez_povtorov')}</option>`).join('');
+    return `<div class="selbar" role="toolbar" aria-label="${esc(t('rec.sel_aria'))}">
     <span class="selbar-n"><b>${REC.sel.size}</b> выбрано</span>
-    <div class="selbar-grp">
-      <button class="sm" onclick="recSelOptional()"
-              title="Переключить «необязательный»">${recIcon('shield')} необязательные</button>
-      <select class="sm" onchange="recSelRetries(this.value)" aria-label="Повторы для выбранных шагов">
-        <option value="">↻ повторы</option>${retries}</select>
-    </div>
-    <div class="selbar-grp">
-      <label class="selbar-pause">пауза
-        <input type="number" id="selPause" min="0.1" step="0.1" value="1" aria-label="Секунды паузы"> с</label>
-      <button class="sm" onclick="recSelPause()" title="Вставить паузу после каждого выбранного шага">после каждого</button>
-    </div>
-    <div class="selbar-grp">
-      <span class="selbar-k">${esc(t('rec.v_blok'))}</span>
-      <button class="sm" onclick="recSelBlock('loop')" title="${esc(t('rec.blok_povtor_podskazka'))}">${recIcon('rotate')} ${esc(t('rec.blok_povtor'))}</button>
-      <button class="sm" onclick="recSelBlock('chance')" title="${esc(t('rec.blok_shans_podskazka'))}">${recIcon('dice')} ${esc(t('rec.blok_shans'))}</button>
-      <button class="sm" onclick="recSelBlock('until')" title="${esc(t('rec.blok_poka_podskazka'))}">${recIcon('search')} ${esc(t('rec.blok_poka'))}</button>
-      <button class="sm" onclick="recSelBlock('if_seen')" title="${esc(t('rec.blok_esli_podskazka'))}">${recIcon('eye')} ${esc(t('rec.blok_esli'))}</button>
-    </div>
-    <div class="selbar-grp">
-      <button class="sm" onclick="recSelDup()">${recIcon('copy')} дублировать</button>
-      <button class="sm danger" onclick="recSelDelete()">${recIcon('trash')} удалить</button>
-    </div>
+    <details class="selbar-menu">
+      <summary class="sm">${recIcon('layers')} ${esc(t('rec.sel_obernut'))}</summary>
+      <div class="selbar-pop">
+        <button class="sm ghost" onclick="recSelBlock('loop')" title="${esc(t('rec.blok_povtor_podskazka'))}">${recIcon('rotate')} ${esc(t('rec.blok_povtor'))}</button>
+        <button class="sm ghost" onclick="recSelBlock('chance')" title="${esc(t('rec.blok_shans_podskazka'))}">${recIcon('dice')} ${esc(t('rec.blok_shans'))}</button>
+        <button class="sm ghost" onclick="recSelBlock('until')" title="${esc(t('rec.blok_poka_podskazka'))}">${recIcon('search')} ${esc(t('rec.blok_poka'))}</button>
+        <button class="sm ghost" onclick="recSelBlock('if_seen')" title="${esc(t('rec.blok_esli_podskazka'))}">${recIcon('eye')} ${esc(t('rec.blok_esli'))}</button>
+      </div>
+    </details>
+    <button class="sm" onclick="recSelDup()">${recIcon('copy')} ${esc(t('rec.sel_dublirovat'))}</button>
+    <button class="sm danger" onclick="recSelDelete()">${recIcon('trash')} ${esc(t('rec.sel_udalit'))}</button>
+    <details class="selbar-menu">
+      <summary class="sm ghost">${esc(t('rec.sel_esche'))}</summary>
+      <div class="selbar-pop">
+        <button class="sm ghost" onclick="recSelOptional()" title="${esc(t('rec.sel_neobyaz_podskazka'))}">${recIcon('shield')} ${esc(t('rec.sel_neobyaz'))}</button>
+        <select class="sm" onchange="recSelRetries(this.value)" aria-label="${esc(t('rec.sel_povtory_aria'))}">
+          <option value="">${esc(t('rec.sel_povtory'))}</option>${retries}</select>
+        <label class="selbar-pause">${esc(t('rec.sel_pauza'))}
+          <input type="number" id="selPause" min="0.1" step="0.1" value="1" aria-label="${esc(t('rec.sel_pauza_sek'))}"> ${esc(t('rec.sel_sek'))}
+          <button class="sm" onclick="recSelPause()">${esc(t('rec.sel_vstavit'))}</button></label>
+        <button class="sm ghost" onclick="recSelAll()">${esc(t('rec.sel_vse'))}</button>
+      </div>
+    </details>
     <span class="sp"></span>
-    <button class="sm ghost" onclick="recSelAll()">все</button>
-    <button class="sm ghost" onclick="recSelClear()" title="Снять выбор (Esc)">снять</button>
+    <button class="sm ghost" onclick="recSelClear()" title="${esc(t('rec.sel_snyat_podskazka'))}" aria-label="${esc(t('rec.sel_snyat_podskazka'))}">✕</button>
   </div>`;
 }
 
@@ -711,17 +715,13 @@ function stRunBuild() {
     box.hidden = false;
     box.setAttribute('role', 'region');
     box.setAttribute('aria-label', 'Проверка на телефоне');
+    /* Одна строка, без отдельного заголовка: панель занимала треть списка,
+       а нужна ради одной кнопки и пары настроек. */
     box.innerHTML = `
-    <div class="run-head">
-      <span class="run-title">${recIcon('play')} Проверка на телефоне</span>
-      <button class="sm ghost" onclick="recRunClose()" aria-label="Закрыть панель">${recIcon('x')}</button>
-    </div>
     <div class="run-ctl">
       <button class="primary" id="btnRunGo" onclick="recRunGo()"
               title="Правки сохранятся перед запуском">
-        ${recIcon('play')} Запустить</button>
-      <button onclick="recValidate()" title="Проверить шаги без запуска">
-        ${recIcon('check')} Найти ошибки</button>
+        ${recIcon('play')} Запустить на телефоне</button>
       <span class="run-opt"><span class="run-lbl">с шага</span>
         <select id="runFrom" aria-label="Начать с шага" onchange="stRunNote()"></select></span>
       <label class="run-opt inline-check" title="Только этот шаг — с текущего экрана">
@@ -730,6 +730,10 @@ function stRunBuild() {
         <span class="seg" role="group" aria-label="Скорость">${ST_SPEEDS.map(([v, t]) =>
         `<button type="button" class="${REC.runSpeed === v ? 'on' : ''}" aria-pressed="${REC.runSpeed === v}"
           data-speed="${v}" onclick="stSetSpeed('${v}')" title="${esc(t)}">${v}×</button>`).join('')}</span></span>
+      <span class="sp"></span>
+      <button class="sm ghost" onclick="recValidate()" title="Проверить шаги без запуска">
+        ${recIcon('check')} Найти ошибки</button>
+      <button class="sm ghost" onclick="recRunClose()" aria-label="Закрыть панель">${recIcon('x')}</button>
     </div>
     <div class="run-note" id="runNote" hidden></div>
     <div id="runIssues"></div>

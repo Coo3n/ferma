@@ -320,3 +320,24 @@ button.jchip:hover { filter: brightness(1.25); }
    ширину, и выбор растягивался за край, а подпись ломалась в три строки. */
 #recRun #runFrom { width: 210px; max-width: 100%; }
 .run-lbl { white-space: nowrap; }
+
+/* Меню «В блок» и «Ещё» на панели выбранных: выпадают поверх списка. */
+.selbar-menu { position: relative; }
+.selbar-menu > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    min-height: var(--ctl); padding: 4px 10px; border-radius: var(--r1); background: var(--panel2); font-size: var(--fs-2); }
+.selbar-menu > summary.ghost { background: transparent; color: var(--text2); }
+.selbar-menu > summary::-webkit-details-marker { display: none; }
+.selbar-menu[open] > summary { background: var(--panel3); }
+.selbar-pop { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; display: grid; gap: 2px;
+    min-width: 220px; padding: var(--s2); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r2); }
+.selbar-pop button { justify-content: flex-start; }
+.selbar-pop .selbar-pause { flex-wrap: wrap; padding: 4px 10px; }
+/* Панель проверки — одна строка без заголовка. */
+.run-ctl { margin-top: 0; gap: var(--s2) var(--s3); }
+.run-ctl .sp { flex: 1; }
+
+#recRun > :empty { display: none; }
+#recRun .run-ctl .run-lbl { white-space: nowrap; }
+/* Панель проверки — спокойная полоса, а не карточка с тенью. */
+#recRun { margin: var(--s2) var(--s3) 0; padding: var(--s2) var(--s3); background: var(--panel2);
+    border-color: var(--line-soft); box-shadow: none; }

@@ -213,9 +213,20 @@ function blockLoopMeasure(a) {
     return t('rec.povtor_raz', {n: a.times, slovo: declOfNum(Number(a.times), t('rec.raz_formy').split('|'))});
 }
 
+/* Цель блока в подписи — само слово в кавычках («Подписаться»), без «по
+   тексту / по внутреннему имени»: заголовок читают, а не разбирают. */
+function blockTargetName(args) {
+    const m = String(args || '').match(/=\s*"([^"]*)"/);
+    if (!m) return recFeatText(args);
+    let v = m[1];
+    if (/^resourceId/.test(args)) v = v.split('/').pop().replace(/_/g, ' ');
+    if (/^resourceIdMatches/.test(args)) v = v.replace(/^\.\*\//, '').replace(/\$$/, '').replace(/\\(.)/g, '$1').replace(/_/g, ' ');
+    return `«${v}»`;
+}
+
 function blockTarget(step) {
     const first = (step.any || [])[0];
-    return first ? recFeatText(first) : t('rec.ne_zadano_v_zagolovke');
+    return first ? blockTargetName(first) : t('rec.ne_zadano_v_zagolovke');
 }
 
 function blockLabel(step) {
@@ -268,21 +279,12 @@ function blockRowClass(step) {
    ссылки «в блок»: возможность находится там, где о ней думают, — глядя на
    шаг, который хочется крутить или делать иногда. */
 function recBlockEditor(step) {
-    if (!blockIsHead(step)) {
-        if (step.kind === 'branch' || blockDepth(step) >= BLOCK_DEPTH_MAX) return '';
-        return `<div class="rs-block-offer"><span class="dim">${esc(t('rec.v_blok'))}</span>
-      <button class="sm ghost" onclick="recBlockWrap('loop', [${step.id}])">${recIcon('rotate')}${esc(t('rec.blok_povtor'))}</button>
-      <button class="sm ghost" onclick="recBlockWrap('chance', [${step.id}])">${recIcon('dice')}${esc(t('rec.blok_shans'))}</button>
-      <button class="sm ghost" onclick="recBlockWrap('until', [${step.id}])">${recIcon('search')}${esc(t('rec.blok_poka'))}</button>
-      <button class="sm ghost" onclick="recBlockWrap('if_seen', [${step.id}])">${recIcon('eye')}${esc(t('rec.blok_esli'))}</button>
-    </div>`;
-    }
+    if (!blockIsHead(step)) return '';   // «в блок» — в меню «⋯» строки (REC_ROW_MENU)
     const body = step.kind === 'loop' ? blockLoopEditor(step)
         : step.kind === 'chance' ? blockChanceEditor(step)
         : step.kind === 'if_seen' ? blockIfSeenEditor(step) : blockUntilEditor(step);
     return `<div class="blk-ed">${body}
       <div class="blk-ed-row">
-        <span class="dim">${esc(t('rec.v_bloke_shagov', {n: blockInside(step).length}))}</span>
         <span class="sp"></span>
         <button class="sm ghost" onclick="recBlockUnwrap(${step.id})">${esc(t('rec.ubrat_ramku'))}</button>
       </div>
@@ -334,28 +336,34 @@ function blockChanceEditor(step) {
 }
 
 /* «Что ищем»: признаки цели — общие у «пока не найдёшь» и «если на экране». */
+/* «Что ищем» одной строкой: найденное словами («Подписаться», «или» между
+   вариантами) и кнопка «Указать на экране». Ввод текстом — запасной путь,
+   спрятан под ссылкой, пока цель уже есть: три ряда кнопок на одну цель
+   читались как форма из анкеты. */
 function blockFeatsEditor(step, after) {
-    const feats = (step.any || []).map((args, i) => `<span class="rs-feat" title="${esc(args)}">${esc(recFeatText(args))}
+    const any = step.any || [];
+    const feats = any.map((args, i) => `${i ? `<span class="dim">${esc(t('rec.ili'))}</span>` : ''}
+        <span class="blk-target" title="${esc(recFeatText(args))}">${esc(blockTargetName(args))}
         <button class="feat-x" aria-label="${esc(t('rec.ubrat'))}" onclick="recUntilDrop(${step.id}, ${i})">×</button></span>`).join('');
+    const picking = REC.blockPick === step.id;
+    const typing = !any.length || REC.blockTyping === step.id;
     return `<div class="blk-ed-row">
         <span class="blk-ed-k">${esc(t('rec.chto_ischem'))}</span>
         ${feats || `<span class="warn-text">${esc(t('rec.ne_zadano'))}</span>`}
-      </div>
-      <div class="blk-ed-row">
-        <span class="blk-ed-k"></span>
-        <button class="sm ${REC.blockPick === step.id ? 'armed' : ''}" onclick="recBlockPickToggle(${step.id})"
-                title="${esc(t('rec.ukazat_na_ekrane_podskazka'))}">${recIcon('crosshair')}${esc(REC.blockPick === step.id ? t('rec.otmena') : t('rec.ukazat_na_ekrane'))}</button>
-        ${after ? `<button class="sm ghost" onclick="recUntilFromStep(${step.id}, ${after.id})"
+        <button class="sm ${picking ? 'armed' : ''}" onclick="recBlockPickToggle(${step.id})"
+                title="${esc(t('rec.ukazat_na_ekrane_podskazka'))}">${recIcon('crosshair')}${esc(picking ? t('rec.otmena') : t('rec.ukazat_na_ekrane'))}</button>
+        ${after && !any.length ? `<button class="sm ghost" onclick="recUntilFromStep(${step.id}, ${after.id})"
             title="${esc(recLabel(after))}">${esc(t('rec.vzyat_iz_shaga', {n: REC.steps.indexOf(after) + 1}))}</button>` : ''}
+        ${typing ? '' : `<button class="sm ghost" onclick="REC.blockTyping=${step.id};recRender()">${esc(t('rec.vvesti_tekstom'))}</button>`}
       </div>
-      <div class="blk-ed-row">
+      ${typing ? `<div class="blk-ed-row">
         <span class="blk-ed-k dim">${esc(t('rec.ili_tekstom'))}</span>
         <select id="untilKind${step.id}" aria-label="${esc(t('rec.kak_iskat'))}">${UNTIL_FEATS.map(k =>
             `<option value="${k}">${esc(untilFeatName(k))}</option>`).join('')}</select>
         <input type="text" id="untilVal${step.id}" placeholder="${esc(t('rec.naprimer_podpisatsya'))}"
                onkeydown="if(event.key==='Enter')recUntilAdd(${step.id})">
         <button class="sm ghost" onclick="recUntilAdd(${step.id})">${esc(t('rec.dobavit'))}</button>
-      </div>`;
+      </div>` : ''}`;
 }
 
 /* «Указать на экране» для цели блока: следующее нажатие по зеркалу не уходит
@@ -505,6 +513,7 @@ function recUntilAdd(id) {
     const value = String(($('untilVal' + id) || {}).value || '').trim();
     if (!head || !value || !UNTIL_FEATS.includes(kind)) return;
     head.any = [...(head.any || []), `${kind}=${JSON.stringify(value)}`].slice(0, 3);
+    REC.blockTyping = null;
     recRender();
     recSave();
 }

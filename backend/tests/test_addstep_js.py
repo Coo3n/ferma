@@ -19,7 +19,7 @@ const item = (p, k) => p.groups.flatMap(g => g.items).find(i => i.key === k);
 // Обычное место: все разделы, по порядку из спеки; «выйти из повтора» нет.
 let p = plan({sel: 0, depth: 0, inLoop: false, phone: true});
 assert.strictEqual(p.wrap, false);
-assert.deepStrictEqual(keys(p), ['action', 'repeat', 'seen', 'chance', 'other']);
+assert.deepStrictEqual(keys(p), ['repeat', 'seen', 'chance', 'action', 'other']);
 assert.deepStrictEqual(items(p, 'repeat').map(i => i.key), ['loop', 'until']);
 assert.deepStrictEqual(items(p, 'seen').map(i => i.key), ['if_seen', 'if_not', 'anchor']);
 assert.deepStrictEqual(items(p, 'other').map(i => i.key), ['call', 'finish']);

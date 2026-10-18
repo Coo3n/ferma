@@ -15,8 +15,9 @@ function addStepPlan(c) {
     const wrap = (c.sel || 0) > 0;
     const deep = !wrap && (c.depth || 0) >= c.depthMax ? 'deep' : null;
     const item = (key, off) => ({key, off: off || null});
+    /* Блоки — первыми: готовых действий полтора десятка, и «Повторять» /
+       «Если на экране» раньше оказывались за прокруткой. */
     const groups = [];
-    if (!wrap) groups.push({key: 'action', items: [item('presets')]});
     const repeat = [item('loop', deep), item('until', deep)];
     if (!wrap && c.inLoop) repeat.push(item('break'));
     groups.push({key: 'repeat', items: repeat});
@@ -24,6 +25,7 @@ function addStepPlan(c) {
     if (!wrap) seen.push(item('anchor', c.phone ? null : 'phone'));
     groups.push({key: 'seen', items: seen});
     groups.push({key: 'chance', items: [item('chance', deep)]});
+    if (!wrap) groups.push({key: 'action', items: [item('presets')]});
     if (!wrap) groups.push({key: 'other', items: [item('call'), item('finish')]});
     return {wrap, groups};
 }
@@ -62,10 +64,14 @@ const ADD_STEP_PRESET_ICON = {
     key: 'home', sleep: 'pause', screenshot: 'camera', swipe: 'scroll', type: 'keyboard',
 };
 
-function addStepCard(onclick, icon, title, desc, off) {
-    return `<button type="button" class="addpick-card" onclick="${onclick}"${off ? ' disabled' : ''}>
+/* compact — готовые действия: название без пояснения (оно в подсказке).
+   Пятнадцать карточек с абзацем текста под каждой читались как статья. */
+function addStepCard(onclick, icon, title, desc, off, compact) {
+    const note = off ? addStepOffText(off) : desc;
+    return `<button type="button" class="addpick-card ${compact ? 'compact' : ''}" onclick="${onclick}"${off ? ' disabled' : ''}
+        title="${esc(note)}">
         <span class="addpick-ic">${recIcon(icon)}</span>
-        <span class="addpick-tx"><b>${esc(title)}</b><span>${esc(off ? addStepOffText(off) : desc)}</span></span>
+        <span class="addpick-tx"><b>${esc(title)}</b>${compact && !off ? '' : `<span>${esc(note)}</span>`}</span>
       </button>`;
 }
 
@@ -78,7 +84,7 @@ function addStepHtml(plan, presets) {
                 return (presets || []).map((preset, index) => {
                     const first = (preset.steps || [])[0];
                     const icon = (first && ADD_STEP_PRESET_ICON[first.kind]) || 'plus';
-                    return addStepCard(`recLibPick(${index})`, icon, preset.title, preset.desc);
+                    return addStepCard(`recLibPick(${index})`, icon, preset.title, preset.desc, null, true);
                 }).join('');
             }
             const text = addStepItemText(it.key);
