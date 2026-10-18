@@ -1046,7 +1046,9 @@
 
 /* «Если не нашёл» — одна фраза в строку. */
 .rs-fail { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
-.rs-fail-h { font-weight: 600; }
+/* Подпись строки настроек — та же колонка, что у редакторов блоков
+   (.blk-ed-k): без жирного и двоеточия, ширина 150px. */
+.rs-fail-h { min-width: 150px; color: var(--text2); }
 /* Глобальные label/select — блок и на всю ширину; здесь фраза в одну строку. */
 .rs-fail > label { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
 .rs-fail select { width: auto; min-width: 0; flex: 0 0 auto; }
@@ -1137,3 +1139,4 @@ body.rec-picking .stage, body.rec-picking #recLayer { cursor: crosshair; }
 #recSchemeSel:empty { display: none; }
 #recSchemeSel { position: sticky; top: 0; z-index: 6; }
 #recCanvas.panning { cursor: grabbing; }
+.rs-block-offer > .dim:first-child { min-width: 150px; }

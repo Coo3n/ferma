@@ -253,7 +253,7 @@ function recFlexEditor(step) {
     const tries = stFailTriesOptions(fail.tries).map(n =>
         `<option value="${n}" ${fail.tries === n ? 'selected' : ''}>${n}</option>`).join('');
     return `<div class="rs-flex rs-fail">
-    <span class="rs-fail-h">${esc(t('rec.nenashel'))}:</span>
+    <span class="rs-fail-h">${esc(t('rec.nenashel'))}</span>
     <label>${esc(t('rec.nenashel_probovat'))}
       <select onchange="recSetFail(${step.id}, 'tries', this.value)">${tries}</select>
       ${esc(t('rec.nenashel_raz'))}</label>

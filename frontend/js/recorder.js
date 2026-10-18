@@ -899,7 +899,7 @@ function recScrollEditor(step, index) {
         `<option value="${k}" ${sc && sc.max === k ? 'selected' : ''}>${k}</option>`).join('');
     const tip = recScrollSuggest(REC.steps, index);
     return `<div class="rs-flex rs-fail rs-scroll">
-    <span class="rs-fail-h">${esc(t('rec.scroll_h'))}:</span>
+    <span class="rs-fail-h">${esc(t('rec.scroll_h'))}</span>
     <select onchange="recSetScroll(${step.id}, 'dir', this.value)" aria-label="${esc(t('rec.scroll_h'))}">
       ${opt('', t('rec.scroll_off'))}${opt('down', t('rec.scroll_down'))}${opt('up', t('rec.scroll_up'))}
     </select>
