@@ -5,9 +5,8 @@
    Не лезет поверх модалок и записи. Грузится после app.js: оборачивает showView. */
 
 const ONB_SEEN_KEY = 'farm.onb.tour';        // sessionStorage: тур уже показан
-const ONB_HINTS_KEY = 'farm.onb.hints';      // sessionStorage: разделы с подсказкой
 const ONB_OFF_KEY = 'farm.onb.off';          // localStorage: «больше не показывать»
-const ONB = {tour: null, step: 0, opener: null, hintFor: ''};
+const ONB = {tour: null, step: 0, opener: null};
 
 function onbSession(key, value) {
     try {
@@ -26,7 +25,8 @@ function onbBusy() {
     const modal = $('modal');
     return !!(modal && modal.classList.contains('on'))
         || !!(window.REC && (REC.on || REC.builder))
-        || !!ONB.tour;
+        || !!ONB.tour
+        || !!(window.COACH && COACH.key);
 }
 
 /* ------------------------------------------------------------ иллюстрации */
@@ -162,7 +162,6 @@ function onbOpen() {
     ONB.opener = document.activeElement;
     ONB.tour = onbSlides();
     ONB.step = 0;
-    onbHintClose();
     onbSession(ONB_SEEN_KEY, '1');
     const root = document.createElement('div');
     root.className = 'onb';
@@ -256,60 +255,8 @@ document.addEventListener('keydown', ev => {
     ev.stopImmediatePropagation();
 }, true);
 
-/* ------------------------------------------------------ подсказки разделов */
-
-const ONB_HINTS = {
-    scen: ['onb.h_scen_title', 'onb.h_scen_text'],
-    jobs: ['onb.h_jobs_title', 'onb.h_jobs_text'],
-    accounts: ['onb.h_accounts_title', 'onb.h_accounts_text'],
-    device: ['onb.h_device_title', 'onb.h_device_text'],
-};
-
-function onbSeenHints() {
-    return (onbSession(ONB_HINTS_KEY) || '').split(',').filter(Boolean);
-}
-
-function onbHintClose() {
-    const node = $('onbHint');
-    if (node) node.remove();
-    ONB.hintFor = '';
-}
-
-function onbHintShow(view) {
-    const pair = ONB_HINTS[view];
-    if (!pair || onbOff() || onbBusy() || S.view !== view) return;
-    const seen = onbSeenHints();
-    if (seen.includes(view)) return;
-    onbSession(ONB_HINTS_KEY, [...seen, view].join(','));
-    onbHintClose();
-    ONB.hintFor = view;
-    const node = document.createElement('aside');
-    node.className = 'onb-hint';
-    node.id = 'onbHint';
-    node.setAttribute('role', 'status');
-    // тексты — литералами t('…'), чтобы тест строк видел ключи
-    const text = {
-        'onb.h_scen_title': t('onb.h_scen_title'), 'onb.h_scen_text': t('onb.h_scen_text'),
-        'onb.h_jobs_title': t('onb.h_jobs_title'), 'onb.h_jobs_text': t('onb.h_jobs_text'),
-        'onb.h_accounts_title': t('onb.h_accounts_title'), 'onb.h_accounts_text': t('onb.h_accounts_text'),
-        'onb.h_device_title': t('onb.h_device_title'), 'onb.h_device_text': t('onb.h_device_text'),
-    };
-    node.innerHTML = `<button class="sm icon ghost x" aria-label="${esc(t('onb.zakryt'))}" onclick="onbHintClose()">
-            <svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
-        <h3>${esc(text[pair[0]])}</h3><p>${esc(text[pair[1]])}</p>
-        <div class="acts"><button class="sm" onclick="onbHintClose()">${esc(t('onb.ponyatno'))}</button></div>`;
-    document.body.appendChild(node);
-}
-
-(function wrapShowView() {
-    const original = window.showView;
-    window.showView = function (name) {
-        const result = original.apply(this, arguments);
-        if (ONB.hintFor && ONB.hintFor !== S.view) onbHintClose();
-        if (ONB_HINTS[S.view]) setTimeout(() => onbHintShow(S.view), 700);
-        return result;
-    };
-})();
+/* Подсказки по разделам живут в coach.js: затемнение и подсветка прямо на
+   экране, а не карточка в углу. */
 
 /* Приветствие: после загрузки, когда ничто не мешает. Метим «показано» только
    в момент показа — тогда занятый экран (модалка, запись) не съедает тур. */

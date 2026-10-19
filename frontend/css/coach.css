@@ -1,0 +1,166 @@
+/* Подсказки по экрану (coach.js): затемнение одним слоем с вырезом —
+   вырез сам рисует тень на весь экран, отдельной маски не нужно. Корень
+   ловит клики: тур только показывает, нажать мимо и что-то сломать нельзя. */
+.coach {
+    --coach-scrim: color-mix(in srgb, var(--bg) 82%, transparent);
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    opacity: 0;
+    transition: opacity var(--mid) var(--ease-out);
+}
+
+.coach.on {
+    opacity: 1;
+}
+
+.coach-hole {
+    position: fixed;
+    border-radius: var(--r2);
+    box-shadow: 0 0 0 9999px var(--coach-scrim);
+    outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+    outline-offset: 0;
+    pointer-events: none;
+    transition: left var(--mid) var(--ease-out), top var(--mid) var(--ease-out),
+    width var(--mid) var(--ease-out), height var(--mid) var(--ease-out);
+}
+
+/* Мягкое «дыхание» рамки: взгляд находит подсвеченное сразу. */
+.coach-hole::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: calc(var(--r2) + 6px);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    animation: coach-breathe 2.4s var(--ease) infinite;
+}
+
+@keyframes coach-breathe {
+    0%, 100% { opacity: .2; transform: scale(.985); }
+    50% { opacity: 1; transform: scale(1); }
+}
+
+.coach-card {
+    position: fixed;
+    width: min(340px, calc(100vw - 24px));
+    padding: var(--s4) var(--s4) var(--s3);
+    border-radius: var(--r3);
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-size: var(--fs-3);
+    line-height: var(--lh);
+    transition: left var(--mid) var(--ease-out), top var(--mid) var(--ease-out);
+}
+
+.coach-card:focus {
+    outline: none;
+}
+
+/* Стрелка к подсвеченному: квадрат, повёрнутый на 45°, той же заливки. */
+.coach-card::before {
+    content: "";
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    transform: rotate(45deg);
+}
+
+.coach-card[data-side="below"]::before {
+    top: -7px;
+    left: calc(var(--ax, 50%) - 6px);
+    border-right: 0;
+    border-bottom: 0;
+}
+
+.coach-card[data-side="above"]::before {
+    bottom: -7px;
+    left: calc(var(--ax, 50%) - 6px);
+    border-left: 0;
+    border-top: 0;
+}
+
+.coach-card[data-side="right"]::before {
+    left: -7px;
+    top: calc(var(--ay, 50%) - 6px);
+    border-top: 0;
+    border-right: 0;
+}
+
+.coach-card[data-side="left"]::before {
+    right: -7px;
+    top: calc(var(--ay, 50%) - 6px);
+    border-bottom: 0;
+    border-left: 0;
+}
+
+.coach-card[data-side="inside"]::before {
+    display: none;
+}
+
+.coach-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s2);
+    margin-bottom: var(--s1);
+}
+
+.coach-n {
+    color: var(--accent);
+    font-size: var(--fs-1);
+    font-weight: 600;
+}
+
+/* «Всё о ферме» — ссылка, а не четвёртая кнопка: ряд действий остаётся
+   в одну строку. */
+.coach-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--dim);
+    font: inherit;
+    font-size: var(--fs-1);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.coach-link:hover {
+    color: var(--text);
+}
+
+.coach-card h3 {
+    margin: 0 0 var(--s1);
+    font-size: var(--fs-4);
+    font-weight: 600;
+}
+
+.coach-card p {
+    margin: 0 0 var(--s3);
+    color: var(--dim);
+}
+
+.coach-acts {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    flex-wrap: wrap;
+}
+
+.coach-acts .sp {
+    flex: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .coach, .coach-hole, .coach-card {
+        transition: none;
+    }
+
+    .coach-hole::after {
+        animation: none;
+        opacity: .6;
+    }
+}
