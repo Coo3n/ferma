@@ -14,7 +14,9 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from . import adb, config, control, deviations as dv, guards, obstacle, resolve
+from . import accounts, adb, apklib, config, control, deviations as dv, guards, obstacle, resolve
+from .adb import AdbError
+from .control import facts as phone_facts
 from .devices import pool as u2pool
 from .ui import scope, tree
 
@@ -1452,6 +1454,87 @@ class DeviceContext:
         что = ", ".join(str(next(iter(f.values()), "?")) for f in features)
         self.log(f"на экране {'есть' if есть else 'нет'} «{что}»")
         return есть
+
+    # ------------------------------------------------------------ телефон
+    def _phone_fact(self, what: str, read):
+        """Факт о телефоне с одним повтором. Ложное «нет» вызвало бы лишнюю
+        установку, поэтому не угадываем: второй сбой — понятная ошибка."""
+        for attempt in range(2):
+            self.check_cancel()
+            try:
+                return read()
+            except (AdbError, phone_facts.FactUnknown):
+                if attempt:
+                    raise StepFailed(f"не удалось узнать {what} — телефон не ответил") from None
+                self.sleep(1)
+
+    def _older(self, have: dict | None, want: str | None) -> bool:
+        if not want:
+            return False
+        if have is None:
+            return True
+        try:
+            return phone_facts.version_lt(have["name"], want)
+        except ValueError as e:
+            raise StepFailed(str(e)) from None
+
+    def phone_is(self, check: str, *, package: str | None = None, version: str | None = None,
+                 percent: float | None = None, gb: float | None = None,
+                 platform: str | None = None) -> bool:
+        """«Если на телефоне»: `if ctx.phone_is("battery_below", percent=20):`."""
+        if check in ("app_installed", "app_older"):
+            name = apklib.name_of(package)
+            have = self._phone_fact(f"версию {name}",
+                                    lambda: phone_facts.app_version(self.serial, package))
+            seen = f"{name} есть, {have['name']}" if have else f"{name} не установлено"
+            result = have is not None if check == "app_installed" else self._older(have, version)
+        elif check == "battery_below":
+            level = self._phone_fact("заряд", lambda: phone_facts.battery_level(self.serial))
+            seen, result = f"заряд {level}%", level < float(percent)
+        elif check == "offline":
+            up = self._phone_fact("есть ли интернет", lambda: phone_facts.online(self.serial))
+            seen, result = ("интернет есть" if up else "интернета нет"), not up
+        elif check == "space_below":
+            free = self._phone_fact("свободное место", lambda: phone_facts.free_gb(self.serial))
+            seen, result = f"свободно {free:.1f} ГБ", free < float(gb)
+        elif check == "no_account":
+            acc = accounts.for_device(self.serial, platform)
+            seen = f"аккаунт {platform} {'привязан' if acc else 'не привязан'}"
+            result = acc is None
+        else:
+            raise ValueError(f"ctx.phone_is: неизвестная проверка {check!r}")
+        self.log(f"на телефоне: {seen} → {'да' if result else 'нет'}")
+        return result
+
+    def ensure_app(self, package: str, min_version: str | None = None,
+                   install: bool = True) -> None:
+        """«Приложение готово»: установлено и не старее min_version; нет —
+        поставить из библиотеки APK фермы и проверить ещё раз."""
+        name = apklib.name_of(package)
+        read = lambda: phone_facts.app_version(self.serial, package)  # noqa: E731
+        have = self._phone_fact(f"версию {name}", read)
+        if have is not None and not self._older(have, min_version):
+            self.log(f"{name} готов: {have['name']}")
+            return
+        why = (f"{name} не установлен" if have is None
+               else f"{name} {have['name']}, а нужно не ниже {min_version}")
+        if not install:
+            raise StepFailed(why)
+        lib = apklib.get(package)
+        if lib is None:
+            raise StepFailed(f"{name} нет в библиотеке — добавьте APK в Сценарии → Приложения")
+        if min_version and self._older({"name": lib["version_name"]}, min_version):
+            raise StepFailed(f"в библиотеке {name} {lib['version_name']}, "
+                             f"а нужно не ниже {min_version}")
+        self.log(f"{why} — ставлю {lib['version_name']} из библиотеки")
+        try:
+            apklib.install(self.serial, package, check_cancel=self.check_cancel)
+        except apklib.InstallFailed as e:
+            raise StepFailed(f"{name}: {e}") from None
+        have = self._phone_fact(f"версию {name}", read)
+        if have is None or self._older(have, min_version):
+            raise StepFailed(f"{name} после установки всё ещё не готов")
+        self.log(f"{name} установлен: {have['name']}")
 
     def finish(self, reason: str = "") -> None:
         """Закончить сценарий успехом раньше конца (шаг «закончить сценарий»)."""
