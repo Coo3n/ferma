@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="css/steptools.css">
     <link rel="stylesheet" href="css/schedule.css">
     <link rel="stylesheet" href="css/files.css">
+    <link rel="stylesheet" href="css/apklib.css">
     <link rel="stylesheet" href="css/onboarding.css">
     <link rel="stylesheet" href="css/tooltip.css">
     <!-- Первый кадр не показываем, пока app.js не выберет раздел по адресу:
@@ -721,7 +722,12 @@
     <!-- ======================================================== СЦЕНАРИИ -->
     <section class="view" id="view-scen" aria-label="Сценарии" data-t-aria-label="scen.stsenarii">
         <div class="bar">
-            <strong data-t="scen.stsenarii">Сценарии</strong>
+            <div class="seg runs-seg" role="tablist" aria-label="Сценарии и приложения" data-t-aria-label="apk.stsenarii_tabs">
+                <button class="sm on" role="tab" aria-selected="true"
+                        onclick="showView('scen')" data-t="apk.tab_stsenarii">Сценарии</button>
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('apps')" data-t="apk.tab_prilozheniya">Приложения</button>
+            </div>
             <span class="stat" id="scenCount"></span>
             <span class="sp"></span>
             <button class="sm accent" id="btnScenRecord" onclick="recNew()" data-t="scen.sozdat_zapisyu">
@@ -738,6 +744,31 @@
                 <div class="box" id="scSteps" hidden></div>
             </div>
         </div>
+    </section>
+
+    <!-- Библиотека APK: приложения, которые сценарий ставит сам (шаг
+         «Приложение готово»). Вкладка «Сценариев», а не пятый раздел. -->
+    <section class="view" id="view-apps" aria-label="Приложения для сценариев" data-t-aria-label="apk.razdel"
+             ondragover="event.preventDefault()" ondrop="apkDrop(event)">
+        <div class="bar">
+            <div class="seg runs-seg" role="tablist" aria-label="Сценарии и приложения" data-t-aria-label="apk.stsenarii_tabs">
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('scen')" data-t="apk.tab_stsenarii">Сценарии</button>
+                <button class="sm on" role="tab" aria-selected="true"
+                        onclick="showView('apps')" data-t="apk.tab_prilozheniya">Приложения</button>
+            </div>
+            <span class="stat" id="apkCount"></span>
+            <span class="sp"></span>
+            <button class="sm primary" id="btnApkAdd" onclick="apkPick()" data-t="apk.dobavit">
+                <svg class="ic" aria-hidden="true">
+                    <use href="#i-upload"/>
+                </svg>
+                Добавить APK
+            </button>
+            <input type="file" id="apkFile" accept=".apk" hidden
+                   onchange="apkUpload(this.files[0]); this.value=''">
+        </div>
+        <div class="scroll" id="apkList"></div>
     </section>
 
     <!-- ========================================================== ЗАДАЧИ -->
@@ -908,7 +939,7 @@
         var name = location.hash.replace(/^#/, '').split('/')[0] || 'fleet';
         if (!document.getElementById('view-' + name)) name = 'fleet';
         document.getElementById('view-' + name).classList.add('on');
-        var nav = (name === 'deviations' || name === 'schedule') ? 'jobs' : name;
+        var nav = (name === 'deviations' || name === 'schedule') ? 'jobs' : name === 'apps' ? 'scen' : name;
         var btn = document.querySelector('.navbtn[data-view="' + nav + '"]');
         if (btn) { btn.classList.add('on'); btn.setAttribute('aria-current', 'page'); }
     })();
@@ -949,6 +980,7 @@
 <script src="js/deviations.js"></script>
 <script src="js/schedule.js"></script>
 <script src="js/apppick.js"></script>
+<script src="js/apklib.js"></script>
 <script src="js/device-tools.js"></script>
 <script src="js/draft.js"></script>
 <script src="js/recorder.js"></script>
