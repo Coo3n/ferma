@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
-from .. import adb, config
+from .. import adb, config, streaming
 from . import pool, power
 from .network import net
 
@@ -310,7 +310,10 @@ class Registry:
         for d in list(self._devices.values()):
             if not d.online:
                 continue
-            if now - self._last_health.get(d.serial, 0) < config.HEALTH_INTERVAL:
+            # Телефон на экране у человека: dumpsys делит канал adb с касаниями
+            # и добавляет лаг. Пока его смотрят, опрашиваем в 6 раз реже.
+            every = config.HEALTH_INTERVAL * (6 if streaming.is_live(d.serial) else 1)
+            if now - self._last_health.get(d.serial, 0) < every:
                 continue
             self._last_health[d.serial] = now
             self._read_health(d)

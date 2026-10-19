@@ -19,7 +19,7 @@ import re
 
 PLACEHOLDER_RE = re.compile(r"\{([a-z][a-z0-9_]*)\}")
 
-_PACKAGE = {"name": "package", "label": "Пакет",
+_PACKAGE = {"name": "package", "label": "Приложение",
             "hint": "com.android.settings", "packages": True}
 
 PRESETS = [

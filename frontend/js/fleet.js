@@ -224,7 +224,6 @@ function tileCreate(serial) {
     <div class="cap">
       <div class="top"><span class="dot"></span><span class="nm"></span><span class="accflag" hidden></span><span class="os" hidden></span></div>
       <div class="metrics tnum"></div>
-      <div class="batt" hidden><i></i></div>
       <div class="alert" hidden><svg class="ic"><use href="#i-alert"/></svg><span></span></div>
     </div>`;
 
@@ -290,6 +289,7 @@ function tileUpdate(el, device, ghost) {
     el.querySelector('.dot').className = 'dot ' + status;
     el.dataset.st = status;   // рамка и полоса состояния: норма тихая, исключения громкие
     setText(el.querySelector('.nm'), device.name);
+    el.querySelector('.nm').title = device.name;
     /* На мелких плитках имя обрезается — полное имя и состояние в подсказке. */
     el.title = `${device.name} — ${statusWord(device)}`;
     tileAccountFlag(el.querySelector('.accflag'), device.accounts || []);
@@ -316,20 +316,6 @@ function tileUpdate(el, device, ghost) {
         setText(flag, 'тревога');
     } else {
         flag.hidden = true;
-    }
-
-    const batt = el.querySelector('.batt');
-    /* Полоса заряда — только когда заряд садится: процент уже написан
-       цифрой, а серая полоса на каждой плитке выглядела мёртвым индикатором. */
-    /* Офлайн — заряд последний известный, а не нынешний: полоса врала бы. */
-    if (!device.online || device.battery == null || device.battery > BATTERY_MID) {
-        batt.hidden = true;
-    } else {
-        batt.hidden = false;
-        const bar = batt.querySelector('i');
-        bar.className = device.battery <= BATTERY_LOW ? 'low'
-            : device.battery <= BATTERY_MID ? 'mid' : '';
-        bar.style.width = Math.max(2, Math.min(100, device.battery)) + '%';
     }
 
     const alert = el.querySelector('.alert');

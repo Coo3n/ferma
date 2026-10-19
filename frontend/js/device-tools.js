@@ -37,8 +37,8 @@ function devToolsOpen() {
     <div class="box">
         <h3>Запуск приложения</h3>
         <div class="row">
-            <input type="text" id="pkgInput" placeholder="com.android.settings"
-                   aria-label="Имя пакета" list="pkgList">
+            <input type="text" id="pkgInput" placeholder="Название приложения, например VK"
+                   aria-label="Название приложения" list="pkgList">
             <datalist id="pkgList"></datalist>
             <button class="sm" onclick="launchPkg()">Открыть</button>
         </div>
@@ -85,8 +85,12 @@ function devToolsOpen() {
     openModal();
 }
 
+/* Вписали название («VK») — берём его приложение; не нашли — считаем, что
+   вписали код приложения руками. */
 function packageField() {
-    return $('pkgInput').value.trim();
+    const typed = $('pkgInput').value.trim();
+    const hit = (APP_PICK.byDevice[S.active] || []).find(a => a.label.toLowerCase() === typed.toLowerCase());
+    return hit ? hit.package : typed;
 }
 
 /* Диалог пересобирается при каждом открытии — вывода может уже не быть
@@ -100,10 +104,10 @@ function devOut(text) {
 async function loadPackages() {
     if (!S.active) return;
     try {
-        const list = await api(`/api/devices/${S.active}/packages`);
+        const list = await appChoices(S.active);
         const options = $('pkgList');
-        if (options) options.innerHTML = list.map(name => `<option value="${esc(name)}">`).join('');
-        devOut(list.join('\n'));
+        if (options) options.innerHTML = list.map(a => `<option value="${esc(a.label)}" label="${esc(a.package)}">`).join('');
+        devOut(list.map(a => `${a.label} — ${a.package}`).join('\n'));
         toast(`приложений: ${list.length}`, 'ok');
     } catch (e) {
         toast(e.message, 'bad');

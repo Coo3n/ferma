@@ -5,12 +5,15 @@
 """
 from __future__ import annotations
 
+import logging
 import re
 import subprocess
 import threading
 import time
 from pathlib import Path
 from urllib.parse import quote
+
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import FileResponse, Response, StreamingResponse
@@ -19,6 +22,7 @@ from .. import adb, config, control, streaming
 from ..devices import registry
 
 router = APIRouter(prefix="/api/devices")
+log = logging.getLogger("farm.screen")
 
 SHELL_TIMEOUT = 30
 
@@ -120,6 +124,7 @@ def _rotate(serial, p):
     nxt = "0" if cur in ("1", "3") else "1"
     adb.shell(serial, "settings put system accelerometer_rotation 0", timeout=SHELL_TIMEOUT)
     adb.shell(serial, f"settings put system user_rotation {nxt}", timeout=SHELL_TIMEOUT)
+    control.forget_size(serial)   # размер экрана поменялся: тапы по старому кэшу попадали бы мимо
     return {"ok": True, "landscape": nxt == "1"}
 
 
@@ -139,14 +144,45 @@ ACTIONS = {
 }
 
 
+# Касания одного телефона идут строго по очереди (тап после свайпа не должен
+# обгонять его), но каждый — в своей полосе: медленный жест не держит HTTP-ответ.
+_lanes: dict[str, ThreadPoolExecutor] = {}
+_lanes_lock = threading.Lock()
+BACKGROUND_TYPES = {"swipe", "long_tap"}
+BACKGROUND_MIN_SECONDS = 0.3   # короткий свайп быстрее, чем ждать очередь
+
+
+def _lane(serial: str) -> ThreadPoolExecutor:
+    with _lanes_lock:
+        lane = _lanes.get(serial)
+        if lane is None:
+            lane = _lanes[serial] = ThreadPoolExecutor(1, thread_name_prefix=f"act-{serial}")
+        return lane
+
+
+def _run_background(handler, serial, payload):
+    try:
+        handler(serial, payload)
+    except Exception as e:  # noqa: BLE001
+        log.warning("жест %s на %s не выполнился: %s", payload.get("type"), serial, e)
+
+
 @router.post("/{serial}/action")
-def action(serial: str, payload: dict = Body(...)):
+def action(serial: str, response: Response, payload: dict = Body(...)):
+    t0 = time.perf_counter()
     _require_online(serial)
     handler = ACTIONS.get(payload.get("type"))
     if handler is None:
         raise HTTPException(400, f"неизвестное действие: {payload.get('type')}")
     try:
-        result = handler(serial, payload)
+        # Долгий жест подтверждаем сразу: человек уже видит результат на
+        # экране, а ждать конца 0,8-секундного нажатия незачем.
+        if payload.get("type") in BACKGROUND_TYPES and float(payload.get("duration", 0.25)) >= BACKGROUND_MIN_SECONDS:
+            _lane(serial).submit(_run_background, handler, serial, payload)
+            streaming.note_action(serial)
+            response.headers["Server-Timing"] = f"act;dur={(time.perf_counter() - t0) * 1000:.1f}"
+            return {"ok": True, "queued": True}
+        result = _lane(serial).submit(handler, serial, payload).result()
     except KeyError as e:
         raise HTTPException(400, f"не хватает поля {e}")
     except (ValueError, TypeError) as e:
@@ -155,6 +191,7 @@ def action(serial: str, payload: dict = Body(...)):
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, str(e))
     streaming.note_action(serial)
+    response.headers["Server-Timing"] = f"act;dur={(time.perf_counter() - t0) * 1000:.1f}"
     return result or {"ok": True}
 
 

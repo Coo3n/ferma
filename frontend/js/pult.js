@@ -71,6 +71,7 @@ function pultRender() {
     const device = S.devices.find(d => d.serial === S.active);
     if (!device) return;
     setText($('pultName'), device.name);
+    $('pultName').title = device.name;
     const bits = [];
     if (device.battery != null) bits.push(`${device.battery}%${device.charging ? ' ⚡' : ''}`);
     if (device.temperature != null) bits.push(`${Math.round(device.temperature)}°`);
@@ -80,6 +81,7 @@ function pultRender() {
     if (!device.online) bits.unshift(t('pult.ne_v_seti'));
     else if (device.busy_job) bits.unshift(t('pult.idet_zapusk'));
     setText($('pultMeta'), bits.join(' · '));
+    $('pultMeta').title = bits.join(' · ');
     pultTagsRender(device);
 
     const continues = REC.steps.length;
@@ -388,5 +390,5 @@ pultDropZone(document.querySelector('#mirror .stage'));
 /* Полям пульта (метаданные, запуски) хватает данных, которые уже опрашивают
    ферма и журнал: здесь только перерисовка, без запросов. */
 setInterval(() => {
-    if (S.view === 'device' && pultOn()) pultRender();
+    if (S.view === 'device' && pultOn() && !document.hidden) pultRender();
 }, 2000);

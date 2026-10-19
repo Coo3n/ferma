@@ -99,16 +99,24 @@ function syncInteractive() {
    молчаливое бездействие читается как «сайт завис». */
 function offerScrcpy() {
     if ($('modal').classList.contains('on')) return;
-    $('mTitle').textContent = 'Сейчас экран только показывает';
-    $('mBody').innerHTML = `
-    <p>Чтобы кликать мышью, включите «Управлять телефоном».
-       Нажатия при этом не записываются в сценарий.</p>
-    <p>Запись шагов — «● Запись». Плавно руками — «В окне».</p>`;
+    const device = S.devices.find(d => d.serial === S.active);
+    const busy = !!(device && device.busy_job);
+    $('mTitle').textContent = busy ? t('screen.view_busy_title') : t('screen.view_only_title');
+    $('mBody').innerHTML = `<div class="viewonly">
+        <svg class="viewonly-art" viewBox="0 0 96 96" aria-hidden="true">
+            <rect x="30" y="8" width="36" height="72" rx="7" class="vo-body"/>
+            <rect x="35" y="16" width="26" height="50" rx="2" class="vo-screen"/>
+            <circle cx="48" cy="73" r="2.2" class="vo-dot"/>
+            <path d="M64 70c6-9 18-9 24 0c-6 9-18 9-24 0z" class="vo-eye"/>
+            <circle cx="76" cy="70" r="3.4" class="vo-pupil"/>
+        </svg>
+        <p class="viewonly-text">${esc(busy ? t('screen.view_busy_text') : t('screen.view_only_text'))}</p>
+    </div>`;
     $('mActs').innerHTML = '<span class="sp"></span>'
-        + '<button class="sm" onclick="closeModal();openScrcpy()">'
-        + '<svg class="ic"><use href="#i-external"/></svg>В окне</button>'
-        + '<button class="primary" onclick="closeModal();if(!S.liveControl)toggleLiveControl()">'
-        + 'Включить управление</button>';
+        + `<button class="sm" onclick="closeModal();openScrcpy()">
+            <svg class="ic"><use href="#i-external"/></svg>${esc(t('screen.in_window'))}</button>`
+        + (busy ? '' : `<button class="primary" onclick="closeModal();if(!S.liveControl)toggleLiveControl()">
+            ${esc(t('screen.enable_control'))}</button>`);
     openModal();
 }
 
@@ -210,8 +218,7 @@ async function act(payload) {
     /* То же для цели блока «пока не найдёшь» / «если на экране» — и без записи. */
     if (window.REC && REC.blockPick != null && window.recBlockPickTap && await recBlockPickTap(payload)) return;
     try {
-        const result = await (syncRoute(payload)
-            || post(`/api/devices/${S.active}/action`, payload));
+        const result = await (syncRoute(payload) || actSend(S.active, payload));
         /* Единственная точка перехвата: через act() идут не только жесты,
            но и launch/stop/url со вкладки «Устройство». */
         if (window.REC && REC.on) recNote(payload);
@@ -220,6 +227,38 @@ async function act(payload) {
         toast(e.message, 'bad');
         throw e;
     }
+}
+
+/* Жесты одного телефона уходят по очереди: два параллельных запроса к
+   серверу могли прийти не в том порядке (тап обгонял свайп). Сервер на долгие
+   жесты отвечает сразу, так что очередь не копит задержку. Сбой одного
+   жеста цепочку не рвёт. */
+let actChain = Promise.resolve();
+const ACT_DEBUG = /[?&]debug\b/.test(location.search);
+
+function actSend(serial, payload) {
+    const run = () => {
+        const t0 = performance.now();
+        return fetch(`/api/devices/${serial}/action`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+            keepalive: true,
+        }).then(async response => {
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : 'не получилось');
+            if (ACT_DEBUG) {
+                console.log(`[farm] ${payload.type}: ${Math.round(performance.now() - t0)} мс туда-обратно, `
+                    + `сервер ${response.headers.get('Server-Timing') || '?'}`);
+            }
+            return body;
+        }, () => {
+            throw new Error('нет связи с фермой — программа фермы запущена?');
+        });
+    };
+    const next = actChain.then(run, run);
+    actChain = next.catch(() => {});
+    return next;
 }
 
 function sendKey(name) {

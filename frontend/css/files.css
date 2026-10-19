@@ -30,6 +30,6 @@
     border: 2px dashed var(--accent-line); border-radius: var(--r3); background: var(--glass); color: var(--text); font-size: var(--fs-3); pointer-events: none; }
 .mbody.drag .files-drop { display: flex; }
 .btn-like { display: inline-flex; align-items: center; gap: var(--s2); cursor: pointer; }
-.pult-files { width: 100%; margin-bottom: var(--s2); justify-content: center; }
+.pult-files { width: 100%; margin-top: var(--s2); justify-content: center; }
 @media (max-width: 760px) { .files { grid-template-columns: 1fr; } .files-side { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line-soft); }
     .files-row { grid-template-columns: 28px minmax(0, 1fr) 70px; } .files-row small:last-child { display: none; } }

@@ -78,8 +78,8 @@ def validate(payload: dict, blocks: dict | None = None,
                                     "не найден или не загружается")
         if kind in ("launch_app", "stop_app") and packages is not None \
                 and not step.get("param") and step["args"]["package"] not in packages:
-            add("warning", i, f"пакет {step['args']['package']} не установлен "
-                              "на выбранном устройстве")
+            add("warning", i, f"приложение {step['args']['package']} не установлено "
+                              "на выбранном телефоне")
     if good and good[-1][1].get("optional"):
         add("warning", good[-1][0], "последний шаг необязателен — прогон "
                                     "пройдёт, даже если он не сработает")

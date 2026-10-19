@@ -194,6 +194,13 @@ def note_action(serial: str) -> None:
         src.note_action()
 
 
+def is_live(serial: str, within: float = 8.0) -> bool:
+    """Человек сейчас смотрит или управляет телефоном: фоновым опросам
+    adb на нём лучше не мешать — каждый dumpsys делит канал с касаниями."""
+    src = _sources.get(serial)
+    return bool(src and (src._live_viewers or time.time() - src.last_request < within))
+
+
 def snapshot(serial: str) -> bytes:
     """Одиночный кадр — берётся из уже идущей трансляции, если она есть."""
     src = _sources.get(serial)

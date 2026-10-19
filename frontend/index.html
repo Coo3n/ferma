@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="css/schedule.css">
     <link rel="stylesheet" href="css/files.css">
     <link rel="stylesheet" href="css/onboarding.css">
+    <link rel="stylesheet" href="css/tooltip.css">
     <!-- Первый кадр не показываем, пока app.js не выберет раздел по адресу:
          в разметке «Ферма» выбрана по умолчанию, и при обновлении на другой
          вкладке подсветка было видно, как она перескакивает. Страховка — если
@@ -158,7 +159,7 @@
                 <svg class="ic" aria-hidden="true">
                     <use href="#i-search"/>
                 </svg>
-                <input type="text" id="devSearch" placeholder="имя или номер телефона"
+                <input type="text" id="devSearch" placeholder="имя, номер или тег"
                        aria-label="Поиск по телефонам"
                        oninput="filterDevices(this.value)"
                        onkeydown="if(event.key==='Escape'){this.value='';filterDevices('')}" data-t-placeholder="fleet.imya_ili_nomer_telefona" data-t-aria-label="fleet.poisk_po_telefonam">
@@ -248,7 +249,7 @@
          инструментами. Граф занимает всю площадь, зеркало экрана стоит
          сбоку узкой колонкой и сворачивается: смотреть на телефон нужно
          в момент клика по нему, строить сюжет — всё остальное время.
-         Разовые команды (запуск пакета, ссылка, adb shell, дампы) живут в
+         Разовые команды (запуск приложения, ссылка, adb shell, дампы) живут в
          диалоге «Управление» — они нужны раз в сессию и не стоят
          постоянного места на экране. -->
     <section class="view" id="view-device" aria-label="Рабочее место телефона" data-t-aria-label="device.rabochee_mesto_telefona">
@@ -947,6 +948,7 @@
 <script src="js/jobs.js"></script>
 <script src="js/deviations.js"></script>
 <script src="js/schedule.js"></script>
+<script src="js/apppick.js"></script>
 <script src="js/device-tools.js"></script>
 <script src="js/draft.js"></script>
 <script src="js/recorder.js"></script>
@@ -965,5 +967,6 @@
 <script src="js/inbox.js"></script>
 <script src="js/app.js"></script>
 <script src="js/onboarding.js"></script>
+<script src="js/tooltip.js"></script>
 </body>
 </html>

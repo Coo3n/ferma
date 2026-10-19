@@ -1,0 +1,34 @@
+/* Подсказки (tooltip.js): одна карточка на всё приложение. */
+#tip {
+    position: fixed;
+    z-index: 9999;
+    max-width: min(320px, calc(100vw - 16px));
+    padding: var(--s2, 8px) var(--s3, 12px);
+    background: var(--panel3);
+    color: var(--text);
+    border: 1px solid var(--line-hover);
+    border-radius: var(--r2);
+    font-size: var(--fs-1);
+    line-height: 1.45;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(3px);
+    transition: opacity var(--fast) var(--ease), transform var(--fast) var(--ease-out);
+}
+#tip[data-side="bottom"] { transform: translateY(-3px); }
+#tip.on { opacity: 1; transform: none; }
+#tip .tip-body { display: block; overflow-wrap: anywhere; white-space: pre-line; }
+#tip .tip-arrow {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    background: var(--panel3);
+    border: 1px solid var(--line-hover);
+    transform: rotate(45deg);
+}
+#tip[data-side="top"] .tip-arrow { bottom: -5px; border-top: 0; border-left: 0; }
+#tip[data-side="bottom"] .tip-arrow { top: -5px; border-bottom: 0; border-right: 0; }
+@media (prefers-reduced-motion: reduce) {
+    #tip { transition: none; transform: none; }
+}

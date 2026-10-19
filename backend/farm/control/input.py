@@ -108,10 +108,24 @@ def _keycode(name: str) -> str:
     raise ValueError(f"неизвестная клавиша: {name}")
 
 
+# Имена, которые u2.press понимает сам. Неизвестное имя агент молча
+# игнорирует (возвращает false без ошибки) — так «Недавние» ничего не делали.
+_U2_PRESS = {
+    "back": "back", "home": "home", "recents": "recent", "enter": "enter",
+    "delete": "delete", "up": "up", "down": "down", "left": "left",
+    "right": "right", "menu": "menu", "search": "search", "camera": "camera",
+    "power": "power", "volume_up": "volume_up", "volume_down": "volume_down",
+}
+
+
+def _u2_key_name(name: str) -> str | None:
+    return _U2_PRESS.get(str(name or "").lower())
+
+
 def key(serial: str, name: str) -> None:
     code = _keycode(name)
-    short = code.replace("KEYCODE_", "").lower() if code in KEYCODES.values() else code
-    if via_u2(serial, lambda d: d.press(short)):
+    short = _u2_key_name(name)
+    if short and via_u2(serial, lambda d: d.press(short)):
         return
     adb.shell(serial, ["input", "keyevent", code])
 

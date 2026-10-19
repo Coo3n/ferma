@@ -324,6 +324,7 @@
 .pult-id {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
     min-width: 0;
     line-height: 1.25;
 }
@@ -338,6 +339,9 @@
 .pult-meta {
     font-size: var(--fs-2);
     color: var(--dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .pult-slot[data-slot="held"]:not(:empty) {
@@ -639,3 +643,30 @@ button.pult-tag-add {
 
 .kb[data-state="on"] .kb-state { color: var(--accent) }
 .kb[data-state="idle"] .kb-state { color: var(--warn) }
+
+/* Диалог «экран только показывает» */
+.viewonly {
+    display: flex;
+    align-items: center;
+    gap: var(--s4);
+    padding: var(--s3) 0;
+}
+
+.viewonly-art {
+    flex: none;
+    width: 84px;
+    height: 84px;
+}
+
+.viewonly-art .vo-body { fill: var(--panel3); stroke: var(--line-hover); stroke-width: 2; }
+.viewonly-art .vo-screen { fill: var(--well); }
+.viewonly-art .vo-dot { fill: var(--line-hover); }
+.viewonly-art .vo-eye { fill: var(--panel2); stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+.viewonly-art .vo-pupil { fill: var(--accent); }
+
+.viewonly-text {
+    margin: 0;
+    font-size: var(--fs-3);
+    line-height: var(--lh);
+    color: var(--text);
+}

@@ -2,7 +2,7 @@
 import importlib
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
 
 from farm.api import screen as api_screen
 
@@ -26,7 +26,7 @@ def phone(tmp_path, monkeypatch):
 
 
 def test_поворот_книжный_в_альбомный(phone):
-    res = api_screen.action("A", {"type": "rotate"})
+    res = api_screen.action("A", Response(), {"type": "rotate"})
     assert res["landscape"] is True
     assert "settings put system accelerometer_rotation 0" in phone
     assert "settings put system user_rotation 1" in phone
@@ -107,14 +107,14 @@ def test_клавиша_с_командой_не_уходит_в_shell(phone, mo
     monkeypatch.setattr(inp, "via_u2", lambda serial, fn: False)
     monkeypatch.setattr(inp.adb, "shell", lambda s, cmd, timeout=None: phone.append(cmd))
     with pytest.raises(HTTPException) as e:
-        api_screen.action("A", {"type": "key", "name": "KEYCODE_HOME; reboot"})
+        api_screen.action("A", Response(), {"type": "key", "name": "KEYCODE_HOME; reboot"})
     assert e.value.status_code == 400
     assert phone == []
-    api_screen.action("A", {"type": "key", "name": "keycode_camera"})
+    api_screen.action("A", Response(), {"type": "key", "name": "keycode_camera"})
     assert phone == [["input", "keyevent", "KEYCODE_CAMERA"]]
 
 
 def test_кривые_координаты_это_400(phone):
     with pytest.raises(HTTPException) as e:
-        api_screen.action("A", {"type": "tap", "x": "abc", "y": 0.5})
+        api_screen.action("A", Response(), {"type": "tap", "x": "abc", "y": 0.5})
     assert e.value.status_code == 400

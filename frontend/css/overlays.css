@@ -32,7 +32,7 @@
     background: var(--panel2);
     border: 1px solid var(--line);
     border-radius: 14px;
-    width: 400px;
+    width: 440px;
     max-width: 92vw;
     max-height: 84vh;
     display: flex;
@@ -96,9 +96,11 @@
     font-size: var(--fs-4);
     flex: 1;
     min-width: 0;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .mbody {
@@ -118,7 +120,8 @@
 .kv {
     display: flex;
     justify-content: space-between;
-    gap: 12px;
+    align-items: baseline;
+    gap: var(--s4);
     padding: 6px 0;
     border-bottom: 1px solid var(--line-soft);
     font-size: var(--fs-2);
@@ -130,13 +133,15 @@
 
 .kv span {
     color: var(--dim);
-    flex: 0 0 auto
+    flex: 0 0 auto;
+    white-space: nowrap
 }
 
 .kv b {
     font: 600 var(--fs-2) var(--sans);
     text-align: right;
-    word-break: break-all
+    min-width: 0;
+    overflow-wrap: anywhere
 }
 
 #toast {

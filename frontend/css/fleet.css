@@ -584,10 +584,6 @@
     flex: 1;
 }
 
-/* Полоса заряда — по нижнему краю подписи: у плиток с тегами и без она
-   иначе стояла на разной высоте, и ряд выглядел кривым. */
-.tile .cap .batt { margin-top: auto; }
-
 .tile .cap .top {
     display: flex;
     align-items: center;
@@ -727,38 +723,6 @@
 
 .dot.off {
     background: var(--off)
-}
-
-/* Полоса заряда: цвет дублирует число рядом, самостоятельного смысла не несёт. */
-/* Полоса дублирует процент в строке метрик — показываем её, только когда
-   заряд садится и это повод посмотреть. */
-.batt:not(:has(i.mid, i.low)) {
-    display: none;
-}
-
-.batt {
-    height: 3px;
-    border-radius: 2px;
-    background: var(--panel3);
-    overflow: hidden
-}
-
-/* Нормальный заряд — нейтральный: сорок зелёных полосок были шумом.
-   Цвет появляется, только когда заряд садится. */
-.batt i {
-    display: block;
-    height: 100%;
-    background: var(--dim);
-    border-radius: 2px;
-    transition: width var(--mid) var(--ease);
-}
-
-.batt i.mid {
-    background: var(--warn)
-}
-
-.batt i.low {
-    background: var(--bad)
 }
 
 .tile .alert {

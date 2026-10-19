@@ -274,7 +274,6 @@ body.marqueeing {
 }
 
 .tiles[data-density="s"] .tile .metrics,
-.tiles[data-density="s"] .tile .batt,
 .tiles[data-density="s"] .tile .os,
 .tiles[data-density="s"] .tile .open,
 .tiles[data-density="s"] .tile .acts {

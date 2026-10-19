@@ -2516,34 +2516,29 @@ function recLibPick(index) {
       <div class="row"><label>${esc(input.label)}</label>
         <select class="grow" id="lib_${esc(input.name)}">${Object.entries(input.choices).map(([v, label]) =>
             `<option value="${esc(v)}">${esc(label)}</option>`).join('')}</select>
-      </div>` : `
+      </div>` : input.packages ? `
+      <div class="row"><label>${esc(input.label)}</label>${appPickHtml('lib_' + input.name, input.default)}</div>` : `
       <div class="row"><label>${esc(input.label)}</label>
         <input type="${input.number ? 'number' : 'text'}" step="any" class="grow"
                id="lib_${esc(input.name)}" placeholder="${esc(input.hint || '')}"
                value="${esc(input.default ?? '')}"
-               ${input.packages ? 'list="libPkgs"' : ''}
                onkeydown="if(event.key==='Enter')recLibSubmit(${index})">
       </div>`).join('')
-        + (preset.inputs.some(i => i.packages) ? '<datalist id="libPkgs"></datalist>' : '');
+;
     $('mActs').innerHTML = `<button class="sm" onclick="recLibOpen()">← ${esc(t('rec.dob_nazad'))}</button>`
         + '<span class="sp"></span>'
         + `<button class="primary" onclick="recLibSubmit(${index})">Добавить</button>`;
     const first = $('lib_' + preset.inputs[0].name);
-    if (first) first.focus();
-
-    if (preset.inputs.some(i => i.packages)) {
-        recPackages().then(list => {
-            const box = $('libPkgs');
-            if (box) box.innerHTML = list.map(name => `<option value="${esc(name)}">`).join('');
-        });
-    }
+    if (first && first.tagName === 'INPUT') first.focus();
+    preset.inputs.filter(i => i.packages).forEach(i => appPickFill('lib_' + i.name));
 }
 
 function recLibSubmit(index) {
     const preset = REC.lib[index];
     const values = {};
     for (const input of preset.inputs) {
-        const value = ($('lib_' + input.name).value || '').trim();
+        const value = input.packages ? appPickValue('lib_' + input.name)
+            : ($('lib_' + input.name).value || '').trim();
         if (!value && !input.optional) {
             toast(`не заполнено: ${input.label}`, 'bad');
             return;
@@ -2910,6 +2905,13 @@ function recValueEditorPlain(step, key) {
     if (step.param) {
         return `<div class="rs-param">параметр <b>${esc(step.param)}</b>
       <button class="sm" onclick="recUnparam(${step.id})">вернуть значение</button></div>`;
+    }
+    if (key === 'package') {
+        const pid = 'appStep' + step.id;
+        setTimeout(() => appPickFill(pid), 0);
+        return `<div class="row">${appPickHtml(pid, step.args.package, v => recEditValue(step.id, v))}
+    <button class="sm" title="Вынести в параметры" onclick="recParam(${step.id})">{}</button>
+  </div>`;
     }
     const type = key === 'seconds' ? 'number' : 'text';
     return `<div class="row">
@@ -3288,7 +3290,7 @@ function recParam(id) {
     $('mTitle').textContent = 'Вынести в параметры';
     $('mBody').innerHTML = `
     <div class="row"><label for="pmName">Имя</label>
-      <input type="text" id="pmName" class="grow" placeholder="package"
+      <input type="text" id="pmName" class="grow" placeholder="app"
              oninput="if(!$('pmLabel').dataset.touched)$('pmLabel').value=this.value"></div>
     <div class="row"><label for="pmLabel">Подпись в форме</label>
       <input type="text" id="pmLabel" class="grow" oninput="this.dataset.touched=1"></div>
@@ -3718,7 +3720,7 @@ function recTeachForm() {
     <div class="rs-alts">${варианты}</div>
     <div class="row"><label class="kb">
       <input type="checkbox" id="teachGlobal" style="accent-color:var(--accent)">
-      применять во всех приложениях, не только в ${esc(REC.teach.package || '—')}</label></div>`;
+      применять во всех приложениях, не только в ${esc(REC.teach.package ? recApp(REC.teach.package) : '—')}</label></div>`;
     $('mActs').innerHTML = '<span class="sp"></span>'
         + '<button class="sm" onclick="closeModal()">Отмена</button>'
         + '<button class="primary" onclick="recTeachSubmit()">Сохранить автозакрытие</button>';

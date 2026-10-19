@@ -55,7 +55,8 @@ function matchesQuery(device) {
     return !S.query
         || device.name.toLowerCase().includes(S.query)
         || device.serial.toLowerCase().includes(S.query)
-        || (device.group || '').toLowerCase().includes(S.query);
+        || (device.group || '').toLowerCase().includes(S.query)
+        || (device.tags || []).some(tg => tg.toLowerCase().includes(S.query));
 }
 
 function deviceSignature(list) {
@@ -262,7 +263,8 @@ function setActive(serial) {
     setText($('scrTitle'), device ? device.name : 'Экран');
     markActive();
     syncDeviceNav();
-    if (window.REC) REC.packages = null;   // список приложений у каждого свой
+    if (window.REC) REC.packages = null;
+    if (window.APP_PICK) delete APP_PICK.byDevice[S.active];   // список приложений у каждого свой
     startStream();
     if (window.syncInteractive) syncInteractive();
 }
