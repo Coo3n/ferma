@@ -14,12 +14,14 @@ LONG_SLEEP = 60
 
 
 def validate(payload: dict, blocks: dict | None = None,
-             packages: set | None = None, assets: set | None = None) -> dict:
+             packages: set | None = None, assets: set | None = None,
+             library: set | None = None) -> dict:
     """{ok, errors[], warnings[]}; каждая запись {step, level, text}.
 
     `blocks` — {ключ: True, если блок загружается}; `packages` — установленные
     на устройстве пакеты (None — устройство не выбрано); `assets` — имена кропов,
-    приехавших вместе с запросом.
+    приехавших вместе с запросом; `library` — пакеты в библиотеке APK фермы
+    (None — не проверять).
     """
     out = {"errors": [], "warnings": []}
 
@@ -80,6 +82,11 @@ def validate(payload: dict, blocks: dict | None = None,
                 and not step.get("param") and step["args"]["package"] not in packages:
             add("warning", i, f"приложение {step['args']['package']} не установлено "
                               "на выбранном телефоне")
+        if kind == "ensure_app" and library is not None and not step.get("param") \
+                and step["args"]["install"] and step["args"]["package"] not in library:
+            add("warning", i, f"приложения {step['args']['package']} нет в библиотеке — "
+                              "шаг сможет только проверить; добавьте APK в "
+                              "Сценарии → Приложения")
     if good and good[-1][1].get("optional"):
         add("warning", good[-1][0], "последний шаг необязателен — прогон "
                                     "пройдёт, даже если он не сработает")

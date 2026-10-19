@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import PlainTextResponse
 
-from .. import adb, scenarios
+from .. import adb, apklib, scenarios
 from ..recorder import codegen, presets, save as saver, steps as schema, validate as recorder_validate
 
 router = APIRouter(prefix="/api/recorder")
@@ -90,7 +90,8 @@ def validate(payload: dict = Body(...)):
         except Exception:  # noqa: BLE001 — устройство не обязано отвечать
             packages = None
     assets = set(payload["assets"]) if isinstance(payload.get("assets"), dict) else None
-    return recorder_validate.validate(payload, blocks, packages, assets)
+    library = {a["package"] for a in apklib.list_all()}
+    return recorder_validate.validate(payload, blocks, packages, assets, library)
 
 
 @router.post("/save")
