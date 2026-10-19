@@ -138,3 +138,65 @@ def test_отмена_в_очереди(lib, monkeypatch):
     finally:
         for _ in range(4):
             apklib.SLOTS.release()
+
+
+def test_странное_имя_пакета_это_ApkError(lib):
+    bad = _apk(lib, name="odd.apk", package="x")
+    with pytest.raises(apkinfo.ApkError) as e:
+        apklib.add(bad)
+    assert "имя приложения" in str(e.value)
+    assert apklib.list_all() == []
+
+
+def test_сбой_копирования_не_оставляет_part(lib, monkeypatch):
+    import shutil
+
+    def boom(src, dst, *a, **k):
+        with open(dst, "wb") as fh:
+            fh.write(b"half")
+        raise OSError("диск полон")
+    monkeypatch.setattr(shutil, "copyfile", boom)
+    with pytest.raises(OSError):
+        apklib.add(_apk(lib))
+    assert list((lib / "data" / "apks").glob("*.part")) == []
+    assert apklib.list_all() == []
+
+
+def test_параллельное_добавление_одного_пакета(lib):
+    a = _apk(lib, name="a.apk", version_code=1, version_name="1")
+    b = _apk(lib, name="b.apk", version_code=2, version_name="2")
+    errs = []
+
+    def run(p):
+        try:
+            for _ in range(10):
+                apklib.add(p)
+        except Exception as e:  # noqa: BLE001
+            errs.append(e)
+    ts = [threading.Thread(target=run, args=(p,)) for p in (a, b)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    assert errs == []
+    row = apklib.get("com.vkontakte.android")
+    stored = lib / "data" / "apks" / "com.vkontakte.android.apk"
+    assert apklib._sha256(stored) == row["sha256"]
+    assert list(stored.parent.glob("*.part")) == []
+
+
+def test_переименовать_неизвестное_и_пустое(lib):
+    assert apklib.rename("com.nope.app", "Имя") is None
+    apklib.add(_apk(lib))
+    assert apklib.rename("com.vkontakte.android", "  ") is None
+    assert apklib.get("com.vkontakte.android")["name"] == "VK"
+
+
+def test_битый_индекс_сохраняется_копией(lib, caplog):
+    idx = lib / "data" / "apks.json"
+    idx.parent.mkdir(parents=True)
+    idx.write_text("{не json", "utf-8")
+    with caplog.at_level("WARNING", logger="farm.apklib"):
+        apklib.add(_apk(lib))
+    assert (lib / "data" / "apks.json.bad").read_text("utf-8") == "{не json"
+    assert any("apks.json" in r.getMessage() for r in caplog.records)

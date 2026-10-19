@@ -8,15 +8,19 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import shutil
+import tempfile
 import threading
 import time
 from pathlib import Path
 from typing import Callable
 
 from . import apkinfo, config, control
+
+log = logging.getLogger("farm.apklib")
 
 PACKAGE_RE = re.compile(r"^[A-Za-z][\w]*(\.[A-Za-z][\w]*)+$")
 # 40 телефонов × 100 МБ по USB разом кладут хаб: половина установок
@@ -64,11 +68,22 @@ def path_of(package: str) -> Path:
 
 
 def _load() -> dict:
+    path = _index_path()
     try:
-        data = json.loads(_index_path().read_text("utf-8"))
-    except (OSError, ValueError):
+        data = json.loads(path.read_text("utf-8"))
+    except FileNotFoundError:
         return {}
-    return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        data = None
+    if not isinstance(data, dict):
+        # Не молчим: следующая запись перезапишет индекс, оставим копию.
+        log.warning("индекс %s не читается — сохраняю копию .bad", path)
+        try:
+            shutil.copyfile(path, path.with_name(path.name + ".bad"))
+        except OSError:
+            pass
+        return {}
+    return data
 
 
 def _save(index: dict) -> None:
@@ -112,26 +127,35 @@ def add(src: Path, name: str = "") -> dict:
     """Положить APK в библиотеку (заменив прежний того же пакета)."""
     info = apkinfo.read(src)
     package = info["package"]
-    dest = path_of(package)
+    try:
+        dest = path_of(package)
+    except ValueError:
+        raise apkinfo.ApkError(f"в APK странное имя приложения: {package!r}") from None
     dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(".part")
-    shutil.copyfile(src, tmp)
-    sha = _sha256(tmp)
-    with _lock:
-        os.replace(tmp, dest)
-        index = _load()
-        old = index.get(package) or {}
-        index[package] = {
-            "name": (name or "").strip()[:60] or old.get("name") or name_of(package),
-            "version_name": info["version_name"],
-            "version_code": info["version_code"],
-            "min_sdk": info["min_sdk"],
-            "size": dest.stat().st_size,
-            "sha256": sha,
-            "added": time.time(),
-        }
-        _save(index)
-        return {"package": package, **index[package], "replaced": bool(old)}
+    fd, tmp_name = tempfile.mkstemp(dir=dest.parent, suffix=".part")
+    os.close(fd)
+    tmp = Path(tmp_name)
+    try:
+        shutil.copyfile(src, tmp)
+        sha = _sha256(tmp)
+        with _lock:
+            os.replace(tmp, dest)
+            index = _load()
+            old = index.get(package) or {}
+            index[package] = {
+                "name": (name or "").strip()[:60] or old.get("name") or name_of(package),
+                "version_name": info["version_name"],
+                "version_code": info["version_code"],
+                "min_sdk": info["min_sdk"],
+                "size": dest.stat().st_size,
+                "sha256": sha,
+                "added": time.time(),
+            }
+            _save(index)
+            return {"package": package, **index[package], "replaced": bool(old)}
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def rename(package: str, name: str) -> dict | None:
