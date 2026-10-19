@@ -29,12 +29,18 @@ async function appChoices(serial) {
                 rows = [];
             }
         }
-        APP_PICK.byDevice[serial] = rows.map(r => ({
+        const mapped = rows.map(r => ({
             package: r.package,
             label: r.label || recApp(r.package).replace(/[«»]/g, ''),
         }));
+        if (!rows.length) return mergeApps(mapped, lib);   // сбой не запоминаем
+        APP_PICK.byDevice[serial] = mapped;
     }
-    const list = APP_PICK.byDevice[serial].slice();
+    return mergeApps(APP_PICK.byDevice[serial], lib);
+}
+
+function mergeApps(base, lib) {
+    const list = base.slice();
     for (const a of lib) if (!list.some(x => x.package === a.package)) list.push(a);
     return list.sort((a, b) => (REC_APPS[a.package] ? 0 : 1) - (REC_APPS[b.package] ? 0 : 1)
         || a.label.localeCompare(b.label, 'ru'));
@@ -89,5 +95,5 @@ function appPickChanged(id, typing) {
     input.hidden = select.value !== APP_OTHER;
     if (!typing && !input.hidden) input.focus();
     const handler = APP_PICK.cb[id];
-    if (handler && (select.value !== APP_OTHER || typing)) handler(appPickValue(id));
+    if (handler && (select.value !== APP_OTHER || typing)) handler(appPickValue(id), !!typing);
 }

@@ -83,7 +83,7 @@ PHONE_CHECKS = {
 _PHONE_FIELDS = ("package", "version", "percent", "gb", "platform")
 _PHONE_WORDS = {"package": "приложение", "version": "версия", "percent": "заряд",
                 "gb": "место", "platform": "аккаунт"}
-VERSION_RE = re.compile(r"^\d+(\.\d+){0,4}$")
+VERSION_RE = re.compile(r"^\d+(\.\d+){0,4}\Z")
 
 NUMERIC = {"x", "y", "x1", "y1", "x2", "y2", "duration", "seconds", "timeout",
            "span", "times", "minutes", "pause_min", "pause_max", "percent", "tries", "gb"}

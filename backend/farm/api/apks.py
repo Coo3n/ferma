@@ -1,6 +1,7 @@
 """Библиотека APK: приложения, которые сценарий ставит сам (шаг ensure_app)."""
 from __future__ import annotations
 
+from starlette.concurrency import run_in_threadpool
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
 from .. import apkinfo, apklib
@@ -24,7 +25,7 @@ async def upload(request: Request, name: str = Query("app.apk")):
         raise HTTPException(400, "наборы .apks/.xapk пока не поддерживаются — нужен один файл .apk")
     tmp = await bulk._upload(request, name)
     try:
-        return apklib.add(tmp)
+        return await run_in_threadpool(apklib.add, tmp)
     except apkinfo.ApkError as e:
         raise HTTPException(400, str(e))
     finally:

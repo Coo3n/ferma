@@ -65,3 +65,16 @@ def test_заряд(monkeypatch):
     monkeypatch.setattr(facts.adb, "battery", lambda serial: {})
     with pytest.raises(facts.FactUnknown):
         facts.battery_level("S")
+
+
+@pytest.mark.parametrize("text", ["", "\n", "Error: something odd\n", "Packages:\n"])
+def test_пустой_ответ_не_значит_не_установлено(text):
+    with pytest.raises(facts.FactUnknown):
+        facts.parse_app_version(text)
+
+
+def test_регулярки_не_пускают_перевод_строки():
+    from farm import apklib
+    from farm.recorder import steps
+    assert not apklib.PACKAGE_RE.match("com.a.b\n")
+    assert not steps.VERSION_RE.match("1.2\n")

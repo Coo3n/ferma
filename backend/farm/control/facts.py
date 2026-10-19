@@ -25,7 +25,10 @@ def parse_app_version(text: str) -> dict | None:
     «Hidden system packages» со старой версией — её не берём."""
     name, code = _VNAME.search(text or ""), _VCODE.search(text or "")
     if not name and not code:
-        return None
+        # «Нет» — только по прямой фразе; пустой/странный ответ — не «нет».
+        if "Unable to find package" in (text or ""):
+            return None
+        raise FactUnknown("версия приложения")
     return {"name": name.group(1) if name else "", "code": int(code.group(1)) if code else 0}
 
 

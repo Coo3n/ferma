@@ -2436,9 +2436,10 @@ function recAddPick(key) {
         return;
     }
     if (PHONE_CARD_ARGS[key]) {
+        const before = REC.open;
         if (REC.sel && REC.sel.size) recSelBlock('if_phone');
         else recBlockNew('if_phone');
-        const head = recFind(REC.open);
+        const head = REC.open !== before ? recFind(REC.open) : null;   // отказ — прежний блок не трогаем
         if (head && head.kind === 'if_phone') {
             head.args = Object.assign({}, PHONE_CARD_ARGS[key]);
             recRender();
@@ -2959,7 +2960,7 @@ function recEnsureEditor(step) {
       </div>
       <label class="inline-check"><input type="checkbox" ${a.install !== false ? 'checked' : ''}
              onchange="recEnsureSet(${step.id}, 'install', this.checked)">
-        <span>${esc(t('rec.gotov_stavit'))}<small>${esc(note)}</small></span></label>`;
+        <span>${esc(t('rec.gotov_stavit'))}<small class="ens-note">${esc(note)}</small></span></label>`;
 }
 
 function recEnsureSet(id, key, value) {

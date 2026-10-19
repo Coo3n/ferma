@@ -528,7 +528,7 @@ function blockIfPhoneEditor(step) {
             onchange="recPhoneCheck(${step.id}, this.value)">${checks}</select>`)
         + `<div class="blk-ed-row"><div class="chips" role="group">${chip(false)}${chip(true)}</div></div>`
         + (fields.includes('package') ? row(t('rec.tel_kakoe'),
-            appPickHtml(pid, a.package, v => recBlockSet(step.id, 'package', v))) : '')
+            appPickHtml(pid, a.package, (v, typing) => recBlockSet(step.id, 'package', v, typing))) : '')
         + (fields.includes('version') ? row(t('rec.tel_versiya'), `<input type="text" class="blk-ed-n" placeholder="8.40"
             aria-label="${esc(t('rec.tel_versiya'))}" value="${esc(a.version || '')}"
             onchange="recBlockSet(${step.id}, 'version', this.value.trim())">`) : '')
@@ -623,7 +623,7 @@ function recUntilDrop(id, index) {
     recSave();
 }
 
-function recBlockSet(id, field, value) {
+function recBlockSet(id, field, value, typing) {
     const step = recFind(id);
     if (!blockIsHead(step)) return;
     const a = step.args;
@@ -661,7 +661,8 @@ function recBlockSet(id, field, value) {
         a[field] = Math.max(0, Number(value) || 0);
         if (a.pause_min > (a.pause_max ?? 0)) a.pause_max = a.pause_min;
     }
-    recRender();
+    /* Набор текста: перерисовка убрала бы поле из-под курсора. */
+    if (!typing) recRender();
     recSave();
 }
 

@@ -22,7 +22,7 @@ from . import apkinfo, config, control
 
 log = logging.getLogger("farm.apklib")
 
-PACKAGE_RE = re.compile(r"^[A-Za-z][\w]*(\.[A-Za-z][\w]*)+$")
+PACKAGE_RE = re.compile(r"^[A-Za-z][\w]*(\.[A-Za-z][\w]*)+\Z")
 # 40 телефонов × 100 МБ по USB разом кладут хаб: половина установок
 # отваливается по таймауту. Остальные ждут своей очереди.
 SLOTS = threading.BoundedSemaphore(4)
@@ -198,7 +198,9 @@ def usage() -> dict[str, int]:
     return out
 
 
-def _words(text: str) -> str:
+def _words(text: str, path: str = "") -> str:
+    if path:   # путь к APK содержит имя пакета («x.offline») — не причина отказа
+        text = text.replace(path, "")
     from .api.bulk import failure   # здесь, не сверху: api импортирует apklib
     reason = failure(text)["reason"]
     return REASON_WORDS.get(reason, "телефон отказался ставить приложение")
@@ -213,12 +215,13 @@ def install(serial: str, package: str,
         check_cancel()
     try:
         check_cancel()
+        apk = str(path_of(package))
         try:
-            out = control.install(serial, str(path_of(package))).strip()
+            out = control.install(serial, apk).strip()
         except Exception as e:  # noqa: BLE001 — adb: таймаут, отключение
-            raise InstallFailed(_words(str(e))) from None
+            raise InstallFailed(_words(str(e), apk)) from None
         if "Failure [" in out or "INSTALL_FAILED" in out:
-            raise InstallFailed(_words(out))
+            raise InstallFailed(_words(out, apk))
         return out
     finally:
         SLOTS.release()
