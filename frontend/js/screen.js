@@ -537,3 +537,22 @@ document.addEventListener('paste', ev => {
     ev.preventDefault();
     liveKeysPush({k: 'text', v: text});
 });
+
+/* Экран телефона погашен или заблокирован: поток показывает старый или
+   чёрный кадр, и казалось, что телефон «завис». Говорим, что с ним, и
+   даём разбудить одной кнопкой. Состояние приходит с опросом телефонов. */
+function syncScreenSleep() {
+    const box = $('scrSleep');
+    if (!box) return;
+    const device = (S.devices || []).find(d => d.serial === S.active);
+    const screen = device && device.online ? device.screen : null;
+    const mode = !screen ? '' : !screen.on ? 'off' : screen.locked ? 'locked' : '';
+    if (box.dataset.mode === mode) return;
+    box.dataset.mode = mode;
+    box.hidden = !mode;
+    setText($('scrSleepTitle'), mode === 'off' ? t('device.ekran_vyklyuchen')
+        : mode === 'locked' ? t('device.telefon_zablokirovan') : '');
+    setText(box.querySelector('button'), mode === 'locked' ? t('device.razblokirovat') : t('device.razbudit'));
+    const stage = document.querySelector('.stage');
+    if (stage) stage.classList.toggle('asleep', mode === 'off');
+}

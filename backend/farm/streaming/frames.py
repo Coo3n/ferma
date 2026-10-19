@@ -10,7 +10,7 @@ import logging
 import threading
 import time
 
-from .. import config, control
+from .. import adb, config, control
 from ..devices import pool as u2pool
 
 log = logging.getLogger("farm.screen")
@@ -103,6 +103,7 @@ class FrameSource:
                 if self._viewers == 0 and time.time() - self._last_request >= config.STREAM_IDLE_TIMEOUT:
                     break
             t0 = time.time()
+            screen_refresh(self.serial)
             try:
                 width = config.STREAM_MAX_WIDTH_LIVE if self._live_viewers else self.max_width
                 data = control.screenshot(self.serial, max_width=width, quality=config.STREAM_QUALITY)
@@ -187,6 +188,47 @@ def mjpeg(serial: str, live: bool = False):
         log.info("отключен зритель %s (осталось %d)", serial, src._viewers)
 
 
+# ---- горит ли экран ----
+# Погасший или заблокированный телефон отдаёт старый/чёрный кадр, и плитка
+# выглядела так, будто экран включён. Состояние узнаём в фоне (dumpsys —
+# сотни мс, ждать его в горячем пути кадра нельзя) и не чаще SCREEN_TTL.
+SCREEN_TTL = 4.0
+_screen: dict[str, tuple[float, dict]] = {}
+_screen_busy: set[str] = set()
+_screen_guard = threading.Lock()
+
+
+def _screen_check(serial: str, delay: float) -> None:
+    try:
+        time.sleep(delay)   # экрану нужно мгновение, чтобы погаснуть/загореться
+        state = adb.screen_state(serial)
+        if state is not None:
+            _screen[serial] = (time.time(), state)
+    finally:
+        with _screen_guard:
+            _screen_busy.discard(serial)
+
+
+def screen_refresh(serial: str, force: bool = False) -> None:
+    """Перепроверить экран в фоне, если сведения устарели (или force —
+    после «разбудить/погасить/разблокировать», чтобы плашка сменилась сразу)."""
+    hit = _screen.get(serial)
+    if not force and hit and time.time() - hit[0] < SCREEN_TTL:
+        return
+    with _screen_guard:
+        if serial in _screen_busy:
+            return
+        _screen_busy.add(serial)
+    threading.Thread(target=_screen_check, args=(serial, 0.7 if force else 0.0), daemon=True,
+                     name=f"screen-{serial}").start()
+
+
+def screen_info(serial: str) -> dict | None:
+    """Последнее известное состояние экрана или None, если ещё не знаем."""
+    hit = _screen.get(serial)
+    return hit[1] if hit else None
+
+
 def note_action(serial: str) -> None:
     """Действие человека на телефоне → ускорить захват, если кто-то смотрит."""
     src = _sources.get(serial)
@@ -251,8 +293,14 @@ def thumbnail(serial: str) -> bytes:
     снят, остаётся только ужать.
     """
     now = time.time()
+    screen_refresh(serial)
     cached = _thumbs.get(serial)
     if cached and now - cached[0] < config.THUMB_TTL:
+        return cached[1]
+    # Экран погашен — снимать нечего: кадр был бы чёрным или старым.
+    # Отдаём последний, плитка сама накроет его плашкой «экран выключен».
+    state = screen_info(serial)
+    if cached and state and not state["on"]:
         return cached[1]
 
     with _thumb_lock(serial):

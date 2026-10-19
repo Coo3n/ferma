@@ -670,3 +670,54 @@ button.pult-tag-add {
     line-height: var(--lh);
     color: var(--text);
 }
+
+/* Экран телефона погашен/заблокирован (syncScreenSleep). Выключен — кадр
+   приглушён и по центру кнопка; заблокирован — плашка сверху, кадр с
+   экраном блокировки остаётся виден целиком. */
+.stage.asleep #screen {
+    opacity: .25;
+    filter: grayscale(1);
+}
+
+.scr-sleep {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s3);
+    padding: var(--s4) var(--s5);
+    border-radius: var(--r3);
+    background: color-mix(in srgb, var(--panel) 92%, transparent);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-size: var(--fs-3);
+    text-align: center;
+}
+
+.scr-sleep[hidden] {
+    display: none;
+}
+
+.scr-sleep .ic {
+    width: 28px;
+    height: 28px;
+    color: var(--dim);
+}
+
+.scr-sleep[data-mode="locked"] {
+    top: var(--s4);
+    transform: translateX(-50%);
+    flex-direction: row;
+    padding: var(--s2) var(--s2) var(--s2) var(--s4);
+    border-radius: var(--pill);
+    font-size: var(--fs-2);
+}
+
+.scr-sleep[data-mode="locked"] .ic {
+    width: 18px;
+    height: 18px;
+}

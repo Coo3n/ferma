@@ -683,5 +683,10 @@
   "files.papka": "Папка",
   "files.prevyu_net": "Показать нельзя — скачайте файл",
   "files.peretaschite": "Бросьте файлы сюда — они попадут в эту папку",
-  "files.zakryt": "Закрыть"
+  "files.zakryt": "Закрыть",
+  "fleet.ekran_vyklyuchen": "экран выключен",
+  "fleet.zablokirovan": "заблокирован",
+  "device.ekran_vyklyuchen": "Экран телефона выключен",
+  "device.telefon_zablokirovan": "Телефон заблокирован",
+  "device.razbudit": "Разбудить"
 }

@@ -301,6 +301,129 @@ select {
     cursor: pointer;
 }
 
+/* Открытый список раньше рисовала система — своим шрифтом и светлым фоном
+   посреди тёмной консоли. Где браузер умеет base-select (Chrome 135+),
+   список целиком наш: Golos, графит, зелёная галочка у выбранного. В
+   остальных браузерах — хотя бы шрифт пунктов. */
+select option, select optgroup {
+    font-family: var(--sans);
+    font-size: var(--fs-3);
+    background-color: var(--panel2);
+    color: var(--text);
+}
+
+@supports (appearance: base-select) {
+    select:not([multiple]):not([size]),
+    select:not([multiple]):not([size])::picker(select) {
+        appearance: base-select;
+    }
+
+    select:not([multiple]):not([size]) {
+        display: inline-flex;
+        align-items: center;
+        color: var(--text);
+    }
+
+    /* Шеврон уже нарисован фоном выше — системный не дублируем. */
+    select::picker-icon {
+        display: none;
+    }
+
+    select:not([multiple]):not([size]):hover {
+        border-color: var(--line-hover);
+    }
+
+    select::picker(select) {
+        margin-top: var(--s1);
+        padding: var(--s1);
+        min-width: anchor-size(width);
+        max-height: min(360px, 60vh);
+        background: var(--panel2);
+        border: 1px solid var(--line-hover);
+        border-radius: var(--r2);
+        color: var(--text);
+        font-family: var(--sans);
+        box-shadow: 0 12px 32px color-mix(in srgb, var(--glass) 55%, transparent);
+        opacity: 0;
+        translate: 0 -4px;
+        transition: opacity var(--fast) var(--ease), translate var(--fast) var(--ease),
+                    overlay var(--fast) allow-discrete, display var(--fast) allow-discrete;
+    }
+
+    select:open::picker(select) {
+        opacity: 1;
+        translate: 0 0;
+    }
+
+    @starting-style {
+        select:open::picker(select) {
+            opacity: 0;
+            translate: 0 -4px;
+        }
+    }
+
+    select option {
+        display: flex;
+        align-items: center;
+        gap: var(--s2);
+        min-height: 34px;
+        padding: 6px var(--s2) 6px 10px;
+        border-radius: var(--r1);
+        background: transparent;
+        font-size: var(--fs-3);
+        line-height: var(--lh);
+        cursor: pointer;
+    }
+
+    select option:hover,
+    select option:focus-visible {
+        background: var(--panel3);
+        outline: none;
+    }
+
+    select option:checked {
+        color: var(--accent);
+    }
+
+    /* Галочка справа и только у выбранного: место под неё держим у всех,
+       чтобы подписи не прыгали. */
+    select option::checkmark {
+        order: 1;
+        margin-left: auto;
+        color: var(--accent);
+        content: "✓";
+        visibility: hidden;
+    }
+
+    select option:checked::checkmark {
+        visibility: visible;
+    }
+
+    select option:disabled {
+        color: var(--dim);
+        cursor: default;
+    }
+
+    select optgroup {
+        padding-top: var(--s1);
+        color: var(--dim);
+        font-size: var(--fs-1);
+        font-weight: 600;
+    }
+
+    select selectedcontent {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        select::picker(select) {
+            transition: none;
+        }
+    }
+}
+
 input::placeholder {
     color: var(--dim)
 }

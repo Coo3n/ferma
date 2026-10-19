@@ -1042,3 +1042,56 @@
 .tile[data-st="held"] { border-color: var(--warn-line); box-shadow: inset 0 3px 0 var(--warn); }
 .tile .flag.held { background: color-mix(in srgb, var(--warn) 18%, var(--panel)); color: var(--warn); }
 .dot.held { background: var(--warn); }
+
+/* Экран погашен или заблокирован (tileScreenState): последний кадр
+   приглушён, поверх — состояние словами. Заблокирован — только метка
+   внизу: кадр с экраном блокировки и так честный. */
+.tile .shot.asleep img.ready {
+    opacity: .28;
+    filter: grayscale(1);
+}
+
+.tile .shot .sleepy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s2);
+    color: var(--dim);
+    font-size: var(--fs-1);
+    text-align: center;
+    pointer-events: none;
+}
+
+.tile .shot .sleepy[hidden] {
+    display: none;
+}
+
+.tile .shot .sleepy .ic {
+    width: 26px;
+    height: 26px;
+    opacity: .8;
+}
+
+.tile .shot .sleepy[data-mode="locked"] {
+    inset: auto 0 var(--s2) 0;
+    flex-direction: row;
+    gap: var(--s1);
+}
+
+.tile .shot .sleepy[data-mode="locked"] span,
+.tile .shot .sleepy[data-mode="locked"] .ic {
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+}
+
+.tile .shot .sleepy[data-mode="locked"] span {
+    padding: 2px var(--s2);
+    border-radius: var(--pill);
+    color: var(--text);
+}
+
+.tile .shot .sleepy[data-mode="locked"] .ic {
+    display: none;
+}

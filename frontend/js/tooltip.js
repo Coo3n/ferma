@@ -14,9 +14,13 @@
     const tip = document.createElement('div');
     tip.id = 'tip';
     tip.setAttribute('role', 'tooltip');
-    tip.innerHTML = '<span class="tip-body"></span><i class="tip-arrow" aria-hidden="true"></i>';
+    tip.innerHTML = '<b class="tip-head"></b><span class="tip-body"></span>'
+        + '<span class="tip-keys"></span><i class="tip-arrow" aria-hidden="true"></i>';
     document.body.appendChild(tip);
-    const body = tip.firstChild, arrow = tip.lastChild;
+    const head = tip.querySelector('.tip-head'), body = tip.querySelector('.tip-body'),
+        keys = tip.querySelector('.tip-keys'), arrow = tip.querySelector('.tip-arrow');
+    const KEY_NAMES = {Escape: 'Esc', Space: 'Пробел', ArrowLeft: '←', ArrowRight: '→',
+        ArrowUp: '↑', ArrowDown: '↓'};
 
     let target = null, timer = 0;
 
@@ -58,7 +62,20 @@
     function show(el) {
         const text = textOf(el);
         if (!text || !el.isConnected) return;
-        body.textContent = text;
+        /* «Крупно — видно экран»: до тире — заголовок, после — пояснение.
+           Короткое начало, иначе тире внутри фразы рвало бы её пополам. */
+        const cut = text.indexOf(' — ');
+        const titled = cut > 0 && cut <= 32;
+        head.textContent = titled ? text.slice(0, cut) : '';
+        body.textContent = titled ? text.slice(cut + 3) : text;
+        tip.classList.toggle('has-head', titled);
+        const shortcuts = (el.getAttribute('aria-keyshortcuts') || '').split(/\s+/).filter(Boolean).slice(0, 4);
+        keys.innerHTML = '';
+        shortcuts.forEach(k => {
+            const kbd = document.createElement('kbd');
+            kbd.textContent = KEY_NAMES[k] || k;
+            keys.appendChild(kbd);
+        });
         tip.id = 'tip';
         el.setAttribute('aria-describedby', 'tip');
         tip.style.left = tip.style.top = '0px';

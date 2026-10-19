@@ -191,8 +191,20 @@ def action(serial: str, response: Response, payload: dict = Body(...)):
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, str(e))
     streaming.note_action(serial)
+    if _wakes_or_sleeps(payload):
+        streaming.screen_refresh(serial, force=True)
     response.headers["Server-Timing"] = f"act;dur={(time.perf_counter() - t0) * 1000:.1f}"
     return result or {"ok": True}
+
+
+SCREEN_KEYS = {"power", "wake", "sleep", "keycode_power", "keycode_wakeup", "keycode_sleep"}
+
+
+def _wakes_or_sleeps(payload: dict) -> bool:
+    """Действие, после которого экран мог загореться, погаснуть или открыться."""
+    kind = payload.get("type")
+    return kind in ("unlock", "screen_off") or (
+        kind == "key" and str(payload.get("name", "")).lower() in SCREEN_KEYS)
 
 
 @router.get("/{serial}/screenshot")

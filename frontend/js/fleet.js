@@ -211,6 +211,7 @@ function tileCreate(serial) {
         <span class="notch"></span>
         <div class="glass">
           <div class="noshot"><svg class="ic"><use href="#i-moon"/></svg><span></span></div>
+          <div class="sleepy" hidden><svg class="ic"><use href="#i-moon"/></svg><span></span></div>
         </div>
       </div>
       <span class="flag" hidden></span>
@@ -345,7 +346,9 @@ function tileUpdate(el, device, ghost) {
             thumbArm(img, device.serial);
         }
         setText(shot.querySelector('.noshot span'), '');
+        tileScreenState(shot, device.screen);
     } else {
+        tileScreenState(shot, null);
         // Скрытое явным действием рвём сразу; пропажу из опроса — только если
         // повторилась: настоящий USB-телефон мелькает офлайном сам по себе,
         // и рвать живое превью от каждого такого мига — источник «мигнуло и
@@ -363,6 +366,23 @@ function tileUpdate(el, device, ghost) {
     }
     el.setAttribute('aria-label',
         `${device.name}, ${statusWord(device)}. Открыть рабочее место`);
+}
+
+/* Погасший экран отдаёт последний кадр — без плашки плитка выглядела так,
+   будто телефон включён. Выключен: кадр приглушаем и пишем словами.
+   Заблокирован при горящем экране: кадр честный (виден экран блокировки),
+   хватает метки. */
+function tileScreenState(shot, screen) {
+    const box = shot.querySelector('.sleepy');
+    if (!box) return;
+    const mode = !screen ? '' : !screen.on ? 'off' : screen.locked ? 'locked' : '';
+    if (box.dataset.mode === mode) return;
+    box.dataset.mode = mode;
+    box.hidden = !mode;
+    shot.classList.toggle('asleep', mode === 'off');
+    setText(box.querySelector('span'), mode === 'off' ? t('fleet.ekran_vyklyuchen')
+        : mode === 'locked' ? t('fleet.zablokirovan') : '');
+    setHref(box.querySelector('use'), mode === 'locked' ? '#i-unlock' : '#i-moon');
 }
 
 /* Тот же href у <use> не переписываем: Chrome на любую запись атрибута
@@ -465,6 +485,7 @@ function setFleetFilter(name) {
 }
 
 function renderFleet() {
+    if (window.syncScreenSleep) syncScreenSleep();
     const box = $('fleet');
     if (!box) return;
     if (!S.devicesLoaded) return;   // ждём первый ответ фермы — см. pollDevices

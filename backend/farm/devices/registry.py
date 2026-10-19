@@ -113,6 +113,8 @@ class Device:
         d["power"] = power.guard.view(self.serial)
         from .. import accounts   # registry грузится раньше accounts — импорт по месту
         d["accounts"] = accounts.summary_for(self.serial)
+        # {"on", "locked"} или None — ещё не проверяли (кадров не просили).
+        d["screen"] = streaming.screen_info(self.serial) if self.online else None
         if not self.online:
             # Показывать заряд отключённого телефона нечестно: цифра старая,
             # а выглядит как текущая. Чистим на выдаче, а не только в момент

@@ -326,6 +326,65 @@ def battery(serial: str) -> dict:
     return out
 
 
+_LOCK_RE = re.compile(r"\b(mshowinglockscreen|iskeyguardshowing|mkeyguardshowing|mdreaminglockscreen)=(true|false)")
+_KG_SHOWING = re.compile(r"^showing=(true|false)\b")
+
+
+def parse_screen_state(out: str) -> dict:
+    """Вывод dumpsys power/window → {"on", "locked", "known"}.
+
+    on — экран горит. Always On Display (Samsung, Xiaomi) — это Dozing /
+    Display Power: state=DOZE: часы на чёрном, пользоваться нельзя — считаем
+    выключенным. locked — висит экран блокировки: AOSP пишет «showing=» в
+    блоке KeyguardServiceDelegate (One UI и MIUI/HyperOS его сохраняют),
+    старые прошивки — mShowingLockscreen, новые activity-дампы —
+    mKeyguardShowing. «showing=» вне блока Keyguard не считаем: такие строки
+    бывают у других частей системы. known — нашлась ли хоть одна строка
+    про питание экрана (нет — grep на телефоне не сработал).
+    """
+    on = None
+    locked = False
+    kg_indent = None   # отступ заголовка KeyguardServiceDelegate, пока внутри блока
+    for line in out.splitlines():
+        s = line.strip()
+        low = s.lower()
+        indent = len(line) - len(line.lstrip())
+        if "keyguardservicedelegate" in low:
+            kg_indent = indent
+            continue
+        if kg_indent is not None and s and indent <= kg_indent:
+            kg_indent = None   # блок кончился: дальше чужие «showing=»
+        if s.startswith("mWakefulness="):
+            on = s.split("=", 1)[1].strip().lower() == "awake"
+        elif s.startswith("Display Power: state=") and on is None:
+            on = s.rsplit("=", 1)[1].strip().upper() == "ON"
+        m = _LOCK_RE.search(low)
+        if m and m.group(2) == "true":
+            locked = True
+        m = _KG_SHOWING.match(low)
+        if m and kg_indent is not None and m.group(1) == "true":
+            locked = True
+    return {"on": True if on is None else on, "locked": locked, "known": on is not None}
+
+
+SCREEN_STATE_CMD = (
+    "dumpsys power | grep -E 'mWakefulness=|Display Power: state='; "
+    "dumpsys window policy | grep -iE 'keyguardservicedelegate|^ *showing=|lockscreen=|keyguardshowing'")
+
+
+def screen_state(serial: str) -> dict | None:
+    """Горит ли экран и заблокирован ли телефон. None — узнать не удалось."""
+    try:
+        state = parse_screen_state(shell(serial, SCREEN_STATE_CMD, timeout=5))
+        if not state["known"]:
+            # Прошивка без grep -E (старые MIUI) — разбираем дампы целиком.
+            state = parse_screen_state(
+                shell(serial, "dumpsys power; dumpsys window policy", timeout=8))
+    except AdbError:
+        return None
+    return {"on": state["on"], "locked": state["locked"]} if state["known"] else None
+
+
 _WM_SIZE = re.compile(r"(\d+)x(\d+)")
 
 

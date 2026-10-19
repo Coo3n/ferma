@@ -1,34 +1,87 @@
-/* Подсказки (tooltip.js): одна карточка на всё приложение. */
+/* Подсказки (tooltip.js): одна карточка на всё приложение.
+   Светлее любой панели — читается поверх графита без тени-свечения;
+   «Крупно — видно экран» делится на заголовок и пояснение. */
 #tip {
+    --tip-bg: color-mix(in srgb, var(--panel3) 82%, var(--text) 8%);
     position: fixed;
     z-index: 9999;
-    max-width: min(320px, calc(100vw - 16px));
-    padding: var(--s2, 8px) var(--s3, 12px);
-    background: var(--panel3);
+    max-width: min(280px, calc(100vw - 16px));
+    padding: var(--s2) var(--s3);
+    background: var(--tip-bg);
     color: var(--text);
     border: 1px solid var(--line-hover);
     border-radius: var(--r2);
-    font-size: var(--fs-1);
+    font-family: var(--sans);
+    font-size: var(--fs-2);
     line-height: 1.45;
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--bg) 70%, transparent);
     pointer-events: none;
     opacity: 0;
-    transform: translateY(3px);
-    transition: opacity var(--fast) var(--ease), transform var(--fast) var(--ease-out);
+    transform: translateY(4px);
+    transition: opacity 140ms var(--ease-out), transform 140ms var(--ease-out);
 }
-#tip[data-side="bottom"] { transform: translateY(-3px); }
+
+#tip[data-side="bottom"] { transform: translateY(-4px); }
 #tip.on { opacity: 1; transform: none; }
-#tip .tip-body { display: block; overflow-wrap: anywhere; white-space: pre-line; }
+
+#tip .tip-head {
+    display: block;
+    font-weight: 600;
+    color: var(--text);
+}
+
+#tip .tip-head:empty { display: none; }
+
+#tip .tip-body {
+    display: block;
+    overflow-wrap: anywhere;
+    white-space: pre-line;
+    color: var(--text);
+}
+
+/* С заголовком пояснение тише — иерархия без второго размера шрифта. */
+#tip.has-head .tip-body {
+    margin-top: 2px;
+    color: var(--text2);
+}
+
+#tip .tip-keys {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s1);
+    margin-top: var(--s2);
+}
+
+#tip .tip-keys:empty { display: none; }
+
+#tip kbd {
+    min-width: 22px;
+    padding: 1px 6px;
+    border: 1px solid var(--line-hover);
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    background: var(--panel2);
+    color: var(--text2);
+    font-family: var(--sans);
+    font-size: var(--fs-1);
+    text-align: center;
+}
+
+/* Стрелка — повёрнутый квадрат с двумя рамками; скругление делает её мягче. */
 #tip .tip-arrow {
     position: absolute;
-    width: 8px;
-    height: 8px;
-    margin-left: -4px;
-    background: var(--panel3);
+    width: 10px;
+    height: 10px;
+    margin-left: -5px;
+    background: var(--tip-bg);
     border: 1px solid var(--line-hover);
+    border-radius: 2px;
     transform: rotate(45deg);
 }
-#tip[data-side="top"] .tip-arrow { bottom: -5px; border-top: 0; border-left: 0; }
-#tip[data-side="bottom"] .tip-arrow { top: -5px; border-bottom: 0; border-right: 0; }
+
+#tip[data-side="top"] .tip-arrow { bottom: -6px; border-top: 0; border-left: 0; }
+#tip[data-side="bottom"] .tip-arrow { top: -6px; border-bottom: 0; border-right: 0; }
+
 @media (prefers-reduced-motion: reduce) {
-    #tip { transition: none; transform: none; }
+    #tip, #tip[data-side="bottom"] { transition: none; transform: none; }
 }
