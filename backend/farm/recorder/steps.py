@@ -50,12 +50,20 @@ ARGS = {
     "finish": ((), ("result", "reason")),
     # Выполнить другой сохранённый сценарий как шаг (ctx.run).
     "call": (("scenario",), ()),
+    # «Если на телефоне»: следующие span шагов выполняются, только если факт
+    # о телефоне верен (или, с negate, неверен). Поля — по виду check,
+    # см. PHONE_CHECKS.
+    "if_phone": (("span", "check"), ("negate", "package", "version", "percent", "gb",
+                                     "platform")),
+    # «Приложение готово»: установлено и не старее min_version; нет — поставить
+    # из библиотеки APK фермы (install=False — только проверить).
+    "ensure_app": (("package",), ("min_version", "install")),
 }
 
 # Блоки — шаги-рамки: тело — следующие span шагов. Вкладываются друг в друга
 # не глубже BLOCK_DEPTH_MAX: «повтор → с шансом → пока не найдёшь» читается,
 # четвёртый уровень — уже нет.
-BLOCKS = {"loop", "chance", "until", "if_seen"}
+BLOCKS = {"loop", "chance", "until", "if_seen", "if_phone"}
 LOOPS = {"loop", "until"}   # из них выходит break
 FINISH_RESULTS = ("ok", "fail")
 IF_SEEN_TIMEOUT_MAX = 60
@@ -63,9 +71,23 @@ BLOCK_DEPTH_MAX = 3
 UNTIL_TRIES_MAX = 200
 UNTIL_ON_FAIL = ("skip", "fail", "ask")
 
+# Проверки блока «Если на телефоне» и поля, которые каждой нужны.
+PHONE_CHECKS = {
+    "app_installed": ("package",),
+    "app_older": ("package", "version"),
+    "battery_below": ("percent",),
+    "offline": (),
+    "space_below": ("gb",),
+    "no_account": ("platform",),
+}
+_PHONE_FIELDS = ("package", "version", "percent", "gb", "platform")
+_PHONE_WORDS = {"package": "приложение", "version": "версия", "percent": "заряд",
+                "gb": "место", "platform": "аккаунт"}
+VERSION_RE = re.compile(r"^\d+(\.\d+){0,4}$")
+
 NUMERIC = {"x", "y", "x1", "y1", "x2", "y2", "duration", "seconds", "timeout",
-           "span", "times", "minutes", "pause_min", "pause_max", "percent", "tries"}
-BOOLEAN = {"clear", "watch", "negate"}
+           "span", "times", "minutes", "pause_min", "pause_max", "percent", "tries", "gb"}
+BOOLEAN = {"clear", "watch", "negate", "install"}
 
 # Потолки повтора: сутки и десять тысяч кругов — дальше это уже не сценарий,
 # а забытый на ночь цикл, который держит телефон.
@@ -76,13 +98,13 @@ LOOP_PAUSE_MAX = 600
 # Шаги, чьё значение можно вынести в PARAMS. Селекторы сюда не входят:
 # они хранятся готовой строкой из farm/ui/selectors.py и не разбираются.
 PARAMETRIZABLE = {"type", "launch_app", "open_url", "stop_app", "shell", "sleep",
-                  "screenshot"}
+                  "screenshot", "ensure_app"}
 
 
 # Шаги, которым допустимы «пропустить при неудаче» и «повторить». Проверки
 # экрана (expect/branch) и sleep сюда не входят: у них своя логика ожидания.
 FLEXIBLE = {"click", "tap", "long_tap", "swipe", "type", "key", "launch_app",
-            "open_url", "stop_app", "shell", "screenshot", "unlock"}
+            "open_url", "stop_app", "shell", "screenshot", "unlock", "ensure_app"}
 RETRIES_MAX = 5
 
 _LABELS = {
@@ -95,6 +117,7 @@ _LABELS = {
     "chance": "С шансом", "until": "Пока не найдёшь",
     "if_seen": "Если на экране", "break": "Выйти из повтора",
     "finish": "Закончить сценарий", "call": "Сценарий",
+    "if_phone": "Если на телефоне", "ensure_app": "Приложение готово",
 }
 
 
@@ -122,6 +145,28 @@ def label_of(step: dict) -> str:
         tail = m.group(1) if m else ""
         if kind == "if_seen" and args.get("negate"):
             base = "Если нет на экране"
+    elif kind == "if_phone":
+        check = args.get("check")
+        if check == "app_installed":
+            tail = args.get("package", "")
+            if args.get("negate"):
+                base = "Если на телефоне нет"
+        elif check == "app_older":
+            tail = f'{args.get("package", "")} старее {args.get("version", "")}'
+        elif check == "battery_below":
+            tail = f'заряд меньше {_minutes_text(args.get("percent"))}%'
+        elif check == "offline":
+            tail = "нет интернета"
+        elif check == "space_below":
+            tail = f'свободно меньше {_minutes_text(args.get("gb"))} ГБ'
+        elif check == "no_account":
+            tail = f'нет аккаунта {args.get("platform", "")}'
+        if args.get("negate") and check != "app_installed":
+            base = "Если на телефоне НЕ"
+    elif kind == "ensure_app":
+        tail = args.get("package", "")
+        if args.get("min_version"):
+            tail += f' не ниже {args["min_version"]}'
     elif kind == "call":
         tail = args.get("scenario", "")
     elif kind == "finish":
@@ -567,6 +612,10 @@ def normalize_step(raw) -> dict:
         _check_until(step["args"])
     elif kind == "if_seen":
         _check_if_seen(step["args"])
+    elif kind == "if_phone":
+        _check_if_phone(step["args"])
+    elif kind == "ensure_app":
+        _check_ensure_app(step["args"])
     elif kind == "finish":
         _check_finish(step["args"])
     elif kind == "call":
@@ -649,6 +698,47 @@ def _check_if_seen(args: dict) -> None:
         raise StepError(f"«если на экране»: ждать от 0 до {IF_SEEN_TIMEOUT_MAX} с")
     args["timeout"] = timeout
     args["negate"] = bool(args.get("negate"))
+
+
+def _check_if_phone(args: dict) -> None:
+    _span(args, "«если на телефоне»")
+    check = args["check"]
+    if check not in PHONE_CHECKS:
+        raise StepError(f"«если на телефоне»: условие одно из {', '.join(PHONE_CHECKS)}")
+    need = PHONE_CHECKS[check]
+    for field in _PHONE_FIELDS:
+        if field not in need:
+            args.pop(field, None)
+        elif args.get(field) in (None, ""):
+            raise StepError(f"«если на телефоне»: не задано — {_PHONE_WORDS[field]}")
+    from ..apklib import PACKAGE_RE
+    if "package" in need and not PACKAGE_RE.match(args["package"]):
+        raise StepError("«если на телефоне»: приложение — вида com.example.app")
+    if "version" in need and not VERSION_RE.match(args["version"]):
+        raise StepError("«если на телефоне»: версия — числа через точку, например 8.40")
+    if "percent" in need:
+        if not 1 <= args["percent"] <= 99:
+            raise StepError("«если на телефоне»: заряд от 1 до 99 %")
+        args["percent"] = int(args["percent"])
+    if "gb" in need and not 0.1 <= args["gb"] <= 256:
+        raise StepError("«если на телефоне»: место от 0.1 до 256 ГБ")
+    if "platform" in need:
+        from ..accounts import PLATFORMS
+        if args["platform"] not in PLATFORMS:
+            raise StepError(f"«если на телефоне»: аккаунт одной из платформ {', '.join(PLATFORMS)}")
+    args["negate"] = bool(args.get("negate"))
+
+
+def _check_ensure_app(args: dict) -> None:
+    from ..apklib import PACKAGE_RE
+    if not PACKAGE_RE.match(args["package"]):
+        raise StepError("«приложение готово»: приложение — вида com.example.app")
+    version = args.pop("min_version", "") or ""
+    if version:
+        if not VERSION_RE.match(version):
+            raise StepError("«приложение готово»: версия — числа через точку, например 8.40")
+        args["min_version"] = version
+    args["install"] = bool(args.get("install", True))
 
 
 def _check_finish(args: dict) -> None:
@@ -774,6 +864,7 @@ def schema() -> dict:
                                   "снова, не больше max раз; без поля не листает"},
         "until_on_fail": list(UNTIL_ON_FAIL),
         "finish_results": list(FINISH_RESULTS),
+        "phone_checks": {k: list(v) for k, v in PHONE_CHECKS.items()},
         "limits": {
             "block_depth": BLOCK_DEPTH_MAX, "until_tries": UNTIL_TRIES_MAX,
             "loop_times": LOOP_TIMES_MAX, "loop_minutes": LOOP_MINUTES_MAX,
