@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import struct
 import zipfile
+import zlib
 
 RES_STRING_POOL = 0x0001
 RES_XML = 0x0003
@@ -36,11 +37,14 @@ def read(path) -> dict:
         raise ApkError("это не APK: внутри нет AndroidManifest.xml") from None
     except OSError as e:
         raise ApkError(f"файл не читается: {e}") from None
+    except (RuntimeError, NotImplementedError, zlib.error, EOFError):
+        # шифрование, неизвестное сжатие, битый или обрезанный поток
+        raise ApkError("манифест APK повреждён") from None
     try:
         info = parse_manifest(data)
-    except (struct.error, IndexError, ValueError) as e:
-        if isinstance(e, ApkError):
-            raise
+    except ApkError:
+        raise
+    except (struct.error, IndexError, ValueError):
         raise ApkError("манифест APK повреждён") from None
     if not info["package"]:
         raise ApkError("в APK не указано приложение (package)")

@@ -47,12 +47,13 @@ def _start(tag, attrs):
     return struct.pack("<HHIII", 0x0102, 16, 16 + len(body), 1, NO) + body
 
 
-def manifest(package, version_code, version_name, min_sdk=21, utf8=False, bare_names=False):
+def manifest(package, version_code, version_name, min_sdk=21, utf8=False, bare_names=False,
+             with_package=True):
     names = ["", "", ""] if bare_names else ["versionCode", "versionName", "minSdkVersion"]
     strings = names + ["package", "manifest", "uses-sdk", package, version_name]
     body = (_pool(strings, utf8) + _resmap()
-            + _start(4, [_attr(3, string=6), _attr(0, number=version_code),
-                         _attr(1, string=7)])
+            + _start(4, [*([_attr(3, string=6)] if with_package else []),
+                         _attr(0, number=version_code), _attr(1, string=7)])
             + _start(5, [_attr(2, number=min_sdk)]))
     return struct.pack("<HHI", 0x0003, 8, 8 + len(body)) + body
 

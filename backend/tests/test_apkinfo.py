@@ -44,3 +44,23 @@ def test_битый_манифест(tmp_path):
 def test_текстовый_манифест_не_принимаем():
     with pytest.raises(apkinfo.ApkError, match="двоичном"):
         apkinfo.parse_manifest(b"<manifest package='a.b'/>")
+
+
+def test_манифест_без_package(tmp_path):
+    path = _axml.apk(tmp_path / "x.apk", with_package=False, **KW)
+    with pytest.raises(apkinfo.ApkError, match="не указано приложение"):
+        apkinfo.read(path)
+
+
+def test_битые_сжатые_данные_манифеста(tmp_path):
+    path = tmp_path / "x.apk"
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("AndroidManifest.xml", _axml.manifest(**KW))
+    with zipfile.ZipFile(path) as z:
+        info = z.getinfo("AndroidManifest.xml")
+    raw = bytearray(path.read_bytes())
+    start = info.header_offset + 30 + len(info.filename)
+    raw[start:start + info.compress_size] = b"\xff" * info.compress_size
+    path.write_bytes(bytes(raw))
+    with pytest.raises(apkinfo.ApkError, match="повреждён"):
+        apkinfo.read(path)
