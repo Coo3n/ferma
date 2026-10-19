@@ -49,3 +49,4 @@ backend/scenarios/*
 
 # сами скачанные run.sh/run.bat инструменты (adb, scrcpy)
 .deps/
+/run-log.txt

@@ -18,6 +18,9 @@ try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::
 
 Set-Location -LiteralPath $PSScriptRoot
 $win = ($env:OS -eq 'Windows_NT')
+# Всё, что видно в окне, пишется и в run-log.txt — его можно прислать, если что-то не так.
+try { Start-Transcript -Path (Join-Path $PSScriptRoot 'run-log.txt') -Force | Out-Null } catch {}
+Write-Host '-> Проверяю, что уже установлено (Python, adb, scrcpy)...' -ForegroundColor Cyan
 $deps = Join-Path $PSScriptRoot '.deps'
 $sep = [IO.Path]::PathSeparator
 
@@ -45,11 +48,35 @@ function Add-ToPath($dir) { $env:PATH = "$dir$sep$env:PATH" }
 function Add-ToPathEnd($dir) { $env:PATH = "$env:PATH$sep$dir" }
 
 # ------------------------------------------------------------------ Python 3.10+
-function Test-Py($exe) {
+# Запуск программы с закрытым вводом и тайм-аутом. Новый py.exe (Python Install
+# Manager) и заглушки python.exe, не найдя Python, молча спрашивают «поставить?»
+# и ждут ответа — а вопрос не виден, и окно казалось пустым и зависшим.
+# Закрытый ввод даёт им «нет», тайм-аут добивает остальное.
+function Invoke-Quiet($exe, [string[]]$argv, [int]$seconds = 15) {
     try {
-        & $exe -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" 2>$null | Out-Null
-        return ($LASTEXITCODE -eq 0)
-    } catch { return $false }
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $exe
+        $psi.Arguments = ($argv | ForEach-Object { if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ } }) -join ' '
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $psi.RedirectStandardInput = $true
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        $proc.StandardInput.Close()
+        $out = $proc.StandardOutput.ReadToEndAsync()
+        $null = $proc.StandardError.ReadToEndAsync()
+        if (-not $proc.WaitForExit($seconds * 1000)) {
+            try { $proc.Kill() } catch {}
+            return @{ code = -1; out = '' }
+        }
+        return @{ code = $proc.ExitCode; out = "$($out.Result)".Trim() }
+    } catch { return @{ code = -1; out = '' } }
+}
+
+function Test-Py($exe) {
+    $r = Invoke-Quiet $exe @('-c', 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)')
+    return ($r.code -eq 0)
 }
 
 function Find-Py {
@@ -59,13 +86,16 @@ function Find-Py {
         Get-Command $name -CommandType Application -ErrorAction SilentlyContinue | ForEach-Object { $cands += $_.Source }
     }
     if ($win) {
-        if (Get-Command py -ErrorAction SilentlyContinue) {
-            try { $p = (& py -3 -c "import sys; print(sys.executable)" 2>$null); if ($p) { $cands += "$p".Trim() } } catch {}
+        $pyl = Get-Command py -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($pyl -and $pyl.Source -notmatch '\\WindowsApps\\') {
+            $r = Invoke-Quiet $pyl.Source @('-3', '-c', 'import sys; print(sys.executable)')
+            if ($r.code -eq 0 -and $r.out) { $cands += ($r.out -split "`n")[-1].Trim() }
         }
         $cands += Get-ChildItem "$env:LOCALAPPDATA\Programs\Python\Python3*\python.exe" -ErrorAction SilentlyContinue |
             Sort-Object FullName -Descending | ForEach-Object { $_.FullName }
     }
     foreach ($exe in $cands) {
+        if ($exe) { Write-Host "   проверяю $exe" }
         # Заглушка python.exe из WindowsApps не Python, а ярлык в Microsoft Store:
         # её запуск открывал бы магазин.
         if (-not $exe -or $exe -match '\\WindowsApps\\') { continue }
@@ -182,6 +212,9 @@ $port = if ($env:FARM_PORT) { $env:FARM_PORT } else { '8777' }
 $url = "http://${hostName}:${port}"
 Say "Ферма поднимается на $url  (остановить — Ctrl+C)"
 if ($win) { Start-Process $url }
+# Журнал нужен для установки; логи сервера в него не пишем — иначе PowerShell
+# красит их красным, как будто это ошибки.
+try { Stop-Transcript | Out-Null } catch {}
 Set-Location -LiteralPath (Join-Path $PSScriptRoot 'backend')
 & $vpy -m farm.server
 exit $LASTEXITCODE

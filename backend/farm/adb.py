@@ -42,6 +42,11 @@ def adb_path() -> str:
 
 ADB = adb_path()
 
+# Как поставить adb — своими словами для каждой системы.
+_ADB_HINT = ("Запустите run.bat — он скачает adb сам, или поставьте Platform-Tools: "
+             "https://developer.android.com/tools/releases/platform-tools") if os.name == "nt" else (
+             "Запустите ./run.sh — он скачает adb сам, или: brew install --cask android-platform-tools")
+
 
 class AdbError(RuntimeError):
     pass
@@ -56,7 +61,7 @@ def _exec(args: list[str], timeout: float | None = None) -> subprocess.Completed
             timeout=timeout if timeout is not None else config.ADB_TIMEOUT,
         )
     except FileNotFoundError as e:
-        raise AdbError(f"adb не найден ({ADB}). Установите: brew install --cask android-platform-tools") from e
+        raise AdbError(f"adb не найден ({ADB}). {_ADB_HINT}") from e
     except subprocess.TimeoutExpired as e:
         raise AdbError(f"adb таймаут: {' '.join(args)}") from e
 
