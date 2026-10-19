@@ -7,6 +7,8 @@ from farm.recorder import presets, steps
 def _dummy(spec):
     if spec.get("choices"):
         return next(iter(spec["choices"]))   # первый вариант выбора
+    if spec.get("version"):
+        return "8.40"
     return "1.5" if spec.get("number") else "com.example.app"
 
 
@@ -43,3 +45,9 @@ def test_подстановка_значений():
     assert [s["args"] for s in filled] == [
         {"package": "com.a"}, {"seconds": 1}, {"package": "com.a"},
     ]
+
+
+def test_приложение_готово_по_умолчанию_ставит():
+    preset = next(p for p in presets.PRESETS if p["key"] == "ensure_app")
+    filled = presets.fill(preset, {"package": "com.a.b", "min_version": ""})
+    assert steps.normalize_step(filled[0])["args"] == {"package": "com.a.b", "install": True}

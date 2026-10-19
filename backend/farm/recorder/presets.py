@@ -56,6 +56,17 @@ PRESETS = [
         "steps": [{"kind": "shell", "args": {"cmd": "pm clear {package}"}}],
     },
     {
+        "key": "ensure_app",
+        "title": "Приложение готово",
+        "desc": "Проверить, что приложение стоит, и поставить из библиотеки, если нет",
+        "inputs": [_PACKAGE,
+                   {"name": "min_version", "label": "Версия не ниже", "hint": "любая",
+                    "optional": True, "version": True}],
+        "steps": [{"kind": "ensure_app",
+                   "args": {"package": "{package}", "min_version": "{min_version}",
+                            "install": True}}],
+    },
+    {
         "key": "open_url",
         "title": "Открыть ссылку",
         "desc": "URL уходит в браузер по умолчанию",
