@@ -31,10 +31,10 @@ def _require_online(serial: str):
 
 
 @router.get("/{serial}/stream")
-def stream(serial: str):
+def stream(serial: str, live: bool = False):
     _require_online(serial)
     return StreamingResponse(
-        streaming.mjpeg(serial),
+        streaming.mjpeg(serial, live),
         media_type=f"multipart/x-mixed-replace; boundary={streaming.BOUNDARY}",
         headers={"Cache-Control": "no-store"},
     )
@@ -84,7 +84,9 @@ def _text(serial, p):
 
 
 def _key(serial, p):
-    control.key(serial, p["name"])
+    # count — удержанная клавиша (Backspace): одним запросом, а не десятью
+    for _ in range(max(1, min(int(p.get("count", 1)), 50))):
+        control.key(serial, p["name"])
 
 
 def _launch(serial, p):
@@ -152,6 +154,7 @@ def action(serial: str, payload: dict = Body(...)):
         raise HTTPException(400, str(e))
     except Exception as e:  # noqa: BLE001
         raise HTTPException(500, str(e))
+    streaming.note_action(serial)
     return result or {"ok": True}
 
 

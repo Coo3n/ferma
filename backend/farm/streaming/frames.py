@@ -30,6 +30,10 @@ class FrameSource:
         self._cond = threading.Condition()
         self._last_request = 0.0
         self._viewers = 0
+        self._live_viewers = 0      # зрители с ?live=1: человек управляет телефоном
+        self._burst_until = 0.0     # после действия снимаем кадры без пауз
+        self._wake = threading.Event()
+        self.alive_at = time.time()  # последний удачный захват, даже если кадр не изменился
         self._thread: threading.Thread | None = None
         # RLock, а не Lock: add_viewer() держит его и вызывает _ensure_running(),
         # который берёт тот же замок. С обычным Lock это вечный дедлок.
@@ -40,14 +44,30 @@ class FrameSource:
         self._last_request = time.time()
         self._ensure_running()
 
-    def add_viewer(self) -> None:
+    def add_viewer(self, live: bool = False) -> None:
         with self._lock:
             self._viewers += 1
+            if live:
+                self._live_viewers += 1
             self._ensure_running()
 
-    def remove_viewer(self) -> None:
+    def remove_viewer(self, live: bool = False) -> None:
         with self._lock:
             self._viewers = max(0, self._viewers - 1)
+            if live:
+                self._live_viewers = max(0, self._live_viewers - 1)
+
+    def note_action(self) -> None:
+        """Человек только что тронул телефон: ответ должен быть виден сразу,
+        а не через шаг обычной частоты кадров."""
+        self._burst_until = time.time() + config.STREAM_BURST_SECONDS
+        self._wake.set()
+
+    def _interval(self) -> float:
+        if time.time() < self._burst_until:
+            return 0.0
+        fps = config.STREAM_FPS_LIVE if self._live_viewers else self.fps
+        return 1.0 / max(fps, 0.5)
 
     def new_generation(self) -> int:
         """Пометить всех текущих зрителей как устаревших и разбудить их.
@@ -78,18 +98,22 @@ class FrameSource:
     # ---- захват ----
     def _loop(self) -> None:
         log.info("старт трансляции %s", self.serial)
-        interval = 1.0 / max(self.fps, 0.5)
         while True:
             with self._lock:
                 if self._viewers == 0 and time.time() - self._last_request >= config.STREAM_IDLE_TIMEOUT:
                     break
             t0 = time.time()
             try:
-                data = control.screenshot(self.serial, max_width=self.max_width, quality=config.STREAM_QUALITY)
+                width = config.STREAM_MAX_WIDTH_LIVE if self._live_viewers else self.max_width
+                data = control.screenshot(self.serial, max_width=width, quality=config.STREAM_QUALITY)
                 with self._cond:
-                    self.frame = data
-                    self.seq += 1
+                    self.alive_at = time.time()
                     self.error = ""
+                    # Тот же кадр не шлём: экран стоит — трафик и перерисовка
+                    # браузера не нужны. alive_at держит поток живым.
+                    if data != self.frame:
+                        self.frame = data
+                        self.seq += 1
                     self._cond.notify_all()
             except Exception as e:  # noqa: BLE001
                 self.error = str(e)[:200]
@@ -97,7 +121,9 @@ class FrameSource:
                     self._cond.notify_all()
                 time.sleep(1.0)
             elapsed = time.time() - t0
-            time.sleep(max(0.0, interval - elapsed))
+            # Event вместо sleep: действие человека будит захват сразу.
+            self._wake.wait(max(0.0, self._interval() - elapsed))
+            self._wake.clear()
         log.info("стоп трансляции %s (нет зрителей)", self.serial)
 
     @property
@@ -125,11 +151,13 @@ def drop(serial: str) -> None:
         src.new_generation()  # осиротевший источник — закрыть его зрителей
 
 
-def mjpeg(serial: str):
-    """Генератор multipart/x-mixed-replace для тега <img>."""
+def mjpeg(serial: str, live: bool = False):
+    """Генератор multipart/x-mixed-replace для тега <img>.
+
+    live — смотрит тот, кто управляет телефоном: кадры чаще и крупнее."""
     src = source(serial)
     gen = src.new_generation()
-    src.add_viewer()
+    src.add_viewer(live)
     src.touch()
     # Именно 0, а не -1: при seq == last_seq wait_frame() спит на условии,
     # а с -1 первый кадр ждался бы холостым циклом на полной загрузке CPU.
@@ -143,7 +171,7 @@ def mjpeg(serial: str):
             src.touch()
             frame, seq = src.wait_frame(last_seq, timeout=5.0)
             if frame is None or seq == last_seq:
-                if time.time() - idle_since > 30:
+                if time.time() - max(idle_since, src.alive_at) > 30:
                     break  # устройство молчит полминуты — закрыть поток
                 continue
             idle_since = time.time()
@@ -155,8 +183,15 @@ def mjpeg(serial: str):
                     + frame + b"\r\n"
             )
     finally:
-        src.remove_viewer()
+        src.remove_viewer(live)
         log.info("отключен зритель %s (осталось %d)", serial, src._viewers)
+
+
+def note_action(serial: str) -> None:
+    """Действие человека на телефоне → ускорить захват, если кто-то смотрит."""
+    src = _sources.get(serial)
+    if src is not None:
+        src.note_action()
 
 
 def snapshot(serial: str) -> bytes:

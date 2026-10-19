@@ -8,11 +8,6 @@ const SWIPE_MIN_DISTANCE = 0.03;
 const SWIPE_MIN_DURATION = 0.1;
 const SWIPE_MAX_DURATION = 0.8;
 
-const KEYMAP = {
-    Backspace: 'delete', Enter: 'enter', Escape: 'back', Tab: 'tab',
-    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-};
-
 /* ------------------------------------------------------------------ просмотр
 
    Экран на сайте — витрина. Жесты и клавиши уходят на телефон только при
@@ -119,7 +114,9 @@ function offerScrcpy() {
 
 function streamUrl() {
     const kind = S.streaming ? 'stream' : 'frame';
-    return `/api/devices/${S.active}/${kind}?t=${Date.now()}`;
+    /* live — кадры чаще: на экране работают руками (пульт, запись, ожидание) */
+    const live = S.streaming && canInteract() ? '&live=1' : '';
+    return `/api/devices/${S.active}/${kind}?t=${Date.now()}${live}`;
 }
 
 /* Узел <img> пересоздаётся, а не переиспользуется: смена src не рвёт
@@ -277,10 +274,22 @@ function gestureTrailEnd(el) {
     setTimeout(() => el.remove(), 200);
 }
 
+/* Тап виден сразу, не дожидаясь кадра с телефона: без отклика экран
+   казался зависшим на те десятые секунды, пока едет ответ. */
+function tapRipple(stage, at) {
+    if (!at) return;
+    const el = document.createElement('i');
+    el.className = 'tap-ripple';
+    el.style.left = at.x + 'px';
+    el.style.top = at.y + 'px';
+    stage.appendChild(el);
+    setTimeout(() => el.remove(), 450);
+}
+
 /* Слушаем .stage, а не сам <img>: startStream() пересоздаёт узел #screen. */
 (function initGestures() {
     const stage = document.querySelector('.stage');
-    let down = null, timer = null, longFired = false, trail = null, downPx = null;
+    let down = null, timer = null, longFired = false, trail = null, downPx = null, downPx0 = null;
 
     const normalize = ev => {
         const rect = $('screen').getBoundingClientRect();
@@ -307,6 +316,7 @@ function gestureTrailEnd(el) {
         down = {...normalize(ev), t: Date.now()};
         longFired = false;
         downPx = stagePoint(ev);
+        downPx0 = downPx;
         trail = gestureTrailStart(stage, downPx);
         timer = setTimeout(() => {
             longFired = true;
@@ -336,6 +346,7 @@ function gestureTrailEnd(el) {
                     duration: Math.min(SWIPE_MAX_DURATION, Math.max(SWIPE_MIN_DURATION, elapsed))
                 });
             } else {
+                tapRipple(stage, downPx0);
                 act({type: 'tap', x: down.x, y: down.y});
             }
         }
@@ -343,19 +354,147 @@ function gestureTrailEnd(el) {
     });
 })();
 
-document.addEventListener('keydown', ev => {
-    if (!canInteract() || !$('kbCapture').checked || !S.active) return;
-    if ($('modal').classList.contains('on')) return;
-    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(ev.target.tagName)) return;
-    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+/* ------------------------------------------------------------ живая клавиатура */
 
-    if (KEYMAP[ev.key]) {
+const LIVE_KEYS = {queue: [], timer: null, busy: false, sink: null, state: null};
+const LIVE_KEYS_DELAY_MS = 60;
+
+function liveKeysOn() {
+    const box = $('kbCapture');
+    return !!(box && box.checked && S.active && canInteract());
+}
+
+function liveKeysPush(op) {
+    if (!op) return;
+    liveKeyMerge(LIVE_KEYS.queue, op);
+    if (!LIVE_KEYS.timer) LIVE_KEYS.timer = setTimeout(liveKeysFlush, LIVE_KEYS_DELAY_MS);
+}
+
+/* Одна пачка за раз и строго по порядку: следующая уходит после ответа. */
+async function liveKeysFlush() {
+    LIVE_KEYS.timer = null;
+    if (LIVE_KEYS.busy || !LIVE_KEYS.queue.length) return;
+    LIVE_KEYS.busy = true;
+    const queue = LIVE_KEYS.queue;
+    LIVE_KEYS.queue = [];
+    try {
+        for (const payload of liveKeyActions(queue)) {
+            /* Запись шагов знает только одиночные нажатия. */
+            const times = payload.count && window.REC && REC.on ? payload.count : 1;
+            for (let i = 0; i < times; i++) {
+                await act(times > 1 ? {type: 'key', name: payload.name} : payload);
+            }
+        }
+    } catch (e) {
+        LIVE_KEYS.queue = [];   // act() уже сказал об ошибке; хвост не досылаем
+    }
+    LIVE_KEYS.busy = false;
+    if (LIVE_KEYS.queue.length) liveKeysFlush();
+}
+
+/* Скрытое поле ловит ввод, который keydown не отдаёт: кириллицу и IME,
+   виртуальные клавиатуры планшетов, вставку. Фокус держим на нём, пока
+   «Живая клавиатура» включена. */
+function liveKeysSink() {
+    if (LIVE_KEYS.sink) return LIVE_KEYS.sink;
+    const sink = document.createElement('textarea');
+    sink.id = 'kbSink';
+    sink.className = 'kb-sink';
+    sink.setAttribute('aria-label', t('device.zhivaya_klaviatura'));
+    sink.autocapitalize = 'off';
+    sink.autocomplete = 'off';
+    sink.spellcheck = false;
+    document.body.appendChild(sink);
+    sink.addEventListener('keydown', ev => {
+        if (!liveKeysOn()) return;
+        const op = liveKeyOp(ev);
+        if (op && op !== 'defer' && op.k === 'key') {
+            ev.preventDefault();
+            liveKeysPush(op);
+        }
+        /* символы — через input: так работают и IME, и раскладки */
+    });
+    sink.addEventListener('input', ev => {
+        if (ev.isComposing) return;   // дождёмся compositionend
+        const op = liveKeysOn() ? liveInputOp(ev.inputType, ev.data || sink.value) : null;
+        sink.value = '';
+        liveKeysPush(op);
+    });
+    sink.addEventListener('compositionend', ev => {
+        if (liveKeysOn() && ev.data) liveKeysPush({k: 'text', v: ev.data});
+        sink.value = '';
+    });
+    sink.addEventListener('paste', ev => {
+        if (!liveKeysOn()) return;
         ev.preventDefault();
-        sendKey(KEYMAP[ev.key]);
+        const text = ev.clipboardData && ev.clipboardData.getData('text');
+        if (text) liveKeysPush({k: 'text', v: text});
+    });
+    sink.addEventListener('focus', liveKeysSyncState);
+    sink.addEventListener('blur', () => setTimeout(liveKeysSyncState, 0));
+    LIVE_KEYS.sink = sink;
+    return sink;
+}
+
+/* Подпись рядом с галочкой: видно, ловит ли страница ввод прямо сейчас. */
+function liveKeysSyncState() {
+    const label = $('kbLabel');
+    if (!label) return;
+    let badge = label.querySelector('.kb-state');
+    if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'kb-state';
+        label.appendChild(badge);
+    }
+    const on = $('kbCapture').checked;
+    const catching = on && liveKeysOn() && document.activeElement === LIVE_KEYS.sink;
+    label.dataset.state = !on ? '' : catching ? 'on' : 'idle';
+    setText(badge, !on ? '' : catching ? t('device.kb_lovit_vvod') : t('device.kb_nazhmite_na_ekran'));
+}
+
+function liveKeysFocus() {
+    if (liveKeysOn()) liveKeysSink().focus({preventScroll: true});
+    liveKeysSyncState();
+}
+
+document.addEventListener('change', ev => {
+    if (ev.target.id !== 'kbCapture') return;
+    if (ev.target.checked) liveKeysFocus();
+    else if (LIVE_KEYS.sink) LIVE_KEYS.sink.blur();
+    liveKeysSyncState();
+});
+/* Клик по экрану возвращает ввод в телефон. */
+document.querySelector('.stage').addEventListener('mouseup', () => setTimeout(liveKeysFocus, 0));
+
+/* Запасной путь: фокус не на скрытом поле (клик по кнопке, вкладка). Чекбокс
+   и кнопки не мешают — раньше после клика по «Живой клавиатуре» фокус
+   оставался на ней, и каждое нажатие отбрасывалось как «ввод в поле». */
+const LIVE_TEXT_INPUTS = new Set(['text', 'search', 'password', 'email', 'url', 'tel', 'number']);
+
+function typingInField(el) {
+    if (!el || el === LIVE_KEYS.sink) return false;
+    if (el.isContentEditable || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
+    return el.tagName === 'INPUT' && LIVE_TEXT_INPUTS.has((el.type || 'text').toLowerCase());
+}
+
+document.addEventListener('keydown', ev => {
+    if (!liveKeysOn() || ev.target === LIVE_KEYS.sink) return;
+    if ($('modal').classList.contains('on')) return;
+    if (typingInField(ev.target)) return;
+    const op = liveKeyOp(ev);
+    if (!op) return;
+    if (op === 'defer') {
+        liveKeysFocus();   // следующий символ придёт в скрытое поле
         return;
     }
-    if (ev.key.length === 1) {
-        ev.preventDefault();
-        act({type: 'text', value: ev.key});
-    }
+    ev.preventDefault();   // и Пробел не переключит чекбокс
+    liveKeysPush(op);
+});
+
+document.addEventListener('paste', ev => {
+    if (!liveKeysOn() || ev.target === LIVE_KEYS.sink || typingInField(ev.target)) return;
+    const text = ev.clipboardData && ev.clipboardData.getData('text');
+    if (!text) return;
+    ev.preventDefault();
+    liveKeysPush({k: 'text', v: text});
 });

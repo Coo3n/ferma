@@ -494,6 +494,13 @@ def _step_labels(sc) -> list:
 
 
 def _execute(job: Job) -> None:
+    dev = registry.get(job.serial)
+    if dev is not None and dev.rest:
+        job.status = FAILED
+        job.error = f"телефон отдыхает: {dev.rest}"
+        job.add_line(job.error)
+        job.finished_at = time.time()
+        return
     # ждём освобождения устройства (например, оно отвалилось и переподключается)
     deadline = time.time() + 120
     while not registry.acquire(job.serial, job.id):
@@ -853,6 +860,17 @@ class Runner:
     def held(self) -> int:
         """Сколько устройств сейчас держат экран в ожидании человека."""
         return sum(1 for job in list(self.jobs.values()) if job.status == HELD)
+
+    def stop_for_power(self, serial: str, reason: str) -> int:
+        """Аварийно снять активные запуски телефона; причину видно в журнале запуска."""
+        n = 0
+        for job in list(self.jobs.values()):
+            if job.serial == serial and job.status in ACTIVE:
+                job.error = f"остановлено: {reason}"
+                job.add_line(job.error)
+                if self.cancel(job.id):
+                    n += 1
+        return n
 
     def cancel_all(self, serial: str | None = None) -> int:
         n = 0

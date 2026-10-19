@@ -297,9 +297,22 @@ const REC_KEYS = {
 const REC_PKG_NOISE = new Set(['com', 'org', 'net', 'ru', 'io', 'app', 'apps', 'android',
     'mobile', 'dev', 'debug', 'release', 'client', 'lite', 'beta', 'main']);
 
+/* Бренды производителей: у com.samsung.android.app.notes имя — «Notes», а не
+   «Samsung»; иначе десять разных приложений подписаны одинаково. */
+const REC_PKG_BRANDS = new Set(['samsung', 'sec', 'google', 'miui', 'xiaomi', 'huawei',
+    'oppo', 'coloros', 'oplus', 'vivo', 'realme', 'oneplus', 'motorola', 'lenovo', 'sony',
+    'sonymobile', 'asus', 'honor', 'meizu', 'zte', 'htc', 'lge', 'nokia', 'hmd', 'qualcomm',
+    'mediatek', 'tecno', 'infinix', 'transsion']);
+
+function recAppWord(pkg) {
+    const parts = String(pkg || '').split('.').filter(p => p.length > 2
+        && !REC_PKG_NOISE.has(p.toLowerCase()));
+    return parts.find(p => !REC_PKG_BRANDS.has(p.toLowerCase())) || parts[0] || '';
+}
+
 function recApp(pkg) {
     if (REC_APPS[pkg]) return `«${REC_APPS[pkg]}»`;
-    const word = String(pkg || '').split('.').find(p => p.length > 2 && !REC_PKG_NOISE.has(p.toLowerCase()));
+    const word = recAppWord(pkg);
     return word ? `«${word[0].toUpperCase()}${word.slice(1)}»` : pkg;
 }
 
@@ -3342,36 +3355,79 @@ function recSave() {
     }));
     try {
         localStorage.setItem(recDraftKey(), JSON.stringify(
-            {steps: light, params: REC.params, nextId: REC.nextId}));
+            {steps: light, params: REC.params, nextId: REC.nextId, savedAt: Date.now()}));
+        sessionStorage.removeItem('farm.recorder.snooze.' + recDraftKey());   // новая работа — новый вопрос
     } catch (e) {
         /* переполнение хранилища не должно ронять запись */
     }
 }
 
-/* Отказ от восстановления черновик не стирает: прошлый вариант удалял его
-   сразу, и случайный «нет» уносил работу безвозвратно. Черновик переживает
-   отказ и предлагается снова — стирается он только сохранением сценария. */
-function recRestore() {
-    if (REC.steps.length) return;
+/* Черновик предлагаем не больше раза за сеанс: «Не сейчас» молчит до
+   перезагрузки страницы, «Удалить» стирает насовсем, пустой и недельный
+   удаляются сами (draftPlan). Раньше «нет» ничего не запоминало, и диалог
+   возвращался при каждом входе в конструктор. */
+function recDraftSnoozeKey(storageKey) {
+    return 'farm.recorder.snooze.' + storageKey;
+}
+
+function recDraftSnoozed(storageKey) {
+    try {
+        return !!sessionStorage.getItem(recDraftSnoozeKey(storageKey));
+    } catch (e) {
+        return false;
+    }
+}
+
+function recDraftOffer(storageKey, title, onRestore) {
     let draft;
     try {
-        draft = JSON.parse(localStorage.getItem(REC_DRAFT_KEY) || 'null');
+        draft = JSON.parse(localStorage.getItem(storageKey) || 'null');
     } catch (e) {
         return;
     }
-    if (!draft || !draft.steps || !draft.steps.length) return;
+    const plan = draftPlan(draft, Date.now(), recDraftSnoozed(storageKey));
+    if (plan === 'drop') {
+        try { localStorage.removeItem(storageKey); } catch (e) { /* хранилище недоступно */ }
+        return;
+    }
+    if (plan === 'skip') return;
 
-    confirmModal('Восстановить черновик?',
-        `<p>С прошлого раза остался незаконченный сценарий на
-         <b>${draft.steps.length}</b> шагов.</p>
-         <p style="color:var(--dim)">Отказ черновик не стирает.</p>`,
-        'Восстановить', () => {
-            REC.steps = draft.steps;
-            REC.params = draft.params || {};
-            REC.nextId = draft.nextId || (REC.steps.length + 1);
-            recRender();
-            recSync();
-        });
+    const first = draft.steps[0] ? recLabel(draft.steps[0]) : '';
+    $('mTitle').textContent = title;
+    $('mBody').innerHTML = `<p>${esc(t('draft.opisanie', {
+        n: draft.steps.length, ago: draftAgo(draft.savedAt, Date.now()) || t('draft.tolko_chto'),
+        first}))}</p>
+        <p style="color:var(--dim)">${esc(t('draft.podskazka'))}</p>`;
+    $('mActs').innerHTML = `<button class="danger sm" id="mDraftDel">${esc(t('draft.udalit'))}</button>
+        <span class="sp"></span>
+        <button class="sm" id="mDraftLater">${esc(t('draft.ne_seychas'))}</button>
+        <button class="primary" id="mDraftOk">${esc(t('draft.vosstanovit'))}</button>`;
+    $('mDraftLater').onclick = () => {
+        try { sessionStorage.setItem(recDraftSnoozeKey(storageKey), '1'); } catch (e) { /* без снуза */ }
+        closeModal();
+    };
+    $('mDraftDel').onclick = () => {
+        if (!armConfirm($('mDraftDel'), t('draft.udalit_tochno'))) return;
+        try { localStorage.removeItem(storageKey); } catch (e) { /* хранилище недоступно */ }
+        closeModal();
+        toast(t('draft.udalen'));
+    };
+    $('mDraftOk').onclick = () => {
+        closeModal();
+        REC.steps = draft.steps;
+        REC.params = draft.params || {};
+        REC.nextId = draft.nextId || (REC.steps.length + 1);
+        onRestore();
+        recRender();
+        recSync();
+    };
+    openModal();
+    $('mDraftOk').focus();
+}
+
+function recRestore() {
+    if (REC.steps.length) return;
+    recDraftOffer(REC_DRAFT_KEY, t('draft.vosstanovit_title'), () => {});
 }
 
 /* ------------------------------------------------------------------ оверлей */
@@ -3872,30 +3928,10 @@ function recDraftKey() {
 }
 
 function recEditRestore(key, assets) {
-    let draft;
-    try {
-        draft = JSON.parse(localStorage.getItem(REC_DRAFT_KEY + '.' + key) || 'null');
-    } catch (e) {
-        return;
-    }
-    if (!draft || !draft.steps || !draft.steps.length) return;
-    /* Как и у черновика новой записи: отказ черновик не стирает. Уносить
-       работу случайным «нет» дороже, чем спросить второй раз. Стирается он
-       сохранением изменений или выходом из правки. */
-    confirmModal('Вернуться к незаконченной правке?',
-        `<p>С прошлого раза остались несохранённые изменения этого сценария:
-         <b>${draft.steps.length}</b> шагов.</p>
-         <p style="color:var(--dim)">Отказ черновик не стирает.</p>`,
-        'Вернуться к правке',
-        () => {
-            REC.steps = draft.steps;
-            REC.params = draft.params || {};
-            REC.nextId = draft.nextId || (REC.steps.length + 1);
-            /* Кропы в черновик не попали — возвращаем их по именам из файла. */
-            REC.steps.forEach(шаг => {
-                if (шаг.cropName && assets[шаг.cropName]) шаг.crop = assets[шаг.cropName];
-            });
-            recRender();
-            recSync();
+    /* Кропы в черновик не попали — возвращаем их по именам из файла. */
+    recDraftOffer(REC_DRAFT_KEY + '.' + key, t('draft.pravka_title'), () => {
+        REC.steps.forEach(шаг => {
+            if (шаг.cropName && assets[шаг.cropName]) шаг.crop = assets[шаг.cropName];
         });
+    });
 }

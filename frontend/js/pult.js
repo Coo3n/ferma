@@ -76,6 +76,7 @@ function pultRender() {
     if (device.temperature != null) bits.push(`${Math.round(device.temperature)}°`);
     if (device.group) bits.push(device.group);
     (device.accounts || []).forEach(a => bits.push(PLATFORM_NAMES[a.platform] || a.platform));
+    if (device.rest) bits.unshift(t('power.pult_otdyhaet', {reason: device.rest}));
     if (!device.online) bits.unshift(t('pult.ne_v_seti'));
     else if (device.busy_job) bits.unshift(t('pult.idet_zapusk'));
     setText($('pultMeta'), bits.join(' · '));
@@ -127,6 +128,11 @@ function pultTagRemove(tag) {
     if (device) pultTagsSave((device.tags || []).filter(tg => tg !== tag));
 }
 
+/* Приложения: сперва быстрый список по именам пакетов, потом сервер
+   подтягивает настоящие названия (как на экране телефона). */
+const PULT_APP_SEARCH_FROM = 12;
+const PULT_BRAND_PKG = /^(com|org)\.(samsung|sec|google|miui|xiaomi|huawei|oppo|coloros|oplus|vivo|realme|oneplus|motorola|sonymobile|lge|qualcomm|mediatek)\b/;
+
 async function pultLoadApps(serial) {
     PULT.appsFor = serial;
     const box = $('pultApps');
@@ -141,14 +147,90 @@ async function pultLoadApps(serial) {
         }
     }
     if (S.active !== serial) return;
-    /* Известные (VK, Instagram…) — первыми: их открывают чаще всего. */
-    const name = pkg => recApp(pkg).replace(/[«»]/g, '');
-    const list = [...PULT.apps[serial]].sort((a, b) =>
-        (REC_APPS[a] ? 0 : 1) - (REC_APPS[b] ? 0 : 1) || name(a).localeCompare(name(b)));
-    box.innerHTML = list.length
-        ? list.map(pkg => `<button class="chip" data-live title="${esc(pkg)}"
-              onclick="act({type:'launch',package:'${esc(pkg)}'})">${esc(name(pkg))}</button>`).join('')
-        : `<span class="dim">${t('pult.svoih_prilozheniy_net')}</span>`;
+    PULT.query = '';
+    PULT.showSys = false;
+    pultAppsRender(serial);
+    pultAppLabels(serial);
+}
+
+async function pultAppLabels(serial) {
+    if ((PULT.labelsFor || {})[serial]) return;
+    PULT.labelsFor = Object.assign(PULT.labelsFor || {}, {[serial]: true});
+    try {
+        const rows = await api(`/api/devices/${serial}/apps`);
+        PULT.labels = PULT.labels || {};
+        PULT.labels[serial] = Object.fromEntries(rows.filter(r => r.label).map(r => [r.package, r.label]));
+    } catch (e) {
+        PULT.labelsFor[serial] = false;   // не вышло — в следующий раз попробуем снова
+        return;
+    }
+    if (S.active === serial) pultAppsRender(serial);
+}
+
+function pultAppName(serial, pkg) {
+    const real = ((PULT.labels || {})[serial] || {})[pkg];
+    return real || recApp(pkg).replace(/[«»]/g, '');
+}
+
+function pultAppsRender(serial) {
+    const box = $('pultApps');
+    const all = PULT.apps[serial] || [];
+    if (!all.length) {
+        box.innerHTML = `<span class="dim">${t('pult.svoih_prilozheniy_net')}</span>`;
+        return;
+    }
+    const rows = all.map(pkg => ({pkg, name: pultAppName(serial, pkg)}));
+    /* Одинаковые названия различаем хвостом пакета: «Заметки · samsung.notes». */
+    const count = {};
+    rows.forEach(r => { count[r.name.toLowerCase()] = (count[r.name.toLowerCase()] || 0) + 1; });
+    rows.forEach(r => {
+        r.dup = count[r.name.toLowerCase()] > 1;
+        r.sys = !REC_APPS[r.pkg] && PULT_BRAND_PKG.test(r.pkg)
+            && !((PULT.labels || {})[serial] || {})[r.pkg];
+    });
+    rows.sort((a, b) => (REC_APPS[a.pkg] ? 0 : 1) - (REC_APPS[b.pkg] ? 0 : 1)
+        || a.name.localeCompare(b.name, 'ru'));
+
+    if (!box.querySelector('.pult-app-list')) {
+        box.innerHTML = '<input type="search" class="pult-app-q" hidden><div class="pult-app-list"></div>';
+        const q = box.querySelector('.pult-app-q');
+        q.addEventListener('input', () => {
+            PULT.query = q.value;
+            pultAppsRender(S.active);
+        });
+    }
+    const q = box.querySelector('.pult-app-q');
+    q.hidden = rows.length <= PULT_APP_SEARCH_FROM;
+    q.placeholder = t('pult.poisk_prilozheniya');
+    q.setAttribute('aria-label', t('pult.poisk_prilozheniya'));
+    if (q.value !== (PULT.query || '')) q.value = PULT.query || '';
+
+    const needle = (PULT.query || '').trim().toLowerCase();
+    const match = r => !needle || r.name.toLowerCase().includes(needle) || r.pkg.toLowerCase().includes(needle);
+    /* Системные обёртки производителей свёрнуты, пока человек не ищет. */
+    const hidden = rows.filter(r => r.sys).length;
+    const folded = !needle && !PULT.showSys;
+    const shown = rows.filter(r => match(r) && !(folded && r.sys));
+    const chip = r => `<button class="chip" data-live data-pkg="${esc(r.pkg)}" title="${esc(r.pkg)}">${esc(r.name)}${
+        r.dup ? ` <small class="dim">${esc(r.pkg.split('.').slice(-2).join('.'))}</small>` : ''}</button>`;
+    let html = shown.map(chip).join('');
+    if (!shown.length) html = `<span class="dim">${t('pult.nichego_ne_nashlos')}</span>`;
+    if (!needle && hidden) {
+        html += `<button class="sm ghost pult-sys-toggle" data-sys-toggle>${esc(PULT.showSys
+            ? t('pult.sistemnye_skryt') : t('pult.sistemnye_n', {n: hidden}))}</button>`;
+    }
+    const list = box.querySelector('.pult-app-list');
+    list.innerHTML = html;
+    list.onclick = ev => {
+        const btn = ev.target.closest('button');
+        if (!btn) return;
+        if (btn.hasAttribute('data-sys-toggle')) {
+            PULT.showSys = !PULT.showSys;
+            pultAppsRender(S.active);
+        } else if (btn.dataset.pkg) {
+            act({type: 'launch', package: btn.dataset.pkg});
+        }
+    };
     if (window.syncInteractive) syncInteractive();
 }
 

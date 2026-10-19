@@ -22,6 +22,8 @@
     <link rel="stylesheet" href="css/repair.css">
     <link rel="stylesheet" href="css/steptools.css">
     <link rel="stylesheet" href="css/schedule.css">
+    <link rel="stylesheet" href="css/files.css">
+    <link rel="stylesheet" href="css/onboarding.css">
     <!-- Первый кадр не показываем, пока app.js не выберет раздел по адресу:
          в разметке «Ферма» выбрана по умолчанию, и при обновлении на другой
          вкладке подсветка было видно, как она перескакивает. Страховка — если
@@ -137,6 +139,12 @@
             title="Если телефон пропал или завис" data-t-title="nav.esli_telefon_propal_ili" data-t-aria-label="nav.perepodklyuchit_telefony">
         <svg class="ic" aria-hidden="true">
             <use href="#i-refresh"/>
+        </svg>
+    </button>
+    <button class="sm icon" onclick="onbOpen()" aria-label="Как тут всё устроено"
+            title="Как тут всё устроено" data-t-title="onb.kak_vse_ustroeno" data-t-aria-label="onb.kak_vse_ustroeno">
+        <svg class="ic" aria-hidden="true">
+            <use href="#i-info"/>
         </svg>
     </button>
 </header>
@@ -678,6 +686,8 @@
                             <svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg>
                             <span data-t="pult.syuda_ili_na_ekran"><b data-t="pult.peretaschite_apk_ili_fayl">Перетащите APK или файл</b> — сюда или на экран</span>
                         </label>
+                        <button class="sm pult-files" onclick="filesOpen()" title="Выгрузить фото, видео и другие файлы с телефона" data-t-title="files.podskazka">
+                            <svg class="ic" aria-hidden="true"><use href="#i-download"/></svg><span data-t="files.otkryt">Файлы на телефоне</span></button>
                         <div class="pult-row">
                             <button class="sm" data-live onclick="pultShot()" data-t="pult.skrinshot">
                                 <svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg>Скриншот</button>
@@ -931,12 +941,14 @@
 <script src="js/devices.js"></script>
 <script src="js/fleet.js"></script>
 <script src="js/device-modal.js"></script>
+<script src="js/livekeys.js"></script>
 <script src="js/screen.js"></script>
 <script src="js/scenarios.js"></script>
 <script src="js/jobs.js"></script>
 <script src="js/deviations.js"></script>
 <script src="js/schedule.js"></script>
 <script src="js/device-tools.js"></script>
+<script src="js/draft.js"></script>
 <script src="js/recorder.js"></script>
 <script src="js/repair.js"></script>
 <script src="js/stepfail.js"></script>
@@ -948,8 +960,10 @@
 <script src="js/rundialog.js"></script>
 <script src="js/accounts.js"></script>
 <script src="js/pult.js"></script>
+<script src="js/files.js"></script>
 <script src="js/notify.js"></script>
 <script src="js/inbox.js"></script>
 <script src="js/app.js"></script>
+<script src="js/onboarding.js"></script>
 </body>
 </html>

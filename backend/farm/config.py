@@ -47,6 +47,11 @@ NETWORK_WORKERS = int(os.getenv("FARM_NETWORK_WORKERS", "8"))  # connect'ы ра
 STREAM_FPS = float(os.getenv("FARM_STREAM_FPS", "6"))
 STREAM_MAX_WIDTH = int(os.getenv("FARM_STREAM_MAX_WIDTH", "480"))
 STREAM_QUALITY = int(os.getenv("FARM_STREAM_QUALITY", "60"))
+# Экран «живой» (пульт, запись, ожидание человека): кадры чаще и чуть крупнее;
+# после каждого действия BURST секунд снимаем без пауз, чтобы реакция была видна.
+STREAM_FPS_LIVE = float(os.getenv("FARM_STREAM_FPS_LIVE", "12"))
+STREAM_MAX_WIDTH_LIVE = int(os.getenv("FARM_STREAM_MAX_WIDTH_LIVE", "540"))
+STREAM_BURST_SECONDS = float(os.getenv("FARM_STREAM_BURST_SECONDS", "1.5"))
 STREAM_IDLE_TIMEOUT = float(os.getenv("FARM_STREAM_IDLE_TIMEOUT", "10.0"))
 
 # Превью для плитки фермы: мелкие, редкие, с кэшем на сервере. Отдельно от
@@ -106,6 +111,15 @@ DEVIATION_HISTORY = int(os.getenv("FARM_DEVIATION_HISTORY", "200"))
 TEMP_ALERT_C = float(os.getenv("FARM_TEMP_ALERT_C", "42"))
 BATTERY_LOW = int(os.getenv("FARM_BATTERY_LOW", "20"))
 BATTERY_HIGH = int(os.getenv("FARM_BATTERY_HIGH", "95"))
+# Защита от разряда и перегрева (devices/power.py): критичный заряд даёт время
+# на реакцию, дальше запуски на телефоне снимаются и он «отдыхает».
+BATTERY_CRITICAL = int(os.getenv("FARM_BATTERY_CRITICAL", "15"))
+BATTERY_STOP = int(os.getenv("FARM_BATTERY_STOP", "5"))                    # стоп сразу
+BATTERY_GRACE = float(os.getenv("FARM_BATTERY_GRACE", "600"))              # секунд на реакцию
+BATTERY_RESUME = int(os.getenv("FARM_BATTERY_RESUME", "30"))               # вернуть в строй
+BATTERY_RESUME_CHARGING = int(os.getenv("FARM_BATTERY_RESUME_CHARGING", "20"))
+TEMP_STOP_C = float(os.getenv("FARM_TEMP_STOP_C", "46"))
+TEMP_RESUME_C = float(os.getenv("FARM_TEMP_RESUME_C", "40"))
 
 DATA_FILES = ("accounts.json", "devices.json", "groups.json", "tags.json",
               "schedules.json", "network.json")

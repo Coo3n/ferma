@@ -550,12 +550,31 @@ function renderFleet() {
 /* Почему телефону нужен человек, или "" — всё в порядке. Не только заряд и
    перегрев: телефон без разрешения отладки и аккаунт в бане тоже ждут
    человека, а раньше в «Требуют внимания» их не было. */
+/* Разряд/перегрев (power.py): словами, что будет и когда. */
+function powerReason(device) {
+    const p = device.online && device.power;
+    if (!p) return '';
+    if (p.state === 'rest') return t('power.otdyhaet', {n: p.resume});
+    if (p.state === 'critical') {
+        if (p.acked) return t('power.batareya', {n: p.level});
+        const m = Math.ceil((p.grace_left || 0) / 60);
+        return m > 0 ? t('power.sadits', {n: p.level, m}) : t('power.sadits_seychas', {n: p.level});
+    }
+    return '';
+}
+
+function powerAck(serial) {
+    post(`/api/devices/${serial}/power/ack`).then(pollDevices).catch(e => toast(e.message, 'bad'));
+}
+
 function attentionReason(device) {
     if (deviceHeld(device)) return 'запуск ждёт вашего решения';
     if (device.state === 'unauthorized') return 'нажмите «Разрешить» на телефоне';
     const acc = device.accounts || [];
     const banned = acc.find(a => a.status === 'banned');
     if (banned) return `бан ${PLATFORM_NAMES[banned.platform] || banned.platform}`;
+    const power = powerReason(device);
+    if (power) return power;
     if (device.online && device.warnings.length) return device.warnings[0];
     const login = acc.find(a => a.status === 'login');
     if (login) return `вход ${PLATFORM_NAMES[login.platform] || login.platform}`;
@@ -614,7 +633,9 @@ function renderFleetStats() {
     </div>
     ${trouble.length ? `<div class="hs-trouble" role="list" aria-label="Требуют внимания">${trouble.slice(0, 8).map(d => `
       <button class="hs-t" role="listitem" onclick="fleetJump('${esc(d.serial)}')"
-              title="Показать плитку"><b>${esc(d.name)}</b> ${esc(attentionReason(d))}</button>`).join('')}
+              title="Показать плитку"><b>${esc(d.name)}</b> ${esc(attentionReason(d))}</button>${
+          d.power && d.power.state === 'critical' && !d.power.acked ? `<button class="hs-t" onclick="powerAck('${esc(d.serial)}')"
+              title="${esc(t('power.vizhu_title'))}">${esc(t('power.vizhu'))}</button>` : ''}`).join('')}
       ${trouble.length > 8 ? `<button class="hs-t more" onclick="setFleetFilter('warn')">ещё ${trouble.length - 8}</button>` : ''}
     </div>` : ''}`;
 }

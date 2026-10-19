@@ -2,7 +2,7 @@
 from fastapi import APIRouter
 
 from . import schedule
-from . import (accounts, bulk, detours, deviations, devices, jobs, network, recorder,
+from . import (accounts, bulk, detours, deviations, devices, files, jobs, network, recorder,
                scenarios, screen, system)
 
 router = APIRouter()
@@ -13,6 +13,7 @@ router.include_router(devices.router)
 router.include_router(devices.tags_router)
 router.include_router(network.router)
 router.include_router(screen.router)
+router.include_router(files.router)
 router.include_router(screen.recordings_router)
 router.include_router(scenarios.router)
 router.include_router(jobs.router)

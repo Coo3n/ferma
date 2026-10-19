@@ -24,6 +24,7 @@ async function pollDevices() {
         return;
     }
     S.devices = list;
+    if (window.notifyPower) notifyPower(list);
     if (!S.devicesLoaded) {
         // Первый ответ: до него заглушка «ферма пуста» мелькала на каждом обновлении.
         S.devicesLoaded = true;
@@ -62,7 +63,8 @@ function deviceSignature(list) {
         S.active, [...S.selected].sort(), [...S.hidden].sort(),
         S.showHidden, S.query, FLEET.filter, FLEET.group, FLEET.tag,
         list.map(d => [d.serial, d.name, d.state, d.busy_job,
-            d.battery, d.temperature, d.android, d.warnings, d.group, d.tags,
+            d.battery, d.temperature, d.android, d.warnings,
+            d.power && [d.power.state, d.power.acked, Math.ceil((d.power.grace_left || 0) / 60)], d.group, d.tags,
             (d.accounts || []).map(a => a.platform + a.status).join()]),
     ]);
 }

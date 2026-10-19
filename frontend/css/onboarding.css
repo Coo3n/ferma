@@ -1,0 +1,182 @@
+/* Онбординг: приветственный тур и подсказки разделов. Только токены. */
+
+.onb {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--s4);
+    background: color-mix(in srgb, var(--glass) 70%, transparent);
+    backdrop-filter: blur(3px);
+    animation: scrim-in var(--mid) var(--ease-out);
+}
+
+.onb[hidden] { display: none; }
+
+.onb-card {
+    width: 720px;
+    max-width: 100%;
+    max-height: 100%;
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: var(--r3);
+    box-shadow: var(--e3);
+    overflow: hidden;
+    animation: sheet-in var(--mid) var(--spring);
+}
+
+.onb-art {
+    background: var(--well);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--s4);
+    min-height: 240px;
+}
+
+.onb-art svg { width: 100%; height: auto; display: block; }
+
+.onb-body {
+    display: flex;
+    flex-direction: column;
+    padding: var(--s5);
+    gap: var(--s3);
+    min-width: 0;
+}
+
+.onb-step {
+    margin: 0;
+    font-size: var(--fs-1);
+    color: var(--dim);
+}
+
+.onb-slide { flex: 1; display: grid; align-content: start; gap: var(--s2); }
+.onb-slide.in { animation: onb-in var(--mid) var(--ease-out); }
+
+@keyframes onb-in {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: none; }
+}
+
+.onb-title {
+    margin: 0;
+    font-size: var(--fs-5);
+    line-height: 1.25;
+    color: var(--text);
+}
+
+.onb-text {
+    margin: 0;
+    font-size: var(--fs-3);
+    line-height: var(--lh);
+    color: var(--text2);
+}
+
+.onb-dots { display: flex; gap: var(--s2); align-items: center; }
+
+.onb-dot {
+    width: 8px;
+    height: 8px;
+    min-height: 0;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--pill);
+    background: var(--line-hover);
+    transition: background var(--fast), width var(--mid) var(--ease);
+}
+
+.onb-dot::before { display: none; }
+.onb-dot.on { width: 22px; background: var(--accent); }
+
+.onb-nav {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+}
+
+.onb-nav .sp { flex: 1; }
+
+.onb-opt {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    font-size: var(--fs-2);
+    color: var(--dim);
+    cursor: pointer;
+}
+
+/* ------------------------------------------------------------- иллюстрации */
+
+.onb-art .a-bg { fill: var(--well); }
+.onb-art .a-p1 { fill: var(--panel2); stroke: var(--line); }
+.onb-art .a-p2 { fill: var(--panel3); }
+.onb-art .a-glass { fill: var(--glass); stroke: var(--line-hover); }
+.onb-art .a-line { fill: var(--line-hover); }
+.onb-art .a-ac { fill: var(--accent); }
+.onb-art .a-acd { fill: var(--accent-dim); stroke: var(--accent-line); }
+.onb-art .a-bad { fill: var(--bad); }
+.onb-art .a-badd { fill: var(--bad-dim); stroke: var(--bad-line); }
+.onb-art .a-busy { fill: var(--busy); }
+.onb-art .a-busyd { fill: var(--busy-dim); stroke: var(--busy-line); }
+.onb-art .a-stk { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.onb-art .a-dash { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 5; stroke-linecap: round; }
+.onb-art .a-ink { fill: var(--accent-ink); }
+.onb-art text { font: 500 12px var(--sans); fill: var(--text2); }
+.onb-art text.t-hi { fill: var(--text); }
+.onb-art text.t-dim { fill: var(--dim); }
+.onb-art .a-ico { color: var(--text2); }
+.onb-art .a-ico use { stroke: currentColor; }
+
+.onb-art .pulse { animation: onb-pulse 1.8s var(--ease) infinite; }
+.onb-art .tap { transform-box: fill-box; transform-origin: center; animation: onb-tap 2s var(--ease-out) infinite; }
+.onb-art .flow { animation: onb-flow 1.2s linear infinite; }
+.onb-art .seq { animation: onb-seq 2.4s var(--ease) infinite; }
+
+@keyframes onb-pulse { 50% { opacity: .35; } }
+@keyframes onb-tap {
+    0% { transform: scale(.3); opacity: .9; }
+    70%, 100% { transform: scale(1.5); opacity: 0; }
+}
+@keyframes onb-flow { to { stroke-dashoffset: -20; } }
+@keyframes onb-seq { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
+
+/* ------------------------------------------------------ подсказка раздела */
+
+.onb-hint {
+    position: fixed;
+    right: var(--s4);
+    bottom: var(--s4);
+    z-index: 40;
+    width: 340px;
+    max-width: calc(100vw - 2 * var(--s4));
+    padding: var(--s4);
+    display: grid;
+    gap: var(--s2);
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: var(--r2);
+    box-shadow: var(--e2);
+    animation: sheet-in var(--mid) var(--spring);
+}
+
+.onb-hint[hidden] { display: none; }
+.onb-hint h3 { margin: 0; font-size: var(--fs-4); padding-right: var(--s5); }
+.onb-hint p { margin: 0; font-size: var(--fs-3); line-height: var(--lh); color: var(--text2); }
+.onb-hint .acts { display: flex; justify-content: flex-end; }
+.onb-hint .x { position: absolute; top: var(--s2); right: var(--s2); }
+
+@media (max-width: 720px) {
+    .onb-card { grid-template-columns: 1fr; overflow-y: auto; }
+    .onb-art { min-height: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .onb, .onb-card, .onb-hint, .onb-slide.in { animation: none; }
+    .onb-art .pulse, .onb-art .tap, .onb-art .flow, .onb-art .seq { animation: none; }
+    .onb-dot { transition: none; }
+}

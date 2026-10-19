@@ -32,6 +32,33 @@ function notifyHeld(held) {
     }
 }
 
+/* Разряд/перегрев: один сигнал на переход состояния телефона (power.py),
+   а не на каждый опрос. Первый опрос только запоминает — без шквала при загрузке. */
+const POWER_SEEN = {};
+
+function notifyPower(devices) {
+    const first = !Object.keys(POWER_SEEN).length;
+    (devices || []).forEach(d => {
+        const st = d.online && d.power ? d.power.state : 'ok';
+        const was = POWER_SEEN[d.serial];
+        POWER_SEEN[d.serial] = st;
+        if (first || was === undefined || was === st) return;
+        const vars = {name: d.name, n: d.power.level, reason: d.rest || d.power.rest_reason};
+        let text = '';
+        if (st === 'rest') text = t('power.t_rest', vars);
+        else if (st === 'critical') text = t('power.t_critical', vars);
+        else if (st === 'low' && was === 'ok') text = t('power.t_low', vars);
+        else if (st === 'ok' && was === 'rest') text = t('power.t_back', vars);
+        if (!text) return;
+        toast(text, st === 'ok' ? 'ok' : 'bad');
+        if (st === 'ok' || st === 'low') return;
+        notifyBeep();
+        if (document.hidden && window.Notification && Notification.permission === 'granted') {
+            try { new Notification(t('notify.ferma_zhdet'), {body: text, tag: 'farm-power-' + d.serial}); } catch (e) { /* только звук */ }
+        }
+    });
+}
+
 /* Два коротких тона без файла: ферма работает без интернета, а лишний
    ассет ради одного писка не нужен. */
 function notifyBeep() {

@@ -406,6 +406,25 @@
     background: var(--panel3);
 }
 
+.pult-apps {
+    flex-direction: column;
+    flex-wrap: nowrap;
+}
+
+.pult-app-q {
+    width: 100%;
+}
+
+.pult-app-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.pult-apps .chip small {
+    font-size: var(--fs-1);
+}
+
 .pult-apps .dim,
 .pult-jobs .dim {
     font-size: var(--fs-2);
@@ -581,3 +600,42 @@ button.pult-tag-add {
 
 .pult-foot > button { overflow: hidden; text-overflow: ellipsis; padding-left: var(--s3); padding-right: var(--s3); }
 .pult-foot > button > span { overflow: hidden; text-overflow: ellipsis; }
+
+/* Тап: мгновенный отклик на экране, пока кадр с телефона в пути. */
+.tap-ripple {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    margin: -18px 0 0 -18px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+    pointer-events: none;
+    animation: tap-ripple .4s var(--ease-out) forwards;
+}
+
+@keyframes tap-ripple {
+    from { transform: scale(.4); opacity: 1 }
+    to { transform: scale(1.4); opacity: 0 }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tap-ripple { animation-duration: .01s }
+}
+
+/* Скрытое поле живой клавиатуры: вне экрана, но фокусируемое. */
+.kb-sink {
+    position: fixed;
+    left: -9999px;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+.kb-state {
+    font-size: var(--fs-1);
+    color: var(--dim);
+}
+
+.kb[data-state="on"] .kb-state { color: var(--accent) }
+.kb[data-state="idle"] .kb-state { color: var(--warn) }

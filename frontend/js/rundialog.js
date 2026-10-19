@@ -35,7 +35,7 @@ function rdTags() {
 }
 
 function rdOnline(list) {
-    return list.filter(d => d.online && !S.hidden.has(d.serial)).map(d => d.serial);
+    return list.filter(d => d.online && !d.rest && !S.hidden.has(d.serial)).map(d => d.serial);
 }
 
 function rdTargets() {
@@ -144,7 +144,7 @@ function rdPickerHtml() {
       </div>
       <div class="rd-pick-list" role="group" aria-label="${esc(t('run.telefony_dlya_zapuska'))}">${shown.length
         ? shown.map(d => `<button class="rd-ph${RD.picked.has(d.serial) ? ' on' : ''}" aria-pressed="${RD.picked.has(d.serial)}"
-            onclick="rdPick('${esc(d.serial)}')"><b>${esc(d.name)}</b>${d.busy_job ? `<i>${esc(t('run.zanyat'))}</i>` : ''}${
+            onclick="rdPick('${esc(d.serial)}')"><b>${esc(d.name)}</b>${d.rest ? `<i title="${esc(d.rest)}">${esc(t('power.propusk'))}</i>` : d.busy_job ? `<i>${esc(t('run.zanyat'))}</i>` : ''}${
             [d.group, ...(d.tags || [])].filter(Boolean).map(v => `<small>${esc(v)}</small>`).join('')}</button>`).join('')
         : `<span class="dim">${esc(t('run.nikogo_ne_naydeno'))}</span>`}</div>
     </div>`;

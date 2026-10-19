@@ -9,7 +9,7 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
 from .. import adb, config
-from . import pool
+from . import pool, power
 from .network import net
 
 log = logging.getLogger("farm.devices")
@@ -54,6 +54,7 @@ class Device:
     last_seen: float = 0.0
     first_seen: float = field(default_factory=time.time)
     error: str = ""
+    rest: str = ""  # причина «отдыха» (разряд/перегрев); пусто — телефон в строю, см. power.py
 
     @property
     def online(self) -> bool:
@@ -61,7 +62,7 @@ class Device:
 
     @property
     def available(self) -> bool:
-        return self.online and self.enabled and self.busy_job is None
+        return self.online and self.enabled and not self.rest and self.busy_job is None
 
     @property
     def name(self) -> str:
@@ -88,6 +89,8 @@ class Device:
                     w.append(f"заряд {self.battery}%")
                 elif self.battery >= config.BATTERY_HIGH and self.charging:
                     w.append(f"держит {self.battery}% на зарядке")
+        if self.rest:
+            w.append(self.rest)
         if self.state == "unauthorized":
             # У платы без монитора подтвердить ключ пальцем негде — только
             # прописать публичный ключ хоста в образ.
@@ -107,6 +110,7 @@ class Device:
         d["u2"] = pool.is_connected(self.serial)
         d["network"] = self.network
         d["transport"] = "tcp" if self.network else "usb"
+        d["power"] = power.guard.view(self.serial)
         from .. import accounts   # registry грузится раньше accounts — импорт по месту
         d["accounts"] = accounts.summary_for(self.serial)
         if not self.online:
@@ -310,6 +314,7 @@ class Registry:
                 continue
             self._last_health[d.serial] = now
             self._read_health(d)
+            self._apply_power(d)
 
     def _read_health(self, d: Device) -> None:
         try:
@@ -330,6 +335,19 @@ class Registry:
             d.error = ""
         except Exception as e:  # noqa: BLE001
             d.error = str(e)[:200]
+
+    def _apply_power(self, d: Device) -> None:
+        """Заряд/температура → стейт-машина power.py; при уходе на отдых снимает запуски."""
+        if d.battery is None:
+            return
+        res = power.guard.update(d.serial, d.battery, d.temperature, bool(d.charging))
+        d.rest = res["rest_reason"]
+        if res["entered_rest"]:
+            from .runner import runner   # runner импортирует registry — по месту
+            try:
+                runner.stop_for_power(d.serial, d.rest)
+            except Exception as e:  # noqa: BLE001
+                log.warning("не удалось снять запуски с %s: %s", d.serial, e)
 
     def recover(self, serial: str) -> str:
         """Попытка вернуть отвалившееся устройство в строй."""

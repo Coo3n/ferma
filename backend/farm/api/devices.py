@@ -11,7 +11,7 @@ from fastapi.responses import PlainTextResponse
 
 from .. import adb, config, control, streaming
 from .. import ui as uitree
-from ..devices import net, registry
+from ..devices import net, power, registry
 
 router = APIRouter(prefix="/api/devices")
 tags_router = APIRouter(prefix="/api/tags")
@@ -125,9 +125,58 @@ def switch_to_tcpip(serial: str, port: int = Body(config.NETWORK_PORT, embed=Tru
     }
 
 
+@router.post("/{serial}/power/ack")
+def power_ack(serial: str):
+    """«Вижу»: человек заметил низкий заряд — таймер аварийной остановки снят."""
+    _require_device(serial)
+    return {"ok": True, "power": power.guard.ack(serial)}
+
+
 @router.get("/{serial}/packages")
 def packages(serial: str, all: bool = Query(False)):
     return adb.list_packages(serial, third_party_only=not all)
+
+
+_APP_LABELS: dict[tuple[str, str], str] = {}
+APP_LABEL_WORKERS = 6
+APP_LABEL_BUDGET = 6.0
+
+
+def _app_label(serial: str, package: str) -> str:
+    """Название приложения, как его видит человек на телефоне ('' — не узнали)."""
+    key = (serial, package)
+    if key in _APP_LABELS:
+        return _APP_LABELS[key]
+    from ..control.fallback import from_u2
+    label = from_u2(
+        serial, lambda d: (d.app_info(package) or {}).get("label") or "") or ""
+    label = str(label).strip()
+    if label:
+        _APP_LABELS[key] = label
+    return label
+
+
+@router.get("/{serial}/apps")
+def apps(serial: str, all: bool = Query(False)):
+    """Приложения с настоящими названиями. Не успевшие за бюджет — label ''.
+
+    Клиент подставит своё имя по пакету; повторный запрос добирает остальное
+    из кэша.
+    """
+    from concurrent.futures import ThreadPoolExecutor, wait
+
+    pkgs = adb.list_packages(serial, third_party_only=not all)
+    pool = ThreadPoolExecutor(max_workers=APP_LABEL_WORKERS)
+    try:
+        futures = {pkg: pool.submit(_app_label, serial, pkg) for pkg in pkgs}
+        wait(futures.values(), timeout=APP_LABEL_BUDGET)
+        out = []
+        for pkg, fut in futures.items():
+            label = fut.result() if fut.done() and not fut.exception() else ""
+            out.append({"package": pkg, "label": label})
+        return out
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 @router.get("/{serial}/hierarchy", response_class=PlainTextResponse)

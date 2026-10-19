@@ -373,6 +373,7 @@ class Scheduler:
                         dev = self.registry.get(serial)
                         reason = ("телефон не подключён" if dev is None or not dev.online
                                   else "телефон выключен из работы" if not getattr(dev, "enabled", True)
+                                  else f"телефон отдыхает: {dev.rest}" if getattr(dev, "rest", "")
                                   else "телефон занят" if dev.busy_job else "")
                         if reason:
                             st.update(note=reason, retry=ts + RETRY_S)
