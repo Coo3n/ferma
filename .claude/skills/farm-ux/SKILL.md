@@ -49,7 +49,7 @@ Design system: **graphite console** (redesign 2026-10-17), tokens in `frontend/d
 | New device action type | add to `ACTIONS` in `backend/farm/api/screen.py` — bulk and sync get it free |
 | Destructive action (reboot, clear, delete) | second click confirms (`data-armed`, 3–4 s timeout), no confirm() dialogs |
 | Disabled button | `disableWithReason(btn, cond, 'why')` — never silent grey |
-| Dialog | fill `mTitle`/`mBody`/`mActs`, call `openModal()` |
+| Dialog | fill `mTitle`/`mBody`/`mActs`, call `openModal()`. Wide sheet → `modalSheet('wide')` before it; never `classList.add` on `.sheet` (classes leaked into every later dialog) |
 | Per-viewer preference (density, phrases, jitter) | `localStorage` wrapped in try/catch |
 | Farm data (accounts, groups) | server JSON file next to `devices.json`, gitignored if it holds secrets |
 | Scenario needs login | `ctx.account("vk"|"inst"|"tiktok"|"tg")` — never hardcode credentials |

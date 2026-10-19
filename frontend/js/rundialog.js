@@ -89,7 +89,7 @@ function openRunDialog(opts) {
     </div>`;
     $('mActs').innerHTML = `<button onclick="closeModal()">Отмена</button>
       <button class="primary" id="rdGo" onclick="rdGo()">Запустить</button>`;
-    $('modal').querySelector('.sheet').classList.add('wide');
+    modalSheet('wide');
     const sel = $('rdScen');
     sel.value = S.scenarios.some(s => s.key === key) ? key : S.scenarios[0].key;
     openModal();
@@ -446,6 +446,7 @@ function rdGroupsOpen() {
       <p class="rd-need">Параметры — по умолчанию.</p>`;
     $('mActs').innerHTML = `<button onclick="closeModal()">Отмена</button>
       <button class="primary" onclick="rdGroupsGo(event)">Запустить</button>`;
+    modalSheet('wide');
     openModal();
 }
 

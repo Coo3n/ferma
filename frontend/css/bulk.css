@@ -10,8 +10,13 @@
 .bulk-grid button {
     display: grid;
     grid-template-columns: auto 1fr;
+    grid-template-rows: auto 1fr;
     column-gap: var(--s2);
-    align-items: center;
+    row-gap: 2px;
+    /* По верху, а не по центру: у плиток разное число строк, и при
+       центровке заголовки в одном ряду скачут по высоте. */
+    align-items: start;
+    align-content: start;
     text-align: left;
     height: auto;
     white-space: normal;
@@ -22,6 +27,7 @@
 
 .bulk-grid button .ic {
     grid-row: span 2;
+    margin-top: 1px;
     width: var(--icon-lg);
     height: var(--icon-lg);
     color: var(--accent);
@@ -40,7 +46,7 @@
 }
 
 .bulk-grid button.armed span {
-    color: #fff;
+    color: var(--text);
 }
 
 .bulk-row {
@@ -349,6 +355,27 @@ body.marqueeing {
 .grun small {
     color: var(--dim);
     margin-left: var(--s1);
+    white-space: nowrap;
+}
+
+/* Имя группы забирает остаток, список сценариев — постоянной ширины:
+   в авто-раскладке таблица ужимала список до «— не запускать -». */
+.grun td:first-child {
+    width: 100%;
+    padding-right: var(--s3);
+}
+
+.grun td:nth-child(2) {
+    min-width: 220px;
+}
+
+.grun .rd-gc {
+    white-space: nowrap;
+    padding-left: var(--s3);
+}
+
+.grun .rd-gc:empty {
+    padding-left: 0;
 }
 
 .grun select {
@@ -400,26 +427,42 @@ body.marqueeing {
     gap: var(--s2);
     max-height: 50vh;
     overflow: auto;
+    /* Место под фокус-рамку (outline-offset 2px): иначе прокрутка
+       срезает её у крайних кнопок. */
+    padding: 4px;
+    margin: -4px;
 }
 
 .phone-pick button {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
     column-gap: var(--s2);
     align-items: center;
+    align-content: start;
     text-align: left;
     height: auto;
     padding: var(--s2) var(--s3);
 }
 
 .phone-pick .dot {
-    grid-row: span 2;
+    grid-row: 1;
+}
+
+.phone-pick b,
+.phone-pick span:last-child {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .phone-pick span:last-child {
+    grid-column: 2;
     color: var(--dim);
     font-size: var(--fs-1);
 }
+
+.phone-pick span:last-child:empty { display: none; }
 
 .runs-seg .seg-n:not(:empty) {
     margin-left: 4px;

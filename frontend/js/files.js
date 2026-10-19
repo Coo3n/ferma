@@ -31,7 +31,7 @@ function filesOpen() {
     FILES.path = keep;
     FILES.sel.clear();
     $('mTitle').textContent = t('files.razdel');
-    $('modal').querySelector('.sheet').classList.add('wide', 'files-sheet');
+    modalSheet('wide', 'files-sheet');
     $('mBody').innerHTML = '<div class="files" id="files"></div>';
     $('mActs').innerHTML = `
       <button class="sm" onclick="filesMkdir()"><svg class="ic"><use href="#i-plus"/></svg>${esc(t('files.novaya_papka'))}</button>

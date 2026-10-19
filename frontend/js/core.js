@@ -364,17 +364,37 @@ document.addEventListener('keydown', ev => {
     }
 });
 
+/* Размер листа задаёт сам диалог: modalSheet('wide') перед openModal().
+   Не попросил — лист обычный. Раньше классы добавляли напрямую, и
+   «files-sheet» (без отступов, overflow: hidden) переживал закрытие:
+   после «Файлов» ломались все следующие диалоги. */
+let modalSized = false;
+
+function modalSheet(...classes) {
+    $('modal').querySelector('.sheet').className = ['sheet', ...classes].join(' ');
+    modalSized = true;
+}
+
 function openModal() {
-    modalReturn = document.activeElement;
-    $('modal').classList.add('on');
+    const modal = $('modal');
+    if (!modalSized) modal.querySelector('.sheet').className = 'sheet';
+    modalSized = false;
+    /* Диалог сменил диалог — вернуть фокус надо туда, откуда открыли
+       первый, а не на кнопку внутри листа. */
+    if (!modal.classList.contains('on')) modalReturn = document.activeElement;
+    modal.classList.add('on');
+    /* Сначала содержимое диалога: «×» в шапке первым в обходе, но
+       фокус-рамка на нём при открытии выглядит как выделенная кнопка. */
     const items = modalFocusables();
-    if (items.length) items[0].focus();
+    const first = items.find(el => $('mBody').contains(el)) || items[0];
+    if (first) first.focus();
 }
 
 window.$ = $;
 window.esc = esc;
 window.setText = setText;
 window.openModal = openModal;
+window.modalSheet = modalSheet;
 
 /* Выключить кнопку, объяснив причину. Причина живёт в title: иначе человек
    видит серую кнопку и гадает, что не так — а это ровно та ситуация, из-за

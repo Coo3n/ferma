@@ -240,6 +240,7 @@ globalThis.document.querySelector = () => null;
 // как core.js / device-modal.js
 globalThis.openModal = () => { H.opens++; H.modalReturn = globalThis.document.activeElement; $('modal').classList.add('on'); };
 globalThis.closeModal = () => { H.closes++; $('modal').classList.remove('on'); H.modalReturn = null; };
+globalThis.modalSheet = noop;
 globalThis.Image = function () { setTimeout(() => this.onerror && this.onerror(), 0); };
 const defer = key => new Promise((res, rej) => { (H.pend[key] = H.pend[key] || []).push({res, rej}); });
 globalThis.api = path => defer('api:' + path);

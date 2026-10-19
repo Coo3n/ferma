@@ -320,7 +320,7 @@ function repairShell(html, acts, focusId) {
     $('mTitle').textContent = Number.isInteger(n) && n >= 0 ? 'Починка шага ' + (n + 1) : 'Починка шага';
     $('mBody').innerHTML = html;
     $('mActs').innerHTML = acts;
-    $('modal').querySelector('.sheet').classList.add('wide');
+    modalSheet('wide');
     if (st !== 'live') {
         openModal();
         RP.state = 'live';

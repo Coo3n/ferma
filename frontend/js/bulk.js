@@ -340,7 +340,7 @@ function bulkMenu() {
     $('mActs').innerHTML = `<label class="bulk-jitter" title="Соцсети не видят одинаковых действий в одну секунду">
         Разброс ${jitterSelectHtml()}</label>
       <span class="sp"></span><button onclick="closeModal()">Закрыть</button>`;
-    $('modal').querySelector('.sheet').classList.add('wide');
+    modalSheet('wide');
     openModal();
     if (BULK_RUN.busy) bulkPaint();   // окно открыли заново, пока действие идёт
 }
@@ -359,7 +359,7 @@ function bulkShots() {
             <img alt="" data-src="${url}"></a><figcaption>${esc(d.name || d.serial)}</figcaption></figure>`;
     }).join('')}</div>`;
     $('mActs').innerHTML = `<span class="sp"></span><button onclick="closeModal()">Закрыть</button>`;
-    $('modal').querySelector('.sheet').classList.add('wide');
+    modalSheet('wide');
     openModal();
     $('mBody').querySelectorAll('.shots img').forEach((img, i) => {
         img.onerror = () => img.closest('figure').classList.add('fail');

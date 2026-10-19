@@ -81,7 +81,7 @@ function devToolsOpen() {
     <pre class="log" id="devOut"></pre>`;
     $('mActs').innerHTML = '<span class="sp"></span>'
         + '<button class="sm" onclick="closeModal()">Закрыть</button>';
-    $('modal').querySelector('.sheet').classList.add('wide');
+    modalSheet('wide');
     openModal();
 }
 

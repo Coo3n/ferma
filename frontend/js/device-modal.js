@@ -7,9 +7,10 @@
 
 function closeModal() {
     $('modal').classList.remove('on');
-    /* Широкий лист просит только «Управление» (там консоль adb): следующий
-       диалог обязан открыться обычной ширины. */
-    $('modal').querySelector('.sheet').classList.remove('wide');
+    /* Размер листа (modalSheet) — только для своего диалога: следующий
+       обязан открыться обычной ширины. */
+    $('modal').querySelector('.sheet').className = 'sheet';
+    modalSized = false;
     if (modalReturn && modalReturn.isConnected) modalReturn.focus();
     modalReturn = null;
 }

@@ -113,6 +113,9 @@
     gap: 6px;
     flex-wrap: wrap;
     align-items: center;
+    /* Кнопки — справа, как в остальных диалогах, даже если диалог забыл
+       распорку .sp перед ними. */
+    justify-content: flex-end;
     padding: 11px 14px;
     border-top: 1px solid var(--line);
 }

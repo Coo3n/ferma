@@ -260,7 +260,7 @@ function openDeviationShot(id) {
     $('mBody').innerHTML = deviationShotBody(item, parseMiss(item));
     $('mActs').innerHTML = '<span class="sp"></span>'
         + '<button class="primary" onclick="closeModal()">Закрыть</button>';
-    $('modal').querySelector('.sheet').classList.add('wide');
+    modalSheet('wide');
     openModal();
 }
 

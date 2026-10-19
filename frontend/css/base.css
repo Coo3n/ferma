@@ -272,7 +272,10 @@ button:not(:has(:not(svg))) {
 
 /* ------------------------------------------------------------------- поля */
 
-input[type=text], input[type=search], input[type=password], input[type=number], input[type=time], input[type=date], select, textarea {
+/* input без type — тоже текстовое поле: раньше такие (логин в «Новом
+   аккаунте») оставались системными, светлыми и с рамкой в 2px. */
+input:not([type]), input[type=text], input[type=search], input[type=password], input[type=number],
+input[type=time], input[type=date], input[type=url], input[type=email], input[type=tel], select, textarea {
     background-color: var(--well);
     border: 1px solid var(--line);
     border-radius: var(--r2);
@@ -606,7 +609,7 @@ input[type=checkbox] {
 }
 
 /* Однострочные поля и списки — высоты --ctl, как кнопки рядом с ними. */
-input[type=text], input[type=search], input[type=number], input[type=time], input[type=date],
-input[type=password], select {
+input:not([type]), input[type=text], input[type=search], input[type=number], input[type=time], input[type=date],
+input[type=password], input[type=url], input[type=email], input[type=tel], select {
     height: var(--ctl);
 }

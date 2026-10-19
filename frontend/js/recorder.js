@@ -2383,7 +2383,7 @@ async function recLibOpen() {
     $('mBody').innerHTML = addStepHtml(addStepPlan(recAddCtx()), REC.lib);
     $('mActs').innerHTML = `<span class="sp"></span>
         <button class="sm" onclick="closeModal()">${esc(t('modal.zakryt'))}</button>`;
-    $('modal').querySelector('.sheet').classList.add('wide');
+    modalSheet('wide');
     openModal();
 }
 
@@ -2461,7 +2461,7 @@ function recLogicPick(key) {
         return;
     }
     if (key === 'finish') {
-        $('modal').querySelector('.sheet').classList.remove('wide');
+        modalSheet();
         $('mTitle').textContent = t('rec.l_finish');
         $('mBody').innerHTML = `<div class="row"><label>${esc(t('rec.kak'))}</label>
             <select id="logFinRes" class="grow">
@@ -2510,7 +2510,7 @@ function recLibPick(index) {
         recLibAdd(preset, {});
         return;
     }
-    $('modal').querySelector('.sheet').classList.remove('wide');
+    modalSheet();
     $('mTitle').textContent = preset.title;
     $('mBody').innerHTML = preset.inputs.map(input => input.choices ? `
       <div class="row"><label>${esc(input.label)}</label>
