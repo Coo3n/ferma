@@ -59,7 +59,7 @@ const REC_KIND = {
 /* Шаги, у которых есть одно строковое значение: его правят и выносят в PARAMS. */
 const REC_VALUE_KEY = {
     type: 'value', launch_app: 'package', stop_app: 'package',
-    open_url: 'url', shell: 'cmd', sleep: 'seconds', screenshot: 'name',
+    open_url: 'url', shell: 'cmd', sleep: 'seconds', screenshot: 'name', ensure_app: 'package',
 };
 
 window.REC = {
@@ -310,6 +310,14 @@ function recAppWord(pkg) {
     return parts.find(p => !REC_PKG_BRANDS.has(p.toLowerCase())) || parts[0] || '';
 }
 
+function ensureAppLabel(a) {
+    const app = recApp(a.package);
+    if (a.install === false) {
+        return a.min_version ? t('rec.gotov_proverka_v', {app, v: a.min_version}) : t('rec.gotov_proverka', {app});
+    }
+    return a.min_version ? t('rec.gotov_postavit_v', {app, v: a.min_version}) : t('rec.gotov_postavit', {app});
+}
+
 function recApp(pkg) {
     if (REC_APPS[pkg]) return `«${REC_APPS[pkg]}»`;
     const word = recAppWord(pkg);
@@ -399,7 +407,10 @@ function recLabel(step) {
         case 'chance':
         case 'until':
         case 'if_seen':
+        case 'if_phone':
             return blockLabel(step);
+        case 'ensure_app':
+            return ensureAppLabel(a);
         case 'break':
             return t('rec.vyyti_iz_povtora');
         case 'finish':
@@ -1657,6 +1668,8 @@ const SCH_ICONS = {
     chance: ['chance', 'dice'],
     until: ['until', 'search'],
     if_seen: ['until', 'eye'],
+    if_phone: ['until', 'phone'],
+    ensure_app: ['block', 'phone'],
     break: ['block', 'stop'],
     finish: ['block', 'check'],
     call: ['block', 'layers'],
@@ -2404,10 +2417,34 @@ function recAddCtx() {
     };
 }
 
+/* Карточки «Если на телефоне» → готовые аргументы блока. Приложение
+   выбирают в открывшемся блоке: без него сохранение подскажет, чего нет. */
+const PHONE_CARD_ARGS = {
+    phone_app: {check: 'app_installed', negate: false, package: ''},
+    phone_no_app: {check: 'app_installed', negate: true, package: ''},
+    phone_older: {check: 'app_older', negate: false, package: '', version: ''},
+    phone_battery: {check: 'battery_below', negate: false, percent: 20},
+    phone_offline: {check: 'offline', negate: false},
+    phone_space: {check: 'space_below', negate: false, gb: 1},
+    phone_account: {check: 'no_account', negate: false, platform: 'vk'},
+};
+
 function recAddPick(key) {
     if (key === 'anchor') {
         closeModal();
         recAnchorHere();
+        return;
+    }
+    if (PHONE_CARD_ARGS[key]) {
+        if (REC.sel && REC.sel.size) recSelBlock('if_phone');
+        else recBlockNew('if_phone');
+        const head = recFind(REC.open);
+        if (head && head.kind === 'if_phone') {
+            head.args = Object.assign({}, PHONE_CARD_ARGS[key]);
+            recRender();
+            recSave();
+        }
+        closeModal();
         return;
     }
     if (BLOCK_KINDS[key] || key === 'if_not') {
@@ -2659,6 +2696,13 @@ function recCode(step, index) {
         return `ctx.click(${[step.selector.args].concat(место).join(', ')})`;
     }
 
+    if (step.kind === 'ensure_app') {
+        const parts = [step.param ? `ctx.params[${JSON.stringify(step.param)}]` : JSON.stringify(a.package)];
+        if (a.min_version) parts.push(`min_version=${JSON.stringify(a.min_version)}`);
+        if (a.install === false) parts.push('install=False');
+        return `ctx.ensure_app(${parts.join(', ')})`;
+    }
+
     const key = REC_VALUE_KEY[step.kind];
     if (key) {
         const value = step.param
@@ -2901,6 +2945,31 @@ function recValueEditor(step) {
     return recValueEditorPlain(step, key);
 }
 
+/* «Приложение готово»: версия и «ставить ли». Нет в библиотеке — говорим
+   об этом прямо под галочкой, а не выключаем её молча. */
+function recEnsureEditor(step) {
+    if (step.kind !== 'ensure_app') return '';
+    const a = step.args;
+    if (!APK_LIB.list) apkList().then(() => { if (REC.open === step.id) recRender(); }).catch(() => {});
+    const lib = (APK_LIB.list || []).find(x => x.package === a.package);
+    const note = lib ? t('rec.gotov_v_bib', {v: lib.version_name}) : t('rec.gotov_net_v_bib');
+    return `<div class="row"><label for="ensVer${step.id}">${esc(t('rec.gotov_ne_nizhe'))}</label>
+        <input type="text" id="ensVer${step.id}" class="grow" placeholder="${esc(t('rec.gotov_lyubaya'))}"
+               value="${esc(a.min_version || '')}" oninput="recEnsureSet(${step.id}, 'min_version', this.value.trim())">
+      </div>
+      <label class="inline-check"><input type="checkbox" ${a.install !== false ? 'checked' : ''}
+             onchange="recEnsureSet(${step.id}, 'install', this.checked)">
+        <span>${esc(t('rec.gotov_stavit'))}<small>${esc(note)}</small></span></label>`;
+}
+
+function recEnsureSet(id, key, value) {
+    const step = recFind(id);
+    if (!step) return;
+    if (key === 'min_version' && !value) delete step.args.min_version;
+    else step.args[key] = value;
+    recSave();
+}
+
 function recValueEditorPlain(step, key) {
     if (step.param) {
         return `<div class="rs-param">параметр <b>${esc(step.param)}</b>
@@ -2975,7 +3044,7 @@ function recRow(step, index) {
    сам, если запасные уже выбраны: спрятать заданное — потерять его из виду. */
 function recStepBody(step, index) {
     const main = recThumb(step) + recAnchorEditor(step) + recBranchEditor(step)
-        + recValueEditor(step) + recBlockEditor(step) + recScrollEditor(step, index)
+        + recValueEditor(step) + recEnsureEditor(step) + recBlockEditor(step) + recScrollEditor(step, index)
         + recFlexEditor(step);
     /* «Дополнительно» закрыто всегда: запасные способы — для того, кто их
        ищет, остальным в раскрытом шаге нужны только его настройки. Что внутри

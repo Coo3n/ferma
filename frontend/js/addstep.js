@@ -24,6 +24,11 @@ function addStepPlan(c) {
     const seen = [item('if_seen', deep), item('if_not', deep)];
     if (!wrap) seen.push(item('anchor', c.phone ? null : 'phone'));
     groups.push({key: 'seen', items: seen});
+    /* Факты о телефоне — не о экране: своя группа, иначе десять карточек
+       «если…» сливаются в стену. Телефон для них не нужен — проверка идёт
+       на прогоне. */
+    groups.push({key: 'phone', items: ['phone_app', 'phone_no_app', 'phone_older', 'phone_battery',
+        'phone_offline', 'phone_space', 'phone_account'].map(k => item(k, deep))});
     groups.push({key: 'chance', items: [item('chance', deep)]});
     if (!wrap) groups.push({key: 'action', items: [item('presets')]});
     if (!wrap) groups.push({key: 'other', items: [item('call'), item('finish')]});
@@ -33,10 +38,11 @@ function addStepPlan(c) {
 /* Ключи строк — буквально: test_strings ищет t('…') в коде. */
 function addStepGroupName(key) {
     return key === 'action' ? t('rec.dob_deystvie') : key === 'repeat' ? t('rec.dob_povtoryat')
-        : key === 'seen' ? t('rec.dob_esli') : key === 'chance' ? t('rec.dob_inogda') : t('rec.dob_drugoe');
+        : key === 'seen' ? t('rec.dob_esli') : key === 'phone' ? t('rec.dob_telefon')
+        : key === 'chance' ? t('rec.dob_inogda') : t('rec.dob_drugoe');
 }
 
-const ADD_STEP_GROUP_ICON = {action: 'plus', repeat: 'rotate', seen: 'eye', chance: 'dice', other: 'layers'};
+const ADD_STEP_GROUP_ICON = {action: 'plus', repeat: 'rotate', seen: 'eye', phone: 'phone', chance: 'dice', other: 'layers'};
 
 function addStepItemText(key) {
     switch (key) {
@@ -49,6 +55,13 @@ function addStepItemText(key) {
             desc: t('device.stsenariy_proverit_chto_doshel')};
         case 'chance': return {icon: 'dice', title: t('rec.dob_chance'), desc: t('rec.dob_chance_d')};
         case 'call': return {icon: 'layers', title: t('rec.l_call'), desc: t('rec.l_call_d')};
+        case 'phone_app': return {icon: 'phone', title: t('rec.dob_tel_app'), desc: t('rec.dob_tel_app_d')};
+        case 'phone_no_app': return {icon: 'phone', title: t('rec.dob_tel_no_app'), desc: t('rec.dob_tel_no_app_d')};
+        case 'phone_older': return {icon: 'refresh', title: t('rec.dob_tel_older'), desc: t('rec.dob_tel_older_d')};
+        case 'phone_battery': return {icon: 'battery', title: t('rec.dob_tel_battery'), desc: t('rec.dob_tel_battery_d')};
+        case 'phone_offline': return {icon: 'wifi', title: t('rec.dob_tel_offline'), desc: t('rec.dob_tel_offline_d')};
+        case 'phone_space': return {icon: 'download', title: t('rec.dob_tel_space'), desc: t('rec.dob_tel_space_d')};
+        case 'phone_account': return {icon: 'shield', title: t('rec.dob_tel_account'), desc: t('rec.dob_tel_account_d')};
         default: return {icon: 'check', title: t('rec.l_finish'), desc: t('rec.l_finish_d')};
     }
 }
