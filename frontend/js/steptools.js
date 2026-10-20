@@ -185,7 +185,7 @@ document.addEventListener('toggle', ev => {
         pop.style.top = (r.bottom + 4) + 'px';
     }
 }, true);
-window.addEventListener('scroll', () => {
+document.addEventListener('scroll', () => {
     document.querySelectorAll('details.held-more[open]').forEach(menu => { menu.open = false; });
 }, true);
 
