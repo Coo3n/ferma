@@ -170,7 +170,18 @@ function startStream() {
     img.style.display = 'block';
     /* Пока не пришёл первый кадр — крутилка, а не чёрное поле. */
     $('scrLoad').hidden = false;
-    img.onload = () => { $('scrLoad').hidden = true; };
+    const loaded = () => { $('scrLoad').hidden = true; };
+    img.onload = loaded;
+    /* MJPEG в Chrome не всегда шлёт load после первого кадра, а крутилка
+       оставалась поверх живого экрана: смотрим, появилась ли картинка. */
+    const watch = setInterval(() => {
+        if (!img.isConnected) return clearInterval(watch);
+        if (img.naturalWidth > 0) {
+            clearInterval(watch);
+            loaded();
+        }
+    }, 150);
+    setTimeout(() => { clearInterval(watch); if (img.isConnected && !img.classList.contains('dead')) loaded(); }, 6000);
     /* Поток не пришёл у телефона «в сети» — раньше оставалось пустое
        чёрное поле. Говорим, что случилось, и даём повторить. */
     img.onerror = () => {
