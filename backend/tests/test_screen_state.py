@@ -88,3 +88,10 @@ def test_без_grep_разбирает_полный_дамп(monkeypatch):
     monkeypatch.setattr(adb, "shell", fake)
     assert adb.screen_state("X") == {"on": True, "locked": True}
     assert len(calls) == 2
+
+
+def test_awake_словом_и_числом_не_перетирается():
+    # эмулятор печатает и «mWakefulness=Awake», и «mWakefulness=1»
+    out = "  mWakefulness=Awake\nmWakefulness=1\n"
+    assert adb.parse_screen_state(out) == {"on": True, "locked": False, "known": True}
+    assert adb.parse_screen_state("  mWakefulness=Asleep\nmWakefulness=0\n")["on"] is False

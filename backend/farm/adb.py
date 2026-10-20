@@ -327,6 +327,8 @@ def battery(serial: str) -> dict:
 
 
 _LOCK_RE = re.compile(r"\b(mshowinglockscreen|iskeyguardshowing|mkeyguardshowing|mdreaminglockscreen)=(true|false)")
+_WAKE = {"awake": True, "asleep": False, "dreaming": False, "dozing": False,
+         "1": True, "0": False, "2": False, "3": False}
 _KG_SHOWING = re.compile(r"^showing=(true|false)\b")
 
 
@@ -343,6 +345,7 @@ def parse_screen_state(out: str) -> dict:
     про питание экрана (нет — grep на телефоне не сработал).
     """
     on = None
+    wake = None
     locked = False
     kg_indent = None   # отступ заголовка KeyguardServiceDelegate, пока внутри блока
     for line in out.splitlines():
@@ -354,9 +357,14 @@ def parse_screen_state(out: str) -> dict:
             continue
         if kg_indent is not None and s and indent <= kg_indent:
             kg_indent = None   # блок кончился: дальше чужие «showing=»
-        if s.startswith("mWakefulness="):
-            on = s.split("=", 1)[1].strip().lower() == "awake"
-        elif s.startswith("Display Power: state=") and on is None:
+        if s.startswith("mWakefulness=") and wake is None:
+            # Дамп пишет и «Awake», и число (1) — берём первую строку со словом/числом,
+            # иначе вторая запись перетирает первую и экран навсегда «выключен».
+            val = s.split("=", 1)[1].strip().lower()
+            if val in _WAKE:
+                wake = _WAKE[val]
+                on = wake
+        elif s.startswith("Display Power: state=") and wake is None:
             on = s.rsplit("=", 1)[1].strip().upper() == "ON"
         m = _LOCK_RE.search(low)
         if m and m.group(2) == "true":
