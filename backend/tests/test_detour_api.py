@@ -224,3 +224,47 @@ def test_правило_для_всех_приложений_и_проверка
         api.add_rule({"package": "com.app", "when": [{"text": "x"}], "action": {"run": "Bad Key"}})
     with pytest.raises(HTTPException):
         api.delete_rule("нет такого", "com.app")
+
+
+def test_правило_правится_и_переносится(песочница):
+    _, grd = песочница
+    api.add_rule({"package": "com.app", "name": "Окно", "when": [{"text": "Позже"}],
+                  "action": {"click": {"text": "Позже"}}, "img": "data:image/png;base64,AAA"})
+    api.edit_rule({"package": "com.app", "name": "Окно", "action": {"key": "back"}})
+    g = guards.load("com.app")[0]
+    assert g.action == {"key": "back"}
+    # картинка правила сохранилась при правке
+    assert api.detour_map("com.app")["rules"][0]["img"] == "data:image/png;base64,AAA"
+    api.edit_rule({"package": "com.app", "name": "Окно", "to_package": ""})
+    assert [x.name for x in guards.load("")] == ["Окно"]
+    assert not json.loads((grd / "com.app.json").read_text("utf-8"))
+
+
+def test_правила_выключаются_для_сценария(песочница, monkeypatch):
+    monkeypatch.setattr(api.saver, "load_recipe", lambda key: {"steps": [
+        {"kind": "launch_app", "args": {"package": "com.app"}}]})
+    api.add_rule({"package": "com.app", "name": "A", "when": [{"text": "A"}], "action": {"key": "back"}})
+    info = api.scenario_rules("my_scen")
+    assert info["packages"] == ["com.app"] and [r["name"] for r in info["rules"]] == ["A"]
+    assert info["off"] is False
+    api.scenario_rules_toggle("my_scen", {"off": True})
+    assert api.scenario_rules("my_scen")["off"] is True
+    assert "my_scen" in guards.scenarios_off()
+
+
+def test_выключенные_правила_не_пробуются_в_запуске(песочница):
+    from types import SimpleNamespace
+    from farm.context import DeviceContext
+
+    class Engine:
+        calls = 0
+
+        def try_all(self, ctx):
+            Engine.calls += 1
+            return ["x"]
+
+    fake = SimpleNamespace(scenario_key="s1", _guards=Engine(), log=lambda *a: None)
+    assert DeviceContext._rescue(fake) is True
+    guards.set_scenario_off("s1", True)
+    assert DeviceContext._rescue(fake) is False
+    assert Engine.calls == 1

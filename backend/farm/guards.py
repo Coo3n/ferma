@@ -100,6 +100,34 @@ def load(package: str = "") -> list:
     return found
 
 
+# Сценарии, где правила окон выключены человеком («этому сценарию не
+# помогать»): список ключей рядом с файлами стражей.
+OFF_FILE = "scenarios_off.json"
+
+
+def _off_path() -> Path:
+    return Path(config.GUARDS_DIR) / OFF_FILE
+
+
+def scenarios_off() -> set:
+    try:
+        data = json.loads(_off_path().read_text("utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    return {k for k in data if isinstance(k, str)} if isinstance(data, list) else set()
+
+
+def set_scenario_off(key: str, off: bool) -> None:
+    keys = scenarios_off()
+    if off:
+        keys.add(key)
+    else:
+        keys.discard(key)
+    path = _off_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(sorted(keys), ensure_ascii=False), "utf-8")
+
+
 class GuardEngine:
     """Счётчики срабатываний. Живёт один прогон задачи — внутри ctx."""
 

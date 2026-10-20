@@ -127,6 +127,11 @@ def add_rule(payload: dict = Body(...)):
     raw = {"name": name, "when": {"any": payload.get("when") or []},
            "action": payload.get("action") or {},
            "max_fires": int(payload.get("max_fires") or guards.DEFAULT_MAX_FIRES)}
+    # Маленькая картинка окна для списка правил — человеку легче узнать окно
+    # по виду, чем по «элемент post header…». Стражи её не читают.
+    img = payload.get("img")
+    if isinstance(img, str) and img.startswith("data:image/") and len(img) < 60_000:
+        raw["img"] = img
     try:
         guards._parse_guard(raw, path.stem)
     except guards.GuardError as e:
@@ -148,6 +153,66 @@ def delete_rule(name: str, package: str = ""):
         raise HTTPException(404, f"правила «{name}» нет")
     _write_rules(path, left)
     return {"ok": True}
+
+
+@router.get("/scenario/{key}")
+def scenario_rules(key: str):
+    """Какие правила окон действуют на сценарий: по приложениям из его шагов
+    (запуск, закрытие, «приложение готово») плюс общие для всех."""
+    рецепт = saver.load_recipe(key) or {}
+    пакеты = []
+    for шаг in рецепт.get("steps") or []:
+        pkg = ((шаг or {}).get("args") or {}).get("package") if isinstance(шаг, dict) else None
+        if isinstance(pkg, str) and PACKAGE_RE.match(pkg) and pkg not in пакеты:
+            пакеты.append(pkg)
+    seen, rules = set(), []
+    for pkg in пакеты or [""]:
+        for g in guards.load(pkg):
+            if (g.source, g.name) in seen:
+                continue
+            seen.add((g.source, g.name))
+            rules.append({"name": g.name, "when": {"any": g.when}, "action": g.action,
+                          "source": g.source, "img": _rule_img(g)})
+    return {"off": key in guards.scenarios_off(), "packages": пакеты, "rules": rules}
+
+
+@router.post("/scenario/{key}")
+def scenario_rules_toggle(key: str, payload: dict = Body(...)):
+    if not re.match(r"^[a-z][a-z0-9_]{0,47}$", key):
+        raise HTTPException(400, "неверный ключ сценария")
+    guards.set_scenario_off(key, bool(payload.get("off")))
+    return {"ok": True, "off": key in guards.scenarios_off()}
+
+
+@router.put("/rules")
+def edit_rule(payload: dict = Body(...)):
+    """Изменить правило: действие и/или где действует (перенос между файлами)."""
+    name = payload.get("name") or ""
+    src = _rules_path(payload.get("package") or "")
+    rules = _read_rules(src)
+    found = next((r for r in rules if isinstance(r, dict) and r.get("name") == name), None)
+    if found is None:
+        raise HTTPException(404, f"правила «{name}» нет")
+    new = dict(found)
+    if "action" in payload:
+        new["action"] = payload["action"]
+    try:
+        guards._parse_guard(new, src.stem)
+    except guards.GuardError as e:
+        raise HTTPException(400, str(e))
+    target_pkg = payload.get("to_package", payload.get("package") or "")
+    dst = _rules_path(target_pkg)
+    if dst == src:
+        _write_rules(src, [new if r is found else r for r in rules])
+    else:
+        _write_rules(src, [r for r in rules if r is not found])
+        dst_rules = _read_rules(dst)
+        names = {r.get("name") for r in dst_rules if isinstance(r, dict)}
+        base, n = new["name"], 2
+        while new["name"] in names:
+            new["name"], n = f"{base} ({n})", n + 1
+        _write_rules(dst, dst_rules + [new])
+    return {"ok": True, "name": new["name"]}
 
 
 def scan_obstacles(package: str = "") -> list:
@@ -187,6 +252,15 @@ def scan_obstacles(package: str = "") -> list:
     return слепки
 
 
+def _rule_img(g) -> str:
+    """Картинка правила из файла стражей (Guard её не хранит)."""
+    path = _rules_path("" if g.source == "global" else g.source)
+    for r in _read_rules(path):
+        if isinstance(r, dict) and r.get("name") == g.name:
+            return r.get("img") or ""
+    return ""
+
+
 @router.get("")
 def detour_map(package: str = ""):
     """Карта отводов: что уже умеем обходить и обо что ещё спотыкаемся.
@@ -199,7 +273,7 @@ def detour_map(package: str = ""):
         # Guard.when — это уже развёрнутый список, и разные формы одного поля
         # в API и на диске путали бы и фронт, и расчёт непокрытых преград.
         {"name": g.name, "when": {"any": g.when},
-         "action": g.action, "source": g.source}
+         "action": g.action, "source": g.source, "img": _rule_img(g)}
         for g in guards.load(package)
     ]
     return {"rules": rules, "obstacles": obstacle.uncovered(scan_obstacles(package), rules)}

@@ -12,8 +12,6 @@
    узнать («по тексту «Нравится»», «по подписи «Like»», «по имени iv_likes»).
    Вписать вручную по-прежнему можно — в «Дополнительно». */
 
-const HOW = {};   // открытый выбор на экране: {id, mode, dump, list, node}
-
 function howIsTap(step) {
     return step.kind === 'tap';
 }
@@ -114,125 +112,43 @@ function howMode(id, mode) {
 
 /* ------------------------------------------------------- выбор на снимке */
 
-async function howPick(id, mode) {
-    if (!S.active) return toast(t('how.net_telefona'), 'bad');
-    HOW.id = id;
-    HOW.mode = mode;
-    HOW.node = null;
-    $('mTitle').textContent = mode === 'point' ? t('how.ukazat_tochku') : t('how.ukazat_knopku');
-    $('mBody').innerHTML = '<div class="rp-skel" aria-busy="true"><div class="rp-skel-line"></div><div class="rp-skel-shot"></div></div>';
-    $('mActs').innerHTML = `<span class="sp"></span><button class="sm" onclick="closeModal()">${esc(t('rec.otmena'))}</button>`;
-    modalSheet('wide');
-    openModal();
-    let dump;
-    try {
-        dump = await api(`/api/devices/${encodeURIComponent(S.active)}/inspect`);
-    } catch (e) {
-        $('mBody').innerHTML = `<p class="dim">${esc(t('how.ekran_ne_prishel', {error: e.message}))}</p>`;
-        return;
-    }
-    if (HOW.id !== id || !$('modal').classList.contains('on')) return;
-    HOW.dump = dump;
-    HOW.list = repairNodes(dump);
-    const boxes = mode === 'point' ? '' : HOW.list.map((node, i) => {
-        const [x1, y1, x2, y2] = node.bounds;
-        return `<div class="rp-box" data-i="${i}" style="left:${x1 * 100}%;top:${y1 * 100}%;width:${(x2 - x1) * 100}%;height:${(y2 - y1) * 100}%"></div>`;
-    }).join('');
-    $('mBody').innerHTML = `<div class="how-pick">
-        <div class="rp-stage" id="howStage">
-          <img class="rp-shot" id="howShot" alt="" draggable="false" src="${esc(dump.screenshot)}">
-          <div class="rp-layer" id="howLayer">${boxes}<i class="how-dot" id="howDot" hidden></i></div>
-        </div>
-        <div class="how-side" id="howSide">${howSideHtml()}</div>
-      </div>`;
-    const stage = $('howStage');
-    stage.addEventListener('click', howPointer);
-    stage.addEventListener('mousemove', ev => howPointer(ev, true));
-}
-
-function howSideHtml() {
-    if (HOW.mode === 'point') {
-        return HOW.point
-            ? `<p class="how-h">${esc(t('how.zhmet_v', {where: recWhere({x: HOW.point[0], y: HOW.point[1]}),
-                x: recNum(HOW.point[0]), y: recNum(HOW.point[1])}))}</p>
-               <button class="primary" onclick="howApplyPoint()">${esc(t('how.gotovo'))}</button>`
-            : `<p class="how-h">${esc(t('how.klik_tochka'))}</p>`;
-    }
-    if (!HOW.node) return `<p class="how-h">${esc(t('how.klik_knopka'))}</p>`;
-    /* Надёжные — сверху; «2-й по счёту» и меняющиеся — ниже, с пометкой. */
-    const shaky = s => s.fragile || s.dynamic || /(?:^|,\s*)(?:index|instance)=/.test(s.args);
-    const sels = (HOW.node.selectors || []).filter(s => s.call === 'click' && !s.oversized)
-        .sort((a, b) => shaky(a) - shaky(b));
-    if (!sels.length) return `<p class="how-h">${esc(t('how.nenadezhno'))}</p>`;
-    const step = recFind(HOW.id) || {};
-    const have = new Set([step.selector && step.selector.args, ...recFallbacks(step)].filter(Boolean));
-    return `<p class="how-h"><b>${esc(recNodeLabel(HOW.node) || t('how.element'))}</b></p>
-      <p class="how-note">${esc(HOW.mode === 'button' ? t('how.vyberite_kak') : t('how.chem_uznat'))}</p>
-      <div class="how-cands">${sels.slice(0, 6).map(s => {
-        const known = have.has(s.args);
-        const mark = shaky(s) ? t('how.nenadezhnyy') : s.matches === 1 ? t('how.odin_na_ekrane')
-            : s.matches > 1 ? t('how.takih_n', {n: s.matches}) : '';
-        return `<button type="button" class="how-cand${shaky(s) ? ' shaky' : ''}" ${known ? 'disabled' : ''} data-args="${esc(s.args)}"
-            onclick="howApplySel(this.dataset.args)">
-            <span>${esc(recFeatText(s.args))}</span><small>${esc(known ? t('how.uzhe_est') : mark)}</small></button>`;
-      }).join('')}</div>`;
-}
-
-function howPointer(ev, hover) {
-    const rect = $('howShot').getBoundingClientRect();
-    if (!rect.width) return;
-    const x = (ev.clientX - rect.left) / rect.width, y = (ev.clientY - rect.top) / rect.height;
-    if (x < 0 || x > 1 || y < 0 || y > 1) return;
-    if (HOW.mode === 'point') {
-        if (hover) return;
-        HOW.point = [Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000];
-        const dot = $('howDot');
-        dot.hidden = false;
-        dot.style.left = x * 100 + '%';
-        dot.style.top = y * 100 + '%';
-        $('howSide').innerHTML = howSideHtml();
-        return;
-    }
-    const hit = recHit(x, y, HOW.dump);
-    const node = hit ? HOW.dump.nodes[hit.target] : null;
-    const i = node ? HOW.list.indexOf(node) : -1;
-    document.querySelectorAll('#howLayer .rp-box.hov, #howLayer .rp-box.on').forEach(b => {
-        if (hover) b.classList.remove('hov'); else b.classList.remove('on', 'hov');
+/* mode: 'or' — ещё один способ найти кнопку шага; 'button' — тап становится
+   нажатием по кнопке; 'point' — точка для «В точку». */
+function howPick(id, mode) {
+    const step = recFind(id) || {};
+    vpOpen({
+        title: mode === 'point' ? t('how.ukazat_tochku') : t('how.ukazat_knopku'),
+        mode: mode === 'point' ? 'point' : 'element',
+        have: mode === 'or' ? [step.selector && step.selector.args, ...recFallbacks(step)].filter(Boolean) : [],
+        side: v => mode === 'point'
+            ? (v.point ? `<p class="vp-h">${esc(t('how.zhmet_v', {where: recWhere({x: v.point[0], y: v.point[1]}),
+                x: recNum(v.point[0]), y: recNum(v.point[1])}))}</p>` : `<div class="vp-empty">${recIcon('target')}<p>${esc(t('how.klik_tochka'))}</p></div>`)
+            : vpChoiceHtml(mode === 'button' ? t('how.vyberite_kak') : t('how.chem_uznat')),
+        acts: v => `<span class="sp"></span><button class="sm" onclick="closeModal()">${esc(t('rec.otmena'))}</button>
+            <button class="primary" id="vpGo" onclick="howApply(${id}, '${mode}')"
+              ${(mode === 'point' ? v.point : v.choice) ? '' : 'disabled'}>${esc(mode === 'or' ? t('how.dobavit') : t('how.gotovo'))}</button>`,
     });
-    const box = i >= 0 && document.querySelector(`#howLayer .rp-box[data-i="${i}"]`);
-    if (box) box.classList.add(hover ? 'hov' : 'on');
-    if (hover) return;
-    HOW.node = node;
-    HOW.at = [x, y];
-    $('howSide').innerHTML = howSideHtml();
 }
 
-function howApplySel(args) {
-    const step = recFind(HOW.id);
-    if (!step || !HOW.node) return;
-    if (HOW.mode === 'button') {
-        /* Тап → клик по выбранному элементу, этим способом основным. */
-        const built = recBuildClickStep(HOW.node, HOW.dump, HOW.at);
-        const chosen = (HOW.node.selectors || []).find(s => s.args === args) || built.selector;
-        Object.assign(step, built, {kind: 'click', args: {}, selector: {call: 'click', args: chosen.args}});
+function howApply(id, mode) {
+    const step = recFind(id);
+    if (!step) return closeModal();
+    if (mode === 'point') {
+        if (!VP.point) return;
+        if (step.kind === 'click') howMode(id, 'point');
+        step.args = {x: VP.point[0], y: VP.point[1]};
+    } else if (mode === 'button') {
+        if (!VP.node || !VP.choice) return;
+        const built = recBuildClickStep(VP.node, VP.dump, VP.at);
+        Object.assign(step, built, {kind: 'click', args: {}, selector: {call: 'click', args: VP.choice}});
         delete step.shot;
         delete step._click;
     } else {
-        if (step.selector && step.selector.args === args) return;
-        step.or = [...recFallbacks(step).filter(a => a !== args), args].slice(0, REC_OR_MAX);
+        if (!VP.choice || (step.selector && step.selector.args === VP.choice)) return;
+        step.or = [...recFallbacks(step).filter(a => a !== VP.choice), VP.choice].slice(0, REC_OR_MAX);
     }
     closeModal();
     recRender();
     recSave();
-    toast(HOW.mode === 'button' ? t('how.teper_po_knopke') : t('how.variant_dobavlen'), 'ok');
-}
-
-function howApplyPoint() {
-    const step = recFind(HOW.id);
-    if (!step || !HOW.point) return;
-    if (step.kind === 'click') howMode(step.id, 'point');
-    step.args = {x: HOW.point[0], y: HOW.point[1]};
-    closeModal();
-    recRender();
-    recSave();
+    toast(mode === 'or' ? t('how.variant_dobavlen') : mode === 'button' ? t('how.teper_po_knopke') : t('how.tochka_zadana'), 'ok');
 }

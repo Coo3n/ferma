@@ -376,6 +376,9 @@ function heldChoiceHtml(job, opts) {
         .slice(0, 2)
         .map(([код, подпись, зачем]) => `<button class="sm" title="${esc(зачем)}" onclick="${decide(код)}">${esc(подпись)}</button>`);
     const меню = [];
+    /* Окно-помеха: научить ферму закрывать его — прямо отсюда, на экране
+       этого телефона (он сейчас держит это окно). */
+    if (job.serial && window.popNew) меню.push(`<button type="button" onclick="popNew('', '${esc(job.serial)}')">${recIcon('layers')}${esc(t('held.meshaet_okno'))}</button>`);
     if (o.open && главное.code !== 'open') меню.push(`<button type="button" onclick="${o.open}">${recIcon('phone')}${esc(t('held.otkryt_telefon'))}</button>`);
     (o.extra || []).forEach(([label, onclick, icon]) =>
         меню.push(`<button type="button" onclick="${onclick}">${recIcon(icon || 'external')}${esc(label)}</button>`));

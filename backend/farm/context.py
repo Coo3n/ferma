@@ -1743,6 +1743,9 @@ class DeviceContext:
 
     def _rescue(self) -> bool:
         """Шаг промахнулся — дать стражам закрыть перехватчик. True, если был толк."""
+        key = getattr(self, "scenario_key", "") or ""
+        if key and key in guards.scenarios_off():
+            return False   # человек выключил правила окон для этого сценария
         try:
             return bool(self._guards.try_all(self))
         except Cancelled:

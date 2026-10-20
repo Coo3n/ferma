@@ -334,8 +334,10 @@ async function renderScenarioSteps(scenario) {
     if (!box) return;
     if (!scenario.editable) {
         box.hidden = true;
+        if ($('scPopups')) $('scPopups').hidden = true;
         return;
     }
+    if (window.popScenarioLoad) popScenarioLoad(scenario.key);
     let recipe = scRecipeCache.get(scenario.key);
     try {
         if (!recipe) {
