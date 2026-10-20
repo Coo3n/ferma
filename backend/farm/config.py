@@ -75,6 +75,7 @@ SETTLE_QUIET = float(os.getenv("FARM_SETTLE_QUIET", "0.4"))
 ESCAPE = os.getenv("FARM_ESCAPE", "1") != "0"
 
 # Сколько задач хранить в журнале
+ARTIFACT_KEEP_DAYS = float(os.getenv("FARM_ARTIFACT_KEEP_DAYS", "14"))  # снимки и отчёты старше — удаляются
 JOB_HISTORY = int(os.getenv("FARM_JOB_HISTORY", "1000"))  # запуск на 100 телефонов × повторы
 
 # Остановка на человеке: шаг промахнулся, но вместо падения задача встаёт и

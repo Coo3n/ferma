@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Body, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 
 from .. import config
@@ -73,6 +73,59 @@ def jobs_csv(jobs: list[dict]) -> str:
                     j.get("device_name") or j.get("serial") or "",
                     _CSV_STATUS.get(j.get("status"), j.get("status") or ""), dur, err])
     return "\ufeff" + buf.getvalue()
+
+
+_STEP_STATUS = {"ok": "ок", "retried": "с повтором", "blind": "вслепую",
+                "skipped": "пропущен", "failed": "упал"}
+
+
+def steps_csv(jobs: list[dict], base_url: str = "") -> str:
+    """CSV «запуск × шаг»: по строке на каждый шаг, чтобы в Excel было видно,
+    на каком шаге что случилось. У упавшего шага — ссылка на снимок экрана
+    (сами фото лежат на ферме и чистятся через ARTIFACT_KEEP_DAYS)."""
+    import csv
+    import io
+    import time as _time
+
+    buf = io.StringIO()
+    w = csv.writer(buf, delimiter=";", lineterminator="\r\n")
+    w.writerow(["время начала", "сценарий", "телефон", "статус запуска", "шаг №", "шаг",
+                "статус шага", "секунд", "проходов", "ошибка", "снимок"])
+    for j in jobs:
+        ts = j.get("started_at") or j.get("created_at")
+        started = _time.strftime("%Y-%m-%d %H:%M:%S", _time.localtime(ts)) if ts else ""
+        head = [started, j.get("scenario_name") or j.get("scenario_key") or "",
+                j.get("device_name") or j.get("serial") or "",
+                _CSV_STATUS.get(j.get("status"), j.get("status") or "")]
+        try:
+            steps = json.loads((Path(config.ARTIFACTS_DIR) / str(j["id"]) / "report.json")
+                               .read_text("utf-8")).get("steps", [])
+        except (OSError, ValueError, KeyError):
+            steps = []
+        if not steps:
+            w.writerow(head + ["", "", "", "", "", " ".join(str(j.get("error") or "").split()), ""])
+            continue
+        for st in steps:
+            shot = ""
+            if st.get("shot"):
+                url = f"{base_url}/api/jobs/{j['id']}/artifacts/{st['shot']}"
+                shot = f'=HYPERLINK("{url}";"снимок")'
+            err = " ".join(str(j.get("error") or "").split()) if st.get("status") == "failed" else ""
+            w.writerow(head + [st.get("i", 0) + 1, st.get("label", ""),
+                               _STEP_STATUS.get(st.get("status"), st.get("status", "")),
+                               f"{st.get('secs') or 0:.1f}".replace(".", ","),
+                               st.get("n", 1), err, shot])
+    return "\ufeff" + buf.getvalue()
+
+
+@router.get("/steps.csv")
+def export_steps_csv(request: Request):
+    import datetime
+    name = f"farm-steps-{datetime.date.today():%Y-%m-%d}.csv"
+    base = str(request.base_url).rstrip("/")
+    return Response(steps_csv(runner.list_jobs(limit=10 ** 9), base).encode("utf-8"),
+                    media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 # Объявлен до /{job_id}: иначе «export.csv» уйдёт в get_job как id задачи.

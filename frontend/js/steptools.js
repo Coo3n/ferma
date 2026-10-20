@@ -1142,7 +1142,28 @@ function jobStepsHtml(job) {
     const speed = job.speed && job.speed < 1 ? `<span class="jnote">замедление ×${job.speed}</span>` : '';
     const err = info ? `<div class="jerr ${info.timeout ? 'timeout' : ''}">
       <b>${info.timeout ? 'Не дождались' : 'Сбой'}: ${esc(info.title)}</b>${info.hint ? `<p>${esc(info.hint)}</p>` : ''}</div>` : '';
-    return `<div class="jsteps"><div class="jchips">${chips}${from}${speed}</div>${err}</div>`;
+    return `<div class="jsteps"><div class="jchips">${chips}${from}${speed}</div>${err}${jobStepListHtml(job)}</div>`;
+}
+
+const JSTEP_WORDS = {ok: 'ок', retried: 'с повтором', blind: 'вслепую', skipped: 'пропущен', failed: 'упал'};
+
+/* Шаги списком с временем; у упавшего — снимок экрана и красная точка, куда
+   нажимали. Снимок один на запуск (см. _mark_failed_step), поэтому диск не
+   забивается. Раскрыт сразу, только если запуск упал. */
+function jobStepListHtml(job) {
+    const timeline = job.timeline || [];
+    if (!timeline.length || job.status === 'running' || job.status === 'queued') return '';
+    const rows = timeline.map(st => {
+        const shot = st.shot ? `<figure class="jshot"><div class="jimg">
+            <img src="/api/jobs/${esc(job.id)}/artifacts/${encodeURIComponent(st.shot)}" alt="" loading="lazy">
+            ${st.tap ? `<i class="jtap" style="left:${st.tap[0] * 100}%;top:${st.tap[1] * 100}%"></i>` : ''}</div>
+            <figcaption>${esc(st.tap ? t('job.shot_tap') : t('job.shot_fail'))}</figcaption></figure>` : '';
+        return `<li class="jstep ${esc(st.status)}"><span class="jn">${st.i + 1}</span>
+            <span class="jl">${esc(st.label || '')}</span>
+            <small>${esc(JSTEP_WORDS[st.status] || st.status)} · ${st.secs != null ? st.secs + ' с' : ''}${st.n > 1 ? ' · ×' + st.n : ''}</small>${shot}</li>`;
+    }).join('');
+    return `<details class="jlist"${job.status === 'failed' ? ' open' : ''}>
+        <summary>${esc(t('job.shagi_spiskom'))}</summary><ol>${rows}</ol></details>`;
 }
 
 window.jobStepsHtml = jobStepsHtml;

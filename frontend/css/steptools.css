@@ -341,3 +341,22 @@ button.jchip:hover { filter: brightness(1.25); }
 /* Панель проверки — спокойная полоса, а не карточка с тенью. */
 #recRun { margin: var(--s2) var(--s3) 0; padding: var(--s2) var(--s3); background: var(--panel2);
     border-color: var(--line-soft); box-shadow: none; }
+
+/* Шаги запуска списком; у упавшего — снимок с красной точкой нажатия. */
+.jlist { margin-top: var(--s3); font-size: var(--fs-2); }
+.jlist summary { cursor: pointer; color: var(--dim); }
+.jlist ol { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; gap: var(--s1); }
+.jstep { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s2); }
+.jstep .jn { color: var(--dim); min-width: 2ch; text-align: right; }
+.jstep small { color: var(--dim); }
+.jstep.failed .jl { color: var(--bad); }
+.jstep.retried small, .jstep.blind small { color: var(--warn); }
+.jimg { position: relative; }
+.jshot { flex-basis: 100%; margin: var(--s2) 0 var(--s2) 3ch; width: fit-content; max-width: 220px; }
+.jshot img { display: block; width: 100%; border-radius: var(--r2); border: 1px solid var(--line); }
+.jshot figcaption { margin-top: var(--s1); color: var(--dim); font-size: var(--fs-1); }
+.jtap {
+    position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%;
+    background: color-mix(in srgb, var(--bad) 35%, transparent); border: 2px solid var(--bad);
+    pointer-events: none;
+}

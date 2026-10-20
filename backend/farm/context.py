@@ -328,6 +328,7 @@ class DeviceContext:
         self._logger = logger or (lambda m: log.info("[%s] %s", serial, m))
         self._cancel_check = cancel_check or (lambda: False)
         self.artifacts_dir = artifacts_dir
+        self.last_tap: tuple[float, float] | None = None   # куда в последний раз нажимали (доли экрана)
         self.scenario_assets = scenario_assets
         # Как спросить человека, что делать с промахнувшимся шагом. Подставляет
         # очередь: только она может остановить задачу, не отпустив устройство.
@@ -493,6 +494,7 @@ class DeviceContext:
     def tap(self, x: float, y: float) -> None:
         self.check_cancel()
         self._pre_action()
+        self.last_tap = (x, y)
         if self.human:
             control.humanize.tap(self.serial, x, y)
         else:
@@ -794,6 +796,7 @@ class DeviceContext:
             self.check_cancel()
             self._pre_action()
             x, y = control.humanize.point_in(x1, y1, x2, y2)
+            self.last_tap = (x, y)
             control.humanize.tap(self.serial, x, y)
             return
         self.tap((x1 + x2) / 2, (y1 + y2) / 2)
@@ -818,6 +821,7 @@ class DeviceContext:
                 w, h = self.size
                 x, y = control.humanize.point_in(
                     b["left"] / w, b["top"] / h, b["right"] / w, b["bottom"] / h)
+                self.last_tap = (x, y)
                 control.humanize.tap(self.serial, x, y)
                 return
             except Exception:  # noqa: BLE001 — info недоступен, жмём как обычно

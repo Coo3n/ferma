@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import logging
 import queue
 import re
@@ -484,6 +485,46 @@ def _collect_failure_artifacts(job: Job, art_dir: Path) -> None:
             job.add_line(f"не удалось снять {label}: {e}")
 
 
+_last_sweep = 0.0
+
+
+def sweep_artifacts(now: float | None = None) -> int:
+    """Удалить папки артефактов старше ARTIFACT_KEEP_DAYS: снимки падений
+    не должны копиться на диске фермы. Не чаще раза в час; возвращает число
+    удалённых папок."""
+    global _last_sweep
+    now = now or time.time()
+    if now - _last_sweep < 3600:
+        return 0
+    _last_sweep = now
+    limit = now - config.ARTIFACT_KEEP_DAYS * 86400
+    removed = 0
+    for d in Path(config.ARTIFACTS_DIR).glob("*"):
+        try:
+            if d.is_dir() and d.stat().st_mtime < limit and d.name not in runner.jobs:
+                shutil.rmtree(d)
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
+def _mark_failed_step(job: Job, ctx) -> None:
+    """Снимок падения и точка последнего нажатия — к упавшему шагу отчёта.
+
+    Фото одно на запуск (его и так снимает `_collect_failure_artifacts`):
+    снимки каждого шага забили бы диск, а нужен тот, где сломалось.
+    """
+    if not job.timeline:
+        return
+    last = job.timeline[-1]
+    last["status"] = "failed"
+    last["shot"] = "99_failure.jpg"
+    tap = getattr(ctx, "last_tap", None)
+    if tap:
+        last["tap"] = [round(min(1, max(0, tap[0])), 4), round(min(1, max(0, tap[1])), 4)]
+
+
 def _step_labels(sc) -> list:
     """Подписи шагов из рецепта; пусто у написанных руками сценариев."""
     if not getattr(sc, "recorded", False):
@@ -529,6 +570,7 @@ def _execute(job: Job) -> None:
     job.started_at = time.time()
     art_dir = Path(config.ARTIFACTS_DIR) / job.id
     sc = None
+    ctx = None
     # Всё, что может бросить (mkdir, scenarios.get при OSError), — внутри try:
     # устройство уже занято, и без finally оно осталось бы занятым навсегда,
     # а задача — вечно RUNNING.
@@ -595,6 +637,7 @@ def _execute(job: Job) -> None:
         # Сначала артефакты, потом отклонение: оно ссылается на слепок
         # преграды, и до его записи ссылаться было бы не на что.
         _collect_failure_artifacts(job, art_dir)
+        _mark_failed_step(job, ctx)
         try:
             idx = (step_index_from_exc(e, sc.path, verified_line_map(sc))
                    if sc is not None else -1)
@@ -970,6 +1013,7 @@ class Runner:
     def _prune(self) -> None:
         """Держать в журнале не больше JOB_HISTORY задач, выбрасывая старейшие
         завершённые. Живые (очередь, работа, HELD) не трогаем никогда."""
+        sweep_artifacts()
         лишних = len(self.order) - config.JOB_HISTORY
         if лишних <= 0:
             return
