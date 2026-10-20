@@ -74,7 +74,9 @@
     align-items: center;
     gap: 4px;
     padding: 0 var(--s2);
-    background: var(--panel2);   /* сплошная: градиент читался как «фейд» */
+    /* Плашка под кнопками повторяет цвет строки (--rs-tint поверх фона): серый
+       прямоугольник на hover/выделении/блоке выглядел как сбитая вёрстка. */
+    background: linear-gradient(var(--rs-tint, transparent), var(--rs-tint, transparent)), var(--bg);
     opacity: 0;
     transition: opacity var(--fast) var(--ease);
 }
@@ -809,15 +811,14 @@
     min-height: 30px;
     padding: 0;
     justify-content: center;
-    border: 1px solid var(--line);
+    border: 0;
     border-radius: var(--r1);
-    background: var(--panel);
+    background: transparent;
     color: var(--text2);
 }
 
 .rs-acts button.sm:hover:not(:disabled),
 .gr-try:hover:not(:disabled) {
-    border-color: var(--line-hover);
     background: var(--panel3);
     color: var(--text);
 }
@@ -843,7 +844,9 @@
 .rs:not(.sel):hover,
 .rs.open:not(.sel) {
     background: var(--panel2);
+    --rs-tint: var(--panel2);
 }
+.rs.mq-on, .rs.sel { --rs-tint: var(--accent-dim); }
 
 /* ------------------------------------------------------------ блоки
 
@@ -1163,3 +1166,19 @@ body.rec-picking .stage, body.rec-picking #recLayer { cursor: crosshair; }
     border-radius: var(--r2); font-size: var(--fs-2); color: var(--text); }
 .rs-ghost span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text2); }
 .gr-edges { overflow: visible; }
+
+/* Меню шага: три группы вместо десяти строк. Плитки — иконка над подписью. */
+.rs-menu { min-width: 248px; padding: var(--s2); gap: var(--s2); }
+.rs-menu-g + .rs-menu-g { border-top: 1px solid var(--line-soft); padding-top: var(--s2); }
+.rs-menu-h { padding: var(--s1) var(--s2) var(--s2); color: var(--dim); font-size: var(--fs-1); }
+.rs-menu-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s1); }
+.rs-menu-tiles.wide { grid-template-columns: repeat(2, 1fr); }
+.rs-menu-t {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: var(--s1); min-height: 56px; padding: var(--s2); border: 0; border-radius: var(--r1);
+    background: var(--panel2); color: var(--text); font-size: var(--fs-1); text-align: center; cursor: pointer;
+}
+.rs-menu-t:hover, .rs-menu-t:focus-visible { background: var(--panel3); }
+.rs-menu-t::before { content: none; }
+.rs-menu-tiles.wide .rs-menu-t { flex-direction: row; justify-content: flex-start; min-height: 40px; gap: var(--s2); text-align: left; }
+.rs-menu-t .ic { width: 18px; height: 18px; color: var(--dim); }

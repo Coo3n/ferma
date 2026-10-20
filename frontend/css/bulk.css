@@ -410,19 +410,54 @@ body.marqueeing {
 }
 
 .sc-steps {
-    margin: var(--s2) 0 0;
-    padding-left: 28px;
+    margin: var(--s3) 0 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: scs;
+    display: grid;
+    gap: var(--s1);
     font-size: var(--fs-2);
-    color: var(--text2);
-    line-height: 1.9;
-    columns: 2 320px;
-    column-gap: var(--s5);
+    color: var(--text);
 }
 
-.sc-steps li::marker {
+/* Строка шага: картинка слева (что сделано), номер и подпись справа. */
+.sc-steps li {
+    counter-increment: scs;
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    min-height: 48px;
+    padding: var(--s1) var(--s3);
+    border-radius: var(--r2);
+    background: var(--panel2);
+}
+
+.sc-steps li::after { content: none; }
+.sc-lbl::before {
+    content: counter(scs);
+    display: inline-block;
+    min-width: 2ch;
+    margin-right: var(--s2);
     color: var(--dim);
     font-variant-numeric: tabular-nums;
 }
+
+.sc-vis {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r1);
+    background: var(--well, var(--panel));
+}
+.sc-vis .ic { width: 20px; height: 20px; color: var(--dim); }
+.sc-crop { max-width: 36px; max-height: 36px; border-radius: 4px; outline: 2px solid var(--accent); outline-offset: 1px; }
+.sc-phone { width: 20px; height: 36px; }
+.sv-body { fill: none; stroke: var(--line-hover); stroke-width: 1.5; }
+.sv-dot { fill: var(--accent); }
+.sv-ring { fill: none; stroke: var(--accent); stroke-width: 1.5; opacity: .6; }
+.sv-arrow { stroke: var(--accent); stroke-width: 2; stroke-linecap: round; }
 
 /* --------------------------------------------- выбор телефона для записи */
 

@@ -352,6 +352,28 @@ async function renderScenarioSteps(scenario) {
                 title="Открыть в конструкторе">
           <svg class="ic"><use href="#i-pencil"/></svg>Изменить</button></div>
       <ol class="sc-steps">${steps.map(st =>
-        `<li>${esc(recLabel(st))}</li>`).join('')}</ol>`);
+        `<li><span class="sc-vis">${scStepVisual(st, recipe.assets || {})}</span>
+          <span class="sc-lbl">${esc(recLabel(st))}</span></li>`).join('')}</ol>`);
+}
+
+/* Картинка шага: что именно сделано. Нажатие по кнопке — её вырезка в
+   рамке (она уже хранится в рецепте, новых фото сервер не копит); нажатие
+   по точке и жест — схема телефона с точкой или стрелкой; остальное — значок. */
+function scStepVisual(st, assets) {
+    const a = st.args || {};
+    const crop = st.crop && assets[st.crop];
+    if (crop) return `<img class="sc-crop" alt="" src="data:image/png;base64,${crop}">`;
+    const dot = (x, y) => `<circle cx="${(x * 24).toFixed(1)}" cy="${(y * 44).toFixed(1)}" r="4" class="sv-dot"/>`
+        + `<circle cx="${(x * 24).toFixed(1)}" cy="${(y * 44).toFixed(1)}" r="7.5" class="sv-ring"/>`;
+    const phone = inner => `<svg class="sc-phone" viewBox="-2 -2 28 48" aria-hidden="true">
+        <rect x="0" y="0" width="24" height="44" rx="4" class="sv-body"/>${inner}</svg>`;
+    const num = v => typeof v === 'number' && isFinite(v);
+    if ((st.kind === 'tap' || st.kind === 'long_tap') && num(a.x) && num(a.y)) return phone(dot(a.x, a.y));
+    if (st.kind === 'swipe' && [a.x1, a.y1, a.x2, a.y2].every(num)) {
+        const [x1, y1, x2, y2] = [a.x1 * 24, a.y1 * 44, a.x2 * 24, a.y2 * 44];
+        return phone(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="sv-arrow"/>
+            <circle cx="${x1}" cy="${y1}" r="2.5" class="sv-dot"/>`);
+    }
+    return `<svg class="ic" aria-hidden="true"><use href="#i-${esc(schIcon(st)[1])}"/></svg>`;
 }
 

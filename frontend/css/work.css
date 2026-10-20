@@ -1028,13 +1028,6 @@ button.held-shot:hover {
 .inbox-acts { display: flex; gap: var(--s2); flex-wrap: wrap; }
 
 /* Советы перед первой записью. */
-.tips { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s3); }
-.tips li { display: flex; gap: var(--s3); align-items: flex-start; }
-.tips p { margin: var(--s1) 0 0; color: var(--dim); font-size: var(--fs-2); }
-.tips-n {
-    flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
-    background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: var(--fs-2);
-}
 
 /* Поиск и фильтры списка сценариев. */
 #scTools {
@@ -1042,3 +1035,16 @@ button.held-shot:hover {
     padding: var(--s3) var(--s4); background: var(--bg); border-bottom: 1px solid var(--line-soft);
 }
 #scTools .seg { flex-wrap: wrap; }
+
+/* Советы: четыре карточки 2×2, в каждой правило и пример «так / не так». */
+.tips { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s3); list-style: none; margin: 0; padding: 0; }
+.tip { display: grid; gap: var(--s2); padding: var(--s4); border-radius: var(--r2); background: var(--panel2); align-content: start; }
+.tip h4 { margin: 0; font-size: var(--fs-3); }
+.tip-ic { width: 22px; height: 22px; color: var(--accent); }
+.tip p { margin: 0; display: flex; gap: var(--s2); align-items: flex-start; font-size: var(--fs-2); line-height: 1.4; }
+.tip p .ic { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+.tip-ok { color: var(--text); }
+.tip-ok .ic { color: var(--ok); }
+.tip-bad { color: var(--dim); }
+.tip-bad .ic { color: var(--bad); }
+@media (max-width: 560px) { .tips { grid-template-columns: 1fr; } }

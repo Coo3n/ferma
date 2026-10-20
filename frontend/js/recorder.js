@@ -3061,18 +3061,26 @@ function recStepBody(step, index) {
 
 /* Подписи — t() прямо здесь, а не ключи: test_strings ищет ключи по t('…'). */
 const REC_ROW_MENU = () => [
-    [t('rec.m_zapisat_posle'), 'plus', (id) => recRecordAfter(id)],
-    [t('rec.m_zapustit_otsyuda'), 'play', (id, index) => recRunFrom(index)],
-    [t('rec.m_dublirovat'), 'copy', (id) => recDup(id)],
-    /* «Обернуть в блок» живёт здесь, а не строкой из четырёх кнопок в каждом
-       раскрытом шаге: нужно редко, а место в шаге — для его настроек. */
-    [t('rec.m_v_povtor'), 'rotate', (id) => recBlockWrap('loop', [id])],
-    [t('rec.m_v_poka'), 'search', (id) => recBlockWrap('until', [id])],
-    [t('rec.m_v_esli'), 'eye', (id) => recBlockWrap('if_seen', [id])],
-    [t('rec.m_v_inogda'), 'dice', (id) => recBlockWrap('chance', [id])],
-    [t('rec.m_vyshe'), 'up', (id) => recMove(id, -1)],
-    [t('rec.m_nizhe'), 'down', (id) => recMove(id, 1)],
-    [t('rec.m_udalit'), 'trash', (id) => recDelete(id), 'danger'],
+    /* Меню в три группы вместо десяти строк подряд: дальше глазами не
+       перебирают, а видят «куда записывать / как двигать / во что обернуть». */
+    {items: [
+        [t('rec.m_zapisat_posle'), 'plus', (id) => recRecordAfter(id)],
+        [t('rec.m_zapustit_otsyuda'), 'play', (id, index) => recRunFrom(index)],
+    ]},
+    {tiles: [
+        [t('rec.mm_kopiya'), 'copy', (id) => recDup(id)],
+        [t('rec.mm_vyshe'), 'up', (id) => recMove(id, -1)],
+        [t('rec.mm_nizhe'), 'down', (id) => recMove(id, 1)],
+    ]},
+    {title: t('rec.mm_obernut'), tiles: [
+        [t('rec.mm_povtor'), 'rotate', (id) => recBlockWrap('loop', [id])],
+        [t('rec.mm_poka'), 'search', (id) => recBlockWrap('until', [id])],
+        [t('rec.mm_esli'), 'eye', (id) => recBlockWrap('if_seen', [id])],
+        [t('rec.mm_inogda'), 'dice', (id) => recBlockWrap('chance', [id])],
+    ], wide: true},
+    {items: [
+        [t('rec.m_udalit'), 'trash', (id) => recDelete(id), 'danger'],
+    ]},
 ];
 
 /* Открытое меню помнится по id шага (REC.menuFor), а не живёт только в
@@ -3112,19 +3120,34 @@ function recRowMenuShow(focus) {
     const menu = document.createElement('div');
     menu.className = 'rs-menu';
     menu.setAttribute('role', 'menu');
-    REC_ROW_MENU().forEach(([label, icon, run, kind]) => {
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'rs-menu-i ' + (kind || '');
-        item.setAttribute('role', 'menuitem');
-        item.innerHTML = recIcon(icon) + `<span>${esc(label)}</span>`;
-        item.onclick = (e) => {
-            e.stopPropagation();
-            recRowMenuClose();
-            /* Номер берём сейчас: за время открытого меню шаги могли сдвинуться. */
-            run(id, REC.steps.findIndex(step => step.id === id));
-        };
-        menu.appendChild(item);
+    const pick = (run) => (e) => {
+        e.stopPropagation();
+        recRowMenuClose();
+        /* Номер берём сейчас: за время открытого меню шаги могли сдвинуться. */
+        run(id, REC.steps.findIndex(step => step.id === id));
+    };
+    REC_ROW_MENU().forEach(group => {
+        const box = document.createElement('div');
+        box.className = 'rs-menu-g';
+        if (group.title) {
+            const head = document.createElement('div');
+            head.className = 'rs-menu-h';
+            head.textContent = group.title;
+            box.appendChild(head);
+        }
+        const list = document.createElement('div');
+        list.className = group.tiles ? 'rs-menu-tiles' + (group.wide ? ' wide' : '') : 'rs-menu-list';
+        (group.tiles || group.items).forEach(([label, icon, run, kind]) => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = (group.tiles ? 'rs-menu-t ' : 'rs-menu-i ') + (kind || '');
+            item.setAttribute('role', 'menuitem');
+            item.innerHTML = recIcon(icon) + `<span>${esc(label)}</span>`;
+            item.onclick = pick(run);
+            list.appendChild(item);
+        });
+        box.appendChild(list);
+        menu.appendChild(box);
     });
     acts.appendChild(menu);
     if (focus) menu.querySelector('button').focus();
