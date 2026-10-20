@@ -353,8 +353,8 @@ function recSelBar() {
     <details class="selbar-menu">
       <summary class="sm">${recIcon('layers')} ${esc(t('rec.sel_obernut'))}</summary>
       <div class="selbar-pop">
-        <button class="sm ghost" onclick="recSelBlock('loop')" title="${esc(t('rec.blok_povtor_podskazka'))}">${recIcon('rotate')} ${esc(t('rec.blok_povtor'))}</button>
-        <button class="sm ghost" onclick="recSelBlock('chance')" title="${esc(t('rec.blok_shans_podskazka'))}">${recIcon('dice')} ${esc(t('rec.blok_shans'))}</button>
+        <button class="sm ghost" onclick="recSelBlock('loop')" title="${esc(t('rec.blok_povtor_podskazka'))}">${recIcon('repeat')} ${esc(t('rec.blok_povtor'))}</button>
+        <button class="sm ghost" onclick="recSelBlock('chance')" title="${esc(t('rec.blok_shans_podskazka'))}">${recIcon('dices')} ${esc(t('rec.blok_shans'))}</button>
         <button class="sm ghost" onclick="recSelBlock('until')" title="${esc(t('rec.blok_poka_podskazka'))}">${recIcon('search')} ${esc(t('rec.blok_poka'))}</button>
         <button class="sm ghost" onclick="recSelBlock('if_seen')" title="${esc(t('rec.blok_esli_podskazka'))}">${recIcon('eye')} ${esc(t('rec.blok_esli'))}</button>
       </div>
@@ -1149,7 +1149,11 @@ function jobStepsHtml(job) {
     const speed = job.speed && job.speed < 1 ? `<span class="jnote">замедление ×${job.speed}</span>` : '';
     const err = info ? `<div class="jerr ${info.timeout ? 'timeout' : ''}">
       <b>${info.timeout ? 'Не дождались' : 'Сбой'}: ${esc(info.title)}</b>${info.hint ? `<p>${esc(info.hint)}</p>` : ''}</div>` : '';
-    return `<div class="jsteps"><div class="jchips">${chips}${from}${speed}</div>${err}${jobStepListHtml(job)}</div>`;
+    /* Есть лента шагов — полоска номеров её только повторяет. */
+    const list = jobStepListHtml(job);
+    const strip = list ? (from || speed ? `<div class="jchips">${from}${speed}</div>` : '')
+        : `<div class="jchips">${chips}${from}${speed}</div>`;
+    return `<div class="jsteps">${strip}${err}${list}</div>`;
 }
 
 const JSTEP_WORDS = {ok: 'ок', retried: 'с повтором', blind: 'вслепую', skipped: 'пропущен', failed: 'упал'};
@@ -1162,11 +1166,12 @@ function jobStepListHtml(job) {
     if (!timeline.length || job.status === 'running' || job.status === 'queued') return '';
     const rows = timeline.map(st => {
         const img = name => `/api/jobs/${esc(job.id)}/artifacts/${encodeURIComponent(name)}`;
-        const expected = st.expected ? `<figure class="jshot"><figcaption>${esc(t('job.shot_expected'))}</figcaption>
+        const expected = st.expected ? `<figure class="jshot exp"><figcaption>${esc(t('job.shot_expected'))}</figcaption>
             <div class="jimg"><img src="${img(st.expected)}" alt="" loading="lazy"></div></figure>` : '';
-        const failed = st.shot ? `<figure class="jshot"><figcaption>${esc(t('job.shot_fail'))}</figcaption>
+        const failed = st.shot ? `<figure class="jshot fail"><figcaption>${esc(t('job.shot_fail'))}</figcaption>
             <div class="jimg"><img src="${img(st.shot)}" alt="" loading="lazy">
-            ${st.tap ? `<i class="jtap" style="left:${st.tap[0] * 100}%;top:${st.tap[1] * 100}%"></i>` : ''}</div></figure>` : '';
+            ${st.tap ? `<i class="jtap" style="left:${st.tap[0] * 100}%;top:${st.tap[1] * 100}%"></i>` : ''}</div>
+            ${st.tap ? `<span class="jlegend"><i></i>${esc(t('job.kuda_nazhali'))}</span>` : ''}</figure>` : '';
         const shot = expected + failed;
         return `<li class="jstep ${esc(st.status)}"><div class="jhead"><span class="jn">${st.i + 1}</span>
             <span class="jl">${esc(st.label || '')}</span>

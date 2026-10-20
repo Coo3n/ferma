@@ -159,6 +159,11 @@
     z-index: 99
 }
 
+/* В пульте внизу справа — «Записать сценарий»: тост не должен его накрывать. */
+body:has(#view-device.on .work.pult-on) #toast {
+    bottom: 72px;
+}
+
 .toast {
     --toast-c: var(--accent);
     display: flex;

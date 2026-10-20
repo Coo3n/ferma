@@ -1038,9 +1038,11 @@ button.held-shot:hover {
 
 /* Советы: четыре карточки 2×2, в каждой правило и пример «так / не так». */
 .tips { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s3); list-style: none; margin: 0; padding: 0; }
-.tip { display: grid; gap: var(--s2); padding: var(--s4); border-radius: var(--r2); background: var(--panel2); align-content: start; }
+.tip { display: grid; gap: var(--s2); padding: var(--s4); border-radius: var(--r3); background: var(--bg); align-content: start; }
 .tip h4 { margin: 0; font-size: var(--fs-3); }
-.tip-ic { width: 22px; height: 22px; color: var(--accent); }
+.tip-ic { display: grid; place-items: center; width: 36px; height: 36px; margin-bottom: var(--s1); border-radius: 50%;
+    background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.tip-ic .ic { width: 18px; height: 18px; }
 .tip p { margin: 0; display: flex; gap: var(--s2); align-items: flex-start; font-size: var(--fs-2); line-height: 1.4; }
 .tip p .ic { width: 16px; height: 16px; flex: none; margin-top: 2px; }
 .tip-ok { color: var(--text); }

@@ -119,7 +119,9 @@ assert.strictEqual('optional' in REC.steps[1], false);
 assert.strictEqual(h.jobStepsHtml({}), '');
 const html = h.jobStepsHtml({timeline: [{i: 0, status: 'ok', label: '<x>'}, {i: 1, status: 'failed', secs: 2}],
     error_info: {title: 'Не то', hint: 'Смотрите кадр', timeout: true}, start_step: 2, speed: 0.5});
-assert(html.includes('jchip failed') && html.includes('Не дождались') && html.includes('с шага 3'));
+// Лента шагов есть — полоски номеров нет (она её только повторяла).
+assert(html.includes('jstep failed') && !html.includes('jchip failed') && html.includes('Не дождались') && html.includes('с шага 3'));
+assert(h.jobStepsHtml({status: 'running', timeline: [{i: 0, status: 'ok'}]}).includes('jchip ok'));
 assert(html.includes('замедление') && html.includes('&lt;x&gt;'));
 assert(h.jobProgressHtml({status: 'running', step_index: 1, step_total: 5}).includes('2/5'));
 assert.strictEqual(h.jobProgressHtml({status: 'passed', step_total: 5}), '');

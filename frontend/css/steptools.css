@@ -233,15 +233,15 @@
 .jchip.failed { background: color-mix(in srgb, var(--bad) 18%, transparent); color: var(--bad); }
 .jnote { color: var(--dim); font-size: var(--fs-1); margin-left: 6px; }
 .jerr {
-    margin-top: 8px;
-    padding: 8px 10px;
-    border: 1px solid color-mix(in srgb, var(--bad) 40%, transparent);
-    border-radius: var(--r2);
-    background: color-mix(in srgb, var(--bad) 6%, transparent);
+    margin-top: var(--s2);
+    padding: var(--s3) var(--s4);
+    border-left: 3px solid var(--bad);
+    border-radius: 0 var(--r2) var(--r2) 0;
+    background: color-mix(in srgb, var(--bad) 8%, transparent);
     font-size: var(--fs-2);
 }
 
-.jerr.timeout { border-color: color-mix(in srgb, var(--warn) 40%, transparent); background: color-mix(in srgb, var(--warn) 6%, transparent); }
+.jerr.timeout { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, transparent); }
 .jerr b { color: var(--bad); }
 .jerr.timeout b { color: var(--warn); }
 .jerr p { margin: 4px 0 0; color: var(--text2); line-height: 1.45; }
@@ -342,25 +342,51 @@ button.jchip:hover { filter: brightness(1.25); }
 #recRun { margin: var(--s2) var(--s3) 0; padding: var(--s2) var(--s3); background: var(--panel2);
     border-color: var(--line-soft); box-shadow: none; }
 
-/* Шаги запуска списком; у упавшего — снимок с красной точкой нажатия. */
+/* Шаги запуска — вертикальная лента: точка статуса на линии. У упавшего —
+   сравнение «ждали / было на экране» на одной подложке, точка нажатия видна. */
 .jlist { margin-top: var(--s3); font-size: var(--fs-2); }
 .jlist summary { cursor: pointer; color: var(--dim); }
-.jlist ol { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; gap: var(--s1); }
-.jhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s2); }
-.jshots { display: flex; flex-wrap: wrap; gap: var(--s3); margin: var(--s2) 0 var(--s2) 3ch; }
-.jstep .jn { color: var(--dim); min-width: 2ch; text-align: right; }
-.jstep small { color: var(--dim); }
-.jstep.failed .jl { color: var(--bad); }
-.jstep.retried small, .jstep.blind small { color: var(--warn); }
-.jimg { position: relative; }
-.jshot { margin: 0; width: 160px; }
-.jshot img { display: block; width: 100%; border-radius: var(--r2); border: 1px solid var(--line); }
-.jshot figcaption { margin-top: var(--s1); color: var(--dim); font-size: var(--fs-1); }
-.jtap {
-    position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%;
-    background: color-mix(in srgb, var(--bad) 35%, transparent); border: 2px solid var(--bad);
-    pointer-events: none;
+.jlist ol { list-style: none; margin: var(--s2) 0 0; padding: 0 0 0 var(--s3); display: grid; }
+.jstep { position: relative; padding: 6px 0 6px var(--s4); border-left: 2px solid var(--line-soft); }
+.jstep:last-child { border-left-color: transparent; }
+.jstep::before {
+    content: ""; position: absolute; left: -6px; top: 12px; width: 10px; height: 10px;
+    border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px var(--bg);
 }
+.jstep.retried::before, .jstep.blind::before { background: var(--warn); }
+.jstep.skipped::before { background: var(--dim); }
+.jstep.failed::before { background: var(--bad); box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--bad-dim); }
+.jhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s2); }
+.jstep .jn { color: var(--dim); min-width: 2ch; font-size: var(--fs-1); font-variant-numeric: tabular-nums; }
+.jstep small { color: var(--dim); font-size: var(--fs-1); }
+.jstep.failed .jl { color: var(--bad); font-weight: 600; }
+.jstep.retried small, .jstep.blind small { color: var(--warn); }
+
+.jshots {
+    display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--s4);
+    width: fit-content; margin: var(--s3) 0 var(--s1); padding: var(--s3) var(--s4);
+    border-radius: var(--r3); background: var(--panel2);
+}
+.jshot { display: flex; flex-direction: column; gap: var(--s2); margin: 0; }
+.jshot figcaption { color: var(--text2); font-size: var(--fs-1); }
+.jimg { position: relative; width: fit-content; }
+.jshot img { display: block; border-radius: var(--r2); }
+.jshot.fail img { max-height: 340px; max-width: 200px; }
+/* Вырезка кнопки — в натуральную величину на тёмной подложке, а не растянутая. */
+.jshot.exp .jimg {
+    display: grid; place-items: center; width: 168px; height: 112px;
+    border-radius: var(--r2); background: var(--well, var(--panel));
+}
+.jshot.exp img { max-width: 140px; max-height: 80px; outline: 2px solid var(--accent); outline-offset: 3px; }
+.jtap {
+    position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
+    border: 3px solid var(--bad); box-shadow: 0 0 0 2px var(--bg), inset 0 0 0 2px var(--bg);
+    pointer-events: none; animation: jtap 1.6s var(--ease) infinite;
+}
+@keyframes jtap { 50% { transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce) { .jtap { animation: none; } }
+.jlegend { display: flex; align-items: center; gap: 6px; color: var(--dim); font-size: var(--fs-1); }
+.jlegend i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--bad); }
 
 /* Итог проверки: карточка с красной полосой, одно главное действие, остальное тихо. */
 .run-fail-box {
@@ -377,19 +403,3 @@ button.jchip:hover { filter: brightness(1.25); }
 .run-fail-box .runprog-acts a:hover { color: var(--text); }
 .run-fail-box .runprog-acts .sp-end { margin-left: auto; }
 
-/* Шаги запуска — вертикальная лента: точка статуса на линии, у упавшего два кадра. */
-.jlist ol { gap: 0; position: relative; padding-left: var(--s4); }
-.jstep { position: relative; padding: var(--s1) 0 var(--s2) var(--s3); border-left: 2px solid var(--line); }
-.jstep::before {
-    content: ""; position: absolute; left: -6px; top: 10px; width: 10px; height: 10px;
-    border-radius: 50%; background: var(--ok); border: 2px solid var(--bg);
-}
-.jstep.retried::before, .jstep.blind::before { background: var(--warn); }
-.jstep.skipped::before { background: var(--dim); }
-.jstep.failed::before { background: var(--bad); }
-.jstep.failed { border-left-color: var(--bad); }
-.jshots { margin: var(--s3) 0 var(--s2); gap: var(--s4); }
-.jshot { width: 168px; }
-.jshot figcaption { order: -1; margin: 0 0 var(--s2); color: var(--text2); font-size: var(--fs-1); }
-.jshot { display: flex; flex-direction: column; }
-.jshot .jimg { order: 1; }

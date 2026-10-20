@@ -42,18 +42,18 @@ function addStepGroupName(key) {
         : key === 'chance' ? t('rec.dob_inogda') : t('rec.dob_drugoe');
 }
 
-const ADD_STEP_GROUP_ICON = {action: 'plus', repeat: 'rotate', seen: 'eye', phone: 'phone', chance: 'dice', other: 'layers'};
+const ADD_STEP_GROUP_ICON = {action: 'plus', repeat: 'repeat', seen: 'eye', phone: 'phone', chance: 'dices', other: 'layers'};
 
 function addStepItemText(key) {
     switch (key) {
-        case 'loop': return {icon: 'rotate', title: t('rec.dob_loop'), desc: t('rec.dob_loop_d')};
+        case 'loop': return {icon: 'repeat', title: t('rec.dob_loop'), desc: t('rec.dob_loop_d')};
         case 'until': return {icon: 'search', title: t('rec.dob_until'), desc: t('rec.dob_until_d')};
         case 'break': return {icon: 'stop', title: t('rec.vyyti_iz_povtora'), desc: t('rec.l_break_d')};
         case 'if_seen': return {icon: 'eye', title: t('rec.l_esli'), desc: t('rec.l_esli_d')};
         case 'if_not': return {icon: 'eye-off', title: t('rec.l_esli_net'), desc: t('rec.l_esli_net_d')};
         case 'anchor': return {icon: 'crosshair', title: t('device.proverka_ekrana'),
             desc: t('device.stsenariy_proverit_chto_doshel')};
-        case 'chance': return {icon: 'dice', title: t('rec.dob_chance'), desc: t('rec.dob_chance_d')};
+        case 'chance': return {icon: 'dices', title: t('rec.dob_chance'), desc: t('rec.dob_chance_d')};
         case 'call': return {icon: 'layers', title: t('rec.l_call'), desc: t('rec.l_call_d')};
         case 'phone_app': return {icon: 'phone', title: t('rec.dob_tel_app'), desc: t('rec.dob_tel_app_d')};
         case 'phone_no_app': return {icon: 'phone', title: t('rec.dob_tel_no_app'), desc: t('rec.dob_tel_no_app_d')};

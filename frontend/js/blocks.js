@@ -18,8 +18,8 @@
 
 const BLOCK_DEPTH_MAX = 3;
 const BLOCK_KINDS = {
-    loop: {icon: 'rotate', defaults: () => ({times: 10, pause_min: 1, pause_max: 3, watch: true})},
-    chance: {icon: 'dice', defaults: () => ({percent: 15})},
+    loop: {icon: 'repeat', defaults: () => ({times: 10, pause_min: 1, pause_max: 3, watch: true})},
+    chance: {icon: 'dices', defaults: () => ({percent: 15})},
     until: {icon: 'search', defaults: () => ({tries: 20, on_fail: 'skip'})},
     if_seen: {icon: 'eye', defaults: () => ({negate: false, timeout: 3})},
     if_phone: {icon: 'phone', defaults: () => ({check: 'app_installed', negate: false})},

@@ -1664,8 +1664,8 @@ function grDragStart(ev, id) {
    восемнадцать одинаковых строк, и глазу не за что было зацепиться. */
 const SCH_ICONS = {
     branch: ['branch', 'branch'],
-    loop: ['loop', 'rotate'],
-    chance: ['chance', 'dice'],
+    loop: ['loop', 'repeat'],
+    chance: ['chance', 'dices'],
     until: ['until', 'search'],
     if_seen: ['until', 'eye'],
     if_phone: ['until', 'phone'],
@@ -1674,22 +1674,23 @@ const SCH_ICONS = {
     finish: ['block', 'check'],
     call: ['block', 'layers'],
     expect: ['anchor', 'crosshair'],
-    launch_app: ['block', 'play'],
-    stop_app: ['block', 'stop'],
+    launch_app: ['block', 'app'],
+    stop_app: ['block', 'app-close'],
     open_url: ['block', 'external'],
     shell: ['block', 'terminal'],
-    sleep: ['block', 'pause'],
+    sleep: ['block', 'timer'],
     screenshot: ['block', 'image'],
-    type: ['', 'keyboard'],
-    key: ['', 'enter'],
+    type: ['', 'text-input'],
+    key: ['', 'key-enter'],
     unlock: ['', 'unlock'],
-    swipe: ['', 'scroll'],
+    swipe: ['', 'swipe'],
+    long_tap: ['', 'hand'],
 };
 
 function schIcon(step) {
     /* «Если на экране нет» — перечёркнутый глаз, «есть» — обычный. */
     if (step.kind === 'if_seen' && step.args && step.args.negate) return ['until', 'eye-off'];
-    return SCH_ICONS[step.kind] || ['', 'zap'];   // click / tap / long_tap
+    return SCH_ICONS[step.kind] || ['', 'pointer'];   // click / tap
 }
 
 /* Подпись узла на хребте. У развилки она короче, чем в списке шагов: имена
@@ -3073,10 +3074,10 @@ const REC_ROW_MENU = () => [
         [t('rec.mm_nizhe'), 'down', (id) => recMove(id, 1)],
     ]},
     {title: t('rec.mm_obernut'), tiles: [
-        [t('rec.mm_povtor'), 'rotate', (id) => recBlockWrap('loop', [id])],
+        [t('rec.mm_povtor'), 'repeat', (id) => recBlockWrap('loop', [id])],
         [t('rec.mm_poka'), 'search', (id) => recBlockWrap('until', [id])],
         [t('rec.mm_esli'), 'eye', (id) => recBlockWrap('if_seen', [id])],
-        [t('rec.mm_inogda'), 'dice', (id) => recBlockWrap('chance', [id])],
+        [t('rec.mm_inogda'), 'dices', (id) => recBlockWrap('chance', [id])],
     ], wide: true},
     {items: [
         [t('rec.m_udalit'), 'trash', (id) => recDelete(id), 'danger'],

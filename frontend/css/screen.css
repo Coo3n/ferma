@@ -374,7 +374,9 @@
     font-weight: 400;
 }
 
-/* Клавиши телефона — плитками: значок над подписью, крупная цель для мыши. */
+/* Клавиши телефона — компактные плитки: значок слева от подписи. Плитки
+   «значок над подписью» по 58 px занимали полпанели, и команды с
+   приложениями уходили за прокрутку. */
 .pult-keys {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -382,16 +384,18 @@
 }
 
 .pult-keys .key {
-    flex-direction: column;
-    justify-content: center;
-    gap: 5px;
-    min-height: 58px;
-    padding: var(--s2) var(--s1);
+    justify-content: flex-start;
+    gap: var(--s2);
+    min-height: 38px;
+    padding: 0 var(--s3);
+    font-size: var(--fs-2);
 }
 
 .pult-keys .key .ic {
-    width: var(--icon-lg);
-    height: var(--icon-lg);
+    flex: none;
+    width: 16px;
+    height: 16px;
+    color: var(--text2);
 }
 
 .pult-apps {
@@ -760,8 +764,10 @@ button.pult-tag-add {
 .pult-fold > summary { cursor: pointer; list-style: none; display: flex; align-items: center; }
 .pult-fold > summary::-webkit-details-marker { display: none; }
 .pult-fold > summary h4 { margin: 0; }
-.pult-fold > summary h4::after { content: "▾"; color: var(--dim); }
-.pult-fold[open] > summary h4::after { content: "▴"; }
+.pult-fold > summary { gap: var(--s2); }
+.pult-fold .fold-chev { width: 14px; height: 14px; color: var(--dim); transition: transform var(--dur, .2s) var(--ease); }
+.pult-fold[open] .fold-chev { transform: rotate(180deg); }
+.pult-fold > summary:hover h4, .pult-fold > summary:hover .fold-chev { color: var(--text); }
 .pult-fold[open] > summary { margin-bottom: var(--s2); }
 
 /* Команды и открытые приложения: компактные чипы в строку, а не плашки на всю ширину. */

@@ -8,9 +8,9 @@ const TIPS_KEY = 'farm.rec.tips';
 /* Ключи строк пишутся целиком: тест на лишние строки ищет их по тексту.
    Четыре правила, у каждого — одна строка и пример «так / не так». */
 const tipsList = () => [
-    ['crosshair', t('tips.tekst_t'), t('tips.tekst_ok'), t('tips.tekst_bad')],
-    ['pause', t('tips.pauza_t'), t('tips.pauza_ok'), t('tips.pauza_bad')],
-    ['check-square', t('tips.shag_t'), t('tips.shag_ok'), t('tips.shag_bad')],
+    ['pointer', t('tips.tekst_t'), t('tips.tekst_ok'), t('tips.tekst_bad')],
+    ['timer', t('tips.pauza_t'), t('tips.pauza_ok'), t('tips.pauza_bad')],
+    ['list-checks', t('tips.shag_t'), t('tips.shag_ok'), t('tips.shag_bad')],
     ['phone', t('tips.odin_t'), t('tips.odin_ok'), t('tips.odin_bad')],
 ];
 
@@ -18,7 +18,7 @@ function recTipsOpen(then) {
     modalSheet('wide');
     $('mTitle').textContent = t('tips.title');
     $('mBody').innerHTML = `<div class="tips">${tipsList().map(([icon, head, ok, bad]) => `<section class="tip">
-        <svg class="ic tip-ic" aria-hidden="true"><use href="#i-${icon}"/></svg>
+        <span class="tip-ic"><svg class="ic" aria-hidden="true"><use href="#i-${icon}"/></svg></span>
         <h4>${esc(head)}</h4>
         <p class="tip-ok"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>${esc(ok)}</p>
         <p class="tip-bad"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg>${esc(bad)}</p>
@@ -35,8 +35,8 @@ function recTipsOpen(then) {
 
 (function wrapRecNew() {
     const original = window.recNew;
-    window.recNew = function () {
-        if (store.get(TIPS_KEY, false)) return original();
-        recTipsOpen(original);
+    window.recNew = function (...args) {
+        if (store.get(TIPS_KEY, false)) return original(...args);
+        recTipsOpen(() => original(...args));
     };
 })();

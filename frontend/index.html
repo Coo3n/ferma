@@ -679,11 +679,11 @@
                     </section>
                     <section class="pult-sect" id="pultCmdSect">
                         <h4><span data-t="cmd.komandy">Команды</span>
-                            <button class="sm ghost" onclick="recBegin(true)" title="Короткое действие до 8 шагов: закрыть всё, очистить кэш, открыть чат" data-t="cmd.novaya" data-t-title="cmd.hint">+ Новая</button></h4>
+                            <button class="sm ghost" onclick="recBegin(true)" title="Короткое действие до 8 шагов: закрыть всё, очистить кэш, открыть чат" data-t="cmd.novaya" data-t-title="cmd.hint"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Новая</button></h4>
                         <div class="pult-chips" id="pultCmds"></div>
                     </section>
                     <details class="pult-sect pult-fold" id="pultRecentsSect" ontoggle="if(this.open)pultRecents()">
-                        <summary><h4 data-t="pult.otkrytye">Открытые приложения</h4></summary>
+                        <summary><h4 data-t="pult.otkrytye">Открытые приложения</h4><svg class="ic fold-chev" aria-hidden="true"><use href="#i-down"/></svg></summary>
                         <div class="pult-chips" id="pultRecents"></div>
                     </details>
                     <section class="pult-sect">
@@ -748,7 +748,7 @@
                         onclick="showView('apps')" data-t="apk.tab_prilozheniya">Приложения</button>
             </div>
             <span class="stat" id="scenCount"></span>
-            <button class="sm ghost" onclick="recTipsOpen()" data-t="tips.link">Как записывать точно</button>
+            <button class="sm ghost" onclick="recTipsOpen()" data-t="tips.link"><svg class="ic" aria-hidden="true"><use href="#i-lightbulb"/></svg>Как записывать точно</button>
             <span class="sp"></span>
             <button class="sm accent" id="btnScenRecord" onclick="recNew(false)" data-t="scen.sozdat_zapisyu">
                 <svg class="ic" aria-hidden="true">
@@ -815,7 +815,7 @@
             <a class="btn sm" href="/api/jobs/steps.csv" download
                title="Каждый шаг каждого запуска для Excel, у упавшего — ссылка на снимок" data-t="jobs.tablitsa_shagov" data-t-title="jobs.tablitsa_shagov_title">
                 <svg class="ic" aria-hidden="true">
-                    <use href="#i-download"/>
+                    <use href="#i-sheet"/>
                 </svg>
                 Таблица по шагам
             </a>
