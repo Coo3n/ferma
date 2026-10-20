@@ -164,7 +164,12 @@ function onbOpen() {
     ONB.tour = onbSlides();
     ONB.step = 0;
     onbSession(ONB_SEEN_KEY, '1');
-    if (window.coachAutoUsed) coachAutoUsed(true);   // после знакомства экранные туры сами не лезут
+    /* Экран, на котором было знакомство, повторно не разбираем; остальные
+       экраны получают свой тур как обычно (раньше знакомство глушило их все). */
+    if (window.coachScreen && window.coachSession) {
+        const here = coachScreen(true), seen = coachSession();
+        if (here && !seen.includes(here)) coachSession([...seen, here]);
+    }
     if (window.store) store.set(ONB_DONE_KEY, true);
     const root = document.createElement('div');
     root.className = 'onb';

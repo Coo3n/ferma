@@ -549,6 +549,10 @@
                         <b id="scrSleepTitle"></b>
                         <button class="primary" data-live onclick="doUnlock()" data-t="device.razbudit">Разбудить</button>
                     </div>
+                    <div class="scr-load" id="scrLoad" hidden role="status" aria-live="polite">
+                        <span class="spinner" aria-hidden="true"></span>
+                        <span data-t="screen.loading">Подключаемся к экрану…</span>
+                    </div>
                     <div class="emptybig" id="scrEmpty">
                         <svg class="art" viewBox="0 0 150 120" fill="none" aria-hidden="true">
                             <rect x="49" y="12" width="52" height="86" rx="9"

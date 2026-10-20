@@ -161,17 +161,22 @@ function startStream() {
         /* flex, а не block: .emptybig — флекс-колонка, и inline-стиль block
            убил бы и gap между рисунком и текстом, и центрирование. */
         empty.style.display = 'flex';
+        $('scrLoad').hidden = true;
         syncInteractive();
         return;
     }
 
     empty.style.display = 'none';
     img.style.display = 'block';
+    /* Пока не пришёл первый кадр — крутилка, а не чёрное поле. */
+    $('scrLoad').hidden = false;
+    img.onload = () => { $('scrLoad').hidden = true; };
     /* Поток не пришёл у телефона «в сети» — раньше оставалось пустое
        чёрное поле. Говорим, что случилось, и даём повторить. */
     img.onerror = () => {
         img.classList.add('dead');
         img.style.display = 'none';
+        $('scrLoad').hidden = true;
         setText($('scrEmptyTitle'), 'Экран не пришёл');
         $('scrEmptyText').innerHTML = 'Телефон занят или только подключился.'
             + '<br><button class="sm" style="margin-top:var(--s3)" onclick="startStream()">Повторить</button>';

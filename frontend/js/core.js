@@ -255,7 +255,10 @@ function toast(message, kind, action) {
     };
     /* Тост — предложение: с заглавной буквы, как и весь интерфейс. */
     const text = String(message);
-    el.append(document.createTextNode(text.charAt(0).toUpperCase() + text.slice(1)));
+    const label = document.createElement('span');
+    label.className = 'toast-text';
+    label.textContent = text.charAt(0).toUpperCase() + text.slice(1);
+    el.append(label);
     if (action) {
         const link = document.createElement('button');
         link.type = 'button';
@@ -272,7 +275,8 @@ function toast(message, kind, action) {
        опроса). Больше трёх сразу не держим: стопка из пяти закрывала
        кнопки телефона, а читают всё равно последний. */
     for (const old of box.children) {
-        if (old.firstChild && old.firstChild.nodeValue === el.firstChild.nodeValue) old.remove();
+        const oldText = old.querySelector('.toast-text');
+        if (oldText && oldText.textContent === label.textContent) old.remove();
     }
     box.appendChild(el);
     while (box.children.length > 3) box.firstElementChild.remove();

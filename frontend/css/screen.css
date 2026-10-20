@@ -721,3 +721,34 @@ button.pult-tag-add {
     width: 18px;
     height: 18px;
 }
+
+/* Крутилка до первого кадра: чёрное поле читалось как «завис». */
+.scr-load {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s3);
+    color: var(--dim);
+    font-size: var(--fs-2);
+    pointer-events: none;
+}
+
+.scr-load[hidden] { display: none; }
+
+.spinner {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 3px solid var(--line);
+    border-top-color: var(--accent);
+    animation: spin .8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .spinner { animation-duration: 2.4s; }
+}

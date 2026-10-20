@@ -153,31 +153,54 @@
     bottom: 16px;
     display: flex;
     flex-direction: column;
+    align-items: flex-end;
     gap: 8px;
+    max-width: calc(100vw - 32px);
     z-index: 99
 }
 
 .toast {
+    --toast-c: var(--accent);
     display: flex;
-    align-items: center;
-    gap: 12px;
-    background: color-mix(in srgb, var(--panel2) 94%, transparent);
+    align-items: flex-start;
+    gap: 10px;
+    width: max-content;
+    min-width: 200px;
+    max-width: min(380px, calc(100vw - 32px));
+    background: color-mix(in srgb, var(--panel2) 96%, transparent);
     backdrop-filter: blur(8px);
     border: 1px solid var(--line);
-    border-left: 3px solid var(--accent);
-    padding: 9px 14px;
-    border-radius: 10px;
-    max-width: 340px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, .55);
+    padding: 10px 14px;
+    border-radius: var(--r2);
+    box-shadow: 0 10px 30px color-mix(in srgb, #000 55%, transparent);
     /* Тост приходит снизу, из своего угла, а не сбоку: он там и живёт,
        и направление движения должно совпадать с тем, откуда он взялся.
        Перелёт — чтобы заметили: тост часто единственный ответ на
        действие, и если он просто проявится, его пропустят. */
     animation: toast-in var(--slow) var(--spring);
     font-size: var(--fs-2);
+    line-height: var(--lh);
     /* Уход короче прихода и вниз, туда же, откуда пришёл. */
     transition: opacity var(--mid) var(--ease-in),
     transform var(--mid) var(--ease-in);
+}
+
+/* Цвет состояния — точка, а не толстая левая рамка: рамка с радиусом
+   гнулась дугой и «ломала» угол карточки. */
+.toast::before {
+    content: "";
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin-top: .55em;
+    border-radius: 50%;
+    background: var(--toast-c);
+}
+
+.toast-text {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 @keyframes toast-in {
@@ -199,21 +222,23 @@
     font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
+    flex: none;
     margin-left: auto;
     padding: 0;
+    line-height: inherit;
 }
 .toast-action:hover { text-decoration: underline; }
 
 .toast.bad {
-    border-left-color: var(--bad)
+    --toast-c: var(--bad)
 }
 
 .toast.ok {
-    border-left-color: var(--ok)
+    --toast-c: var(--ok)
 }
 
 .toast.warn {
-    border-left-color: var(--warn)
+    --toast-c: var(--warn)
 }
 
 /* Выбраны телефоны — снизу панель «Запустить / Действия»: тосты встают

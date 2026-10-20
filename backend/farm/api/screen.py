@@ -167,6 +167,12 @@ def _run_background(handler, serial, payload):
         log.warning("жест %s на %s не выполнился: %s", payload.get("type"), serial, e)
 
 
+# HyperOS/MIUI без тумблера «USB-отладка (настройки безопасности)» режет
+# нажатия adb; сырой стек пользователю ничего не говорит.
+INPUT_BLOCKED_TEXT = ("Телефон не принимает нажатия. Включите в настройках для разработчиков "
+                      "«USB-отладка (настройки безопасности)» и разрешите отладку заново")
+
+
 @router.post("/{serial}/action")
 def action(serial: str, response: Response, payload: dict = Body(...)):
     t0 = time.perf_counter()
@@ -189,6 +195,8 @@ def action(serial: str, response: Response, payload: dict = Body(...)):
         # «x: "abc"», неизвестная клавиша — ошибка запроса, а не сервера.
         raise HTTPException(400, str(e))
     except Exception as e:  # noqa: BLE001
+        if "inject_events" in str(e).lower():
+            raise HTTPException(403, INPUT_BLOCKED_TEXT)
         raise HTTPException(500, str(e))
     streaming.note_action(serial)
     if _wakes_or_sleeps(payload):

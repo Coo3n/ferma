@@ -61,6 +61,7 @@ _REASONS = (
                  "install_failed_verification_failure")),
     ("bad_apk", ("install_parse_failed", "install_failed_invalid_apk", "not a valid zip")),
     ("install_other", ("install_failed", "failure [")),
+    ("no_input", ("inject_events",)),
     ("no_access", ("read-only file system", "permission denied")),
 )
 _INSTALL_CODE = re.compile(r"\b(INSTALL_(?:FAILED|PARSE_FAILED)_[A-Z_]+)")

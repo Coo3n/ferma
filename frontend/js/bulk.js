@@ -81,6 +81,7 @@ const BULK_REASONS = {
     bad_apk: () => t('bulk.prichina_bad_apk'),
     install_other: () => t('bulk.prichina_install_other'),
     no_access: () => t('bulk.prichina_no_access'),
+    no_input: () => t('bulk.prichina_no_input'),
     stopped: () => t('bulk.prichina_stopped'),
 };
 
