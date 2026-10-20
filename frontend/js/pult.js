@@ -246,18 +246,18 @@ async function pultRecents() {
     try {
         pkgs = await api(`/api/devices/${serial}/recents`);
     } catch (e) {
-        box.innerHTML = `<span class="dim">${t('pult.ne_prochitat')}</span>`;
+        box.innerHTML = `<span class="pult-hint">${t('pult.ne_prochitat')}</span>`;
         return;
     }
     if (S.active !== serial) return;
     if (!pkgs.length) {
-        box.innerHTML = `<span class="dim">${t('pult.nichego_ne_otkryto')}</span>`;
+        box.innerHTML = `<span class="pult-hint">${t('pult.nichego_ne_otkryto')}</span>`;
         return;
     }
-    const chip = p => `<button class="chip" data-live data-close="${esc(p)}" title="${esc(p)}">${
-        esc(pultAppName(serial, p))} ✕</button>`;
+    const chip = p => `<button class="chip closable" data-live data-close="${esc(p)}"
+        title="${esc(t('pult.zakryt'))}">${esc(pultAppName(serial, p))}<svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>`;
     box.innerHTML = pkgs.map(chip).join('')
-        + `<button class="sm ghost" data-live data-close-all>${esc(t('pult.zakryt_vse'))}</button>`;
+        + `<button class="chip ghost-chip" data-live data-close-all>${esc(t('pult.zakryt_vse'))}</button>`;
     box.onclick = async ev => {
         const btn = ev.target.closest('button');
         if (!btn) return;
@@ -276,9 +276,9 @@ function pultCommands() {
     const sig = cmds.map(s => s.key + s.name).join('|') + '#' + S.active;
     if (sig === PULT.cmdSig) return;
     PULT.cmdSig = sig;
-    if (!cmds.length) $('pultCmds').innerHTML = `<span class="dim">${t('cmd.pusto')}</span>`;
-    else $('pultCmds').innerHTML = cmds.map(s => `<button class="chip" data-live data-cmd="${esc(s.key)}"
-        title="${esc(s.description || '')}">${esc(s.name)}</button>`).join('');
+    if (!cmds.length) $('pultCmds').innerHTML = `<span class="pult-hint">${t('cmd.pusto')}</span>`;
+    else $('pultCmds').innerHTML = cmds.map(s => `<button class="chip cmd" data-live data-cmd="${esc(s.key)}"
+        title="${esc(s.description || '')}"><svg class="ic" aria-hidden="true"><use href="#i-zap"/></svg>${esc(s.name)}</button>`).join('');
     $('pultCmds').onclick = async ev => {
         const key = ev.target.closest('button') && ev.target.closest('button').dataset.cmd;
         if (!key || !S.active) return;

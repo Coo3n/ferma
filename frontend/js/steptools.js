@@ -1061,6 +1061,10 @@ function stRunRenderStatus() {
     setHTML(box, `${stale}<div class="runprog ${run.active ? 'on' : job.status}">
       <div class="runprog-bar"><i style="width:${pct}%"></i></div>
       <div class="runprog-row">${head}</div>${stRunChips(run)}</div>`);
+    /* Одна главная кнопка на панель: когда в итоге уже есть «Повторить…» или
+       «Следующий шаг», «Запустить на телефоне» становится обычной. */
+    const go = $('btnRunGo');
+    if (go) go.classList.toggle('primary', !box.querySelector('.primary'));
 }
 
 /* Ленты шагов: видно весь ход одним взглядом, клик — к шагу. */
@@ -1120,7 +1124,7 @@ function stRunResult(job) {
     return `<div class="run-fail-box">
       <b>${info.timeout ? 'Не дождались' : 'Сбой'}${last ? ` на шаге ${last.i + 1}` : ''}: ${esc(info.title)}</b>
       ${info.hint ? `<p>${esc(info.hint)}</p>` : ''}
-      <div class="runprog-acts">${buttons} ${shot} ${stReportLink(job)}</div></div>`;
+      <div class="runprog-acts">${buttons}<span class="sp-end"></span>${shot} ${stReportLink(job)}</div></div>`;
 }
 
 function stReportLink(job) {
@@ -1157,15 +1161,16 @@ function jobStepListHtml(job) {
     const timeline = job.timeline || [];
     if (!timeline.length || job.status === 'running' || job.status === 'queued') return '';
     const rows = timeline.map(st => {
-        const shot = st.shot ? `<figure class="jshot"><div class="jimg">
-            <img src="/api/jobs/${esc(job.id)}/artifacts/${encodeURIComponent(st.shot)}" alt="" loading="lazy">
-            ${st.tap ? `<i class="jtap" style="left:${st.tap[0] * 100}%;top:${st.tap[1] * 100}%"></i>` : ''}</div>
-            <figcaption>${esc(st.tap ? t('job.shot_tap') : t('job.shot_fail'))}</figcaption></figure>`
-            + (st.expected ? `<figure class="jshot jexp"><div class="jimg"><img src="/api/jobs/${esc(job.id)}/artifacts/${encodeURIComponent(st.expected)}" alt="" loading="lazy"></div>
-            <figcaption>${esc(t('job.shot_expected'))}</figcaption></figure>` : '') : '';
-        return `<li class="jstep ${esc(st.status)}"><span class="jn">${st.i + 1}</span>
+        const img = name => `/api/jobs/${esc(job.id)}/artifacts/${encodeURIComponent(name)}`;
+        const expected = st.expected ? `<figure class="jshot"><figcaption>${esc(t('job.shot_expected'))}</figcaption>
+            <div class="jimg"><img src="${img(st.expected)}" alt="" loading="lazy"></div></figure>` : '';
+        const failed = st.shot ? `<figure class="jshot"><figcaption>${esc(t('job.shot_fail'))}</figcaption>
+            <div class="jimg"><img src="${img(st.shot)}" alt="" loading="lazy">
+            ${st.tap ? `<i class="jtap" style="left:${st.tap[0] * 100}%;top:${st.tap[1] * 100}%"></i>` : ''}</div></figure>` : '';
+        const shot = expected + failed;
+        return `<li class="jstep ${esc(st.status)}"><div class="jhead"><span class="jn">${st.i + 1}</span>
             <span class="jl">${esc(st.label || '')}</span>
-            <small>${esc(JSTEP_WORDS[st.status] || st.status)} · ${st.secs != null ? st.secs + ' с' : ''}${st.n > 1 ? ' · ×' + st.n : ''}</small>${shot}</li>`;
+            <small>${esc(JSTEP_WORDS[st.status] || st.status)} · ${st.secs != null ? st.secs + ' с' : ''}${st.n > 1 ? ' · ×' + st.n : ''}</small></div>${shot ? `<div class="jshots">${shot}</div>` : ''}</li>`;
     }).join('');
     return `<details class="jlist"${job.status === 'failed' ? ' open' : ''}>
         <summary>${esc(t('job.shagi_spiskom'))}</summary><ol>${rows}</ol></details>`;

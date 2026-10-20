@@ -346,13 +346,14 @@ button.jchip:hover { filter: brightness(1.25); }
 .jlist { margin-top: var(--s3); font-size: var(--fs-2); }
 .jlist summary { cursor: pointer; color: var(--dim); }
 .jlist ol { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; gap: var(--s1); }
-.jstep { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s2); }
+.jhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s2); }
+.jshots { display: flex; flex-wrap: wrap; gap: var(--s3); margin: var(--s2) 0 var(--s2) 3ch; }
 .jstep .jn { color: var(--dim); min-width: 2ch; text-align: right; }
 .jstep small { color: var(--dim); }
 .jstep.failed .jl { color: var(--bad); }
 .jstep.retried small, .jstep.blind small { color: var(--warn); }
 .jimg { position: relative; }
-.jshot { flex-basis: 100%; margin: var(--s2) 0 var(--s2) 3ch; width: fit-content; max-width: 220px; }
+.jshot { margin: 0; width: 160px; }
 .jshot img { display: block; width: 100%; border-radius: var(--r2); border: 1px solid var(--line); }
 .jshot figcaption { margin-top: var(--s1); color: var(--dim); font-size: var(--fs-1); }
 .jtap {
@@ -360,3 +361,35 @@ button.jchip:hover { filter: brightness(1.25); }
     background: color-mix(in srgb, var(--bad) 35%, transparent); border: 2px solid var(--bad);
     pointer-events: none;
 }
+
+/* Итог проверки: карточка с красной полосой, одно главное действие, остальное тихо. */
+.run-fail-box {
+    padding: var(--s3) var(--s4);
+    border-left: 3px solid var(--bad);
+    border-radius: 0 var(--r2) var(--r2) 0;
+    background: color-mix(in srgb, var(--bad) 8%, transparent);
+}
+.run-fail-box b.warnb { color: var(--warn); }
+.run-fail-box:has(.warnb) { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn) 8%, transparent); }
+.run-fail-box p { margin: var(--s1) 0 0; }
+.run-fail-box .runprog-acts { margin-top: var(--s3); gap: var(--s2); }
+.run-fail-box .runprog-acts a { margin-left: var(--s2); font-size: var(--fs-2); color: var(--dim); text-decoration: underline; text-underline-offset: 3px; }
+.run-fail-box .runprog-acts a:hover { color: var(--text); }
+.run-fail-box .runprog-acts .sp-end { margin-left: auto; }
+
+/* Шаги запуска — вертикальная лента: точка статуса на линии, у упавшего два кадра. */
+.jlist ol { gap: 0; position: relative; padding-left: var(--s4); }
+.jstep { position: relative; padding: var(--s1) 0 var(--s2) var(--s3); border-left: 2px solid var(--line); }
+.jstep::before {
+    content: ""; position: absolute; left: -6px; top: 10px; width: 10px; height: 10px;
+    border-radius: 50%; background: var(--ok); border: 2px solid var(--bg);
+}
+.jstep.retried::before, .jstep.blind::before { background: var(--warn); }
+.jstep.skipped::before { background: var(--dim); }
+.jstep.failed::before { background: var(--bad); }
+.jstep.failed { border-left-color: var(--bad); }
+.jshots { margin: var(--s3) 0 var(--s2); gap: var(--s4); }
+.jshot { width: 168px; }
+.jshot figcaption { order: -1; margin: 0 0 var(--s2); color: var(--text2); font-size: var(--fs-1); }
+.jshot { display: flex; flex-direction: column; }
+.jshot .jimg { order: 1; }
