@@ -35,6 +35,7 @@ async function loadScenarios(reload) {
    тяжело. Панель собирается один раз, чтобы набор текста не терял фокус;
    перерисовываются только карточки. */
 const SC_FILTER = {q: '', kind: 'all'};
+const SC_TOOLS_FROM = 6;
 const scKinds = () => [['all', t('scen.f_all')], ['bad', t('scen.f_bad')], ['mine', t('scen.f_mine')]];
 
 function scVisible(list) {
@@ -57,18 +58,26 @@ function scRenderList() {
         }));
         return;
     }
-    if (!$('scTools')) {
+    /* Поиск и фильтры нужны, когда список не помещается в глаз; на двух
+       сценариях это три лишних ряда над списком. */
+    const tools = S.scenarios.length >= SC_TOOLS_FROM;
+    if (!tools) {
+        SC_FILTER.q = '';
+        SC_FILTER.kind = 'all';
+        if ($('scTools')) box.innerHTML = '<div id="scCards"></div>';
+    }
+    if (tools && !$('scTools')) {
         box.innerHTML = `<div id="scTools">
             <input type="search" id="scQ" placeholder="${esc(t('scen.poisk'))}" aria-label="${esc(t('scen.poisk'))}">
             <div class="seg" role="group">${scKinds().map(([k, label]) =>
                 `<button class="sm" data-k="${k}" onclick="scSetKind('${k}')">${esc(label)}</button>`).join('')}</div>
-            <button class="sm ghost" onclick="recTipsOpen()">${esc(t('tips.link'))}</button></div>
-            <div id="scCards"></div>`;
+            </div><div id="scCards"></div>`;
         $('scQ').addEventListener('input', ev => {
             SC_FILTER.q = ev.target.value;
             scRenderList();
         });
     }
+    if (!$('scCards')) box.innerHTML = '<div id="scCards"></div>';
     box.querySelectorAll('#scTools .seg button').forEach(b => b.classList.toggle('on', b.dataset.k === SC_FILTER.kind));
     const shown = scVisible(S.scenarios);
     setHTML($('scCards'), shown.length ? scListHtml(shown)

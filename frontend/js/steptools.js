@@ -1113,18 +1113,20 @@ function stRunResult(job) {
             || (job.step_index >= 0 ? {i: job.step_index} : null));
     const shot = (job.artifacts || []).includes('99_failure.jpg')
         ? `<a target="_blank" href="/api/jobs/${job.id}/artifacts/99_failure.jpg">кадр падения</a>` : '';
-    const buttons = last ? `<button class="sm" onclick="recRunShow(${last.i})">показать шаг ${last.i + 1}</button>
-      <button class="sm" onclick="recRunFrom(${last.i})">повторить с шага ${last.i + 1}</button>` : '';
+    /* Одна главная кнопка — повторить; «показать» и ссылки — тихо. Раньше
+       после падения рядом стояло пять равных действий. */
+    const buttons = last ? `<button class="sm primary" onclick="recRunFrom(${last.i})">Повторить с шага ${last.i + 1}</button>
+      <button class="sm ghost" onclick="recRunShow(${last.i})">Показать шаг</button>` : '';
     return `<div class="run-fail-box">
       <b>${info.timeout ? 'Не дождались' : 'Сбой'}${last ? ` на шаге ${last.i + 1}` : ''}: ${esc(info.title)}</b>
       ${info.hint ? `<p>${esc(info.hint)}</p>` : ''}
-      <div class="runprog-acts">${buttons} ${shot} ${stReportLink(job)}
-        <a href="#" onclick="showView('deviations');return false">все проблемы</a></div></div>`;
+      <div class="runprog-acts">${buttons} ${shot} ${stReportLink(job)}</div></div>`;
 }
 
 function stReportLink(job) {
+    /* Не сырой JSON, а карточка запуска: там шаги, снимок и точка нажатия. */
     return (job.artifacts || []).includes('report.json')
-        ? `<a target="_blank" href="/api/jobs/${job.id}/artifacts/report.json">отчёт</a>` : '';
+        ? `<a href="#" onclick="showView('jobs');pickJob('${job.id}');return false">подробно</a>` : '';
 }
 
 /* ------------------------------------------------- журнал задач (jobs.js) */

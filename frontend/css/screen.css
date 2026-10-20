@@ -752,3 +752,14 @@ button.pult-tag-add {
 @media (prefers-reduced-motion: reduce) {
     .spinner { animation-duration: 2.4s; }
 }
+
+/* Команды: «+ Новая» уходит вправо, как «из буфера» у текста. */
+#pultCmdSect h4 .sm { margin-left: auto; }
+
+/* «Открытые приложения» свёрнуты: нужны редко, список грузится по раскрытию. */
+.pult-fold > summary { cursor: pointer; list-style: none; display: flex; align-items: center; }
+.pult-fold > summary::-webkit-details-marker { display: none; }
+.pult-fold > summary h4 { margin: 0; }
+.pult-fold > summary h4::after { content: "▾"; color: var(--dim); }
+.pult-fold[open] > summary h4::after { content: "▴"; }
+.pult-fold[open] > summary { margin-bottom: var(--s2); }
