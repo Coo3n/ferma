@@ -556,7 +556,13 @@
                         <button class="primary" data-live onclick="doUnlock()" data-t="device.razbudit">Разбудить</button>
                     </div>
                     <div class="scr-load" id="scrLoad" hidden role="status" aria-live="polite">
-                        <span class="spinner" aria-hidden="true"></span>
+                        <!-- Силуэт телефона с бликом вместо крутилки: видно, что
+                             сейчас появится — экран телефона, а не «что-то грузится». -->
+                        <span class="scr-ghost" aria-hidden="true">
+                            <i class="sk g-status"></i><i class="sk g-title"></i>
+                            <i class="sk g-card"></i><i class="sk g-card"></i><i class="sk g-card short"></i>
+                            <i class="sk g-bar"></i>
+                        </span>
                         <span data-t="screen.loading">Подключаемся к экрану…</span>
                         <span class="scr-slow" data-t="screen.slow">Телефон отвечает медленно</span>
                         <button class="sm scr-slow" onclick="startStream()" data-t="screen.retry">Подключить заново</button>
@@ -674,7 +680,7 @@
             <!-- Пульт: телефон открыли с фермы, чтобы им управлять. Экран слева
                  во всю высоту, справа — всё, что можно сделать с телефоном.
                  Конструктор появляется по «Записать сценарий» (pultSync). -->
-            <aside class="col pult" id="pult" aria-label="Пульт телефона" data-t-aria-label="pult.pult_telefona">
+            <aside class="col pult loading" id="pult" aria-label="Пульт телефона" data-t-aria-label="pult.pult_telefona">
                 <div class="pult-head">
                     <button class="sm ghost crumb" onclick="showView('fleet')"
                             title="Вернуться к ферме" aria-label="Вернуться к ферме" data-t-title="pult.vernutsya_k_ferme" data-t-aria-label="pult.vernutsya_k_ferme">
@@ -694,7 +700,7 @@
                     <section class="pult-sect" id="pultCmdSect">
                         <h4><span data-t="cmd.komandy">Команды</span>
                             <button class="sm ghost" onclick="recBegin(true)" title="Короткое действие до 8 шагов: закрыть всё, очистить кэш, открыть чат" data-t="cmd.novaya" data-t-title="cmd.hint"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Новая</button></h4>
-                        <div class="pult-chips" id="pultCmds"></div>
+                        <div class="pult-chips" id="pultCmds"><span class="sk sk-chip" style="--w:92px"></span><span class="sk sk-chip" style="--w:76px"></span></div>
                     </section>
                     <section class="pult-sect">
                         <h4><span data-t="pult.prilozheniya">Приложения</span>
@@ -702,7 +708,7 @@
                                 <button role="tab" aria-selected="true" data-k="all" onclick="pultAppsTab('all')" data-t="pult.vse">Все</button>
                                 <button role="tab" aria-selected="false" data-k="open" onclick="pultAppsTab('open')" data-t="pult.otkrytye_tab">Открытые</button>
                             </span></h4>
-                        <div class="pult-apps" id="pultApps"></div>
+                        <div class="pult-apps" id="pultApps"><div class="pult-app-skel"><span class="sk sk-chip" style="--w:64px"></span><span class="sk sk-chip" style="--w:96px"></span><span class="sk sk-chip" style="--w:80px"></span><span class="sk sk-chip" style="--w:72px"></span><span class="sk sk-chip" style="--w:104px"></span><span class="sk sk-chip" style="--w:60px"></span><span class="sk sk-chip" style="--w:88px"></span></div></div>
                         <div class="pult-chips" id="pultRecents" hidden></div>
                     </section>
                     <section class="pult-sect">
@@ -727,7 +733,7 @@
                     </section>
                     <section class="pult-sect">
                         <h4 data-t="pult.poslednie_zapuski">Последние запуски</h4>
-                        <div class="pult-jobs" id="pultJobs"></div>
+                        <div class="pult-jobs" id="pultJobs"><span class="sk sk-line" style="--w:86%"></span><span class="sk sk-line" style="--w:64%"></span><span class="sk sk-line" style="--w:74%"></span></div>
                     </section>
                 </div>
                 <div class="pult-foot">

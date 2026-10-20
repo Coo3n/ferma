@@ -736,3 +736,25 @@ input:not([type]), input[type=text], input[type=search], input[type=number], inp
 input[type=password], input[type=url], input[type=email], input[type=tel], select {
     height: var(--ctl);
 }
+
+/* ------------------------------------------------- заготовки с бликом
+   Серые формы на месте данных, пока они едут: вместо мигания «пусто» →
+   «есть». Блик один на всю страницу (background-attachment: fixed) — все
+   заготовки светятся одной волной, а не каждая своим отблеском. */
+.sk {
+    background: var(--panel2) linear-gradient(100deg,
+        transparent 40%, color-mix(in srgb, var(--text) 7%, transparent) 50%, transparent 60%)
+        fixed;
+    background-size: 200vw 100%;
+    animation: sk-sweep 1.6s var(--ease) infinite;
+    border-radius: var(--r1);
+}
+@keyframes sk-sweep {
+    from { background-position: 100vw 0; }
+    to { background-position: -100vw 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .sk { animation: none; }
+}
+.sk-chip { display: inline-block; width: var(--w, 72px); height: 30px; border-radius: var(--pill); }
+.sk-line { display: block; width: var(--w, 100%); height: 12px; margin: 10px 0; }

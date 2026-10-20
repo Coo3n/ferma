@@ -741,21 +741,6 @@ button.pult-tag-add {
 
 .scr-load[hidden] { display: none; }
 
-.spinner {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    border: 3px solid var(--line);
-    border-top-color: var(--accent);
-    animation: spin .8s linear infinite;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-@media (prefers-reduced-motion: reduce) {
-    .spinner { animation-duration: 2.4s; }
-}
-
 /* Команды: «+ Новая» уходит вправо, как «из буфера» у текста. */
 #pultCmdSect h4 .sm { margin-left: auto; }
 
@@ -809,3 +794,41 @@ button.pult-tag-add {
 .scr-load.slow .scr-slow { display: inline-flex; }
 .scr-load.slow > span.scr-slow { color: var(--warn); }
 .scr-load button { pointer-events: auto; }
+
+/* Пока нет первого кадра, плашка «Экран выключен / заблокирован» молчит:
+   на перезагрузке она ложилась поверх «Подключаемся к экрану». */
+.stage:has(#scrLoad:not([hidden])) #scrSleep { display: none; }
+
+/* Силуэт телефона на месте экрана, пока ждём первый кадр. */
+.scr-ghost {
+    display: grid; align-content: start; gap: 10px;
+    width: 176px; aspect-ratio: 9 / 18.5; padding: 14px 12px;
+    border: 2px solid var(--line); border-radius: 26px; background: var(--panel);
+}
+.scr-ghost i { display: block; }
+.scr-ghost .g-status { height: 8px; width: 40%; justify-self: center; border-radius: var(--pill); }
+.scr-ghost .g-title { height: 14px; width: 62%; margin-top: 6px; }
+.scr-ghost .g-card { height: 54px; border-radius: var(--r2); }
+.scr-ghost .g-card.short { height: 36px; width: 70%; }
+.scr-ghost .g-bar { height: 22px; margin-top: auto; border-radius: var(--pill); align-self: end; }
+.scr-load .scr-ghost + span { margin-top: var(--s2); }
+
+/* Пульт до прихода телефона: имя и строка состояния — заготовками, кнопки
+   разделов спрятаны (нажимать нечего). */
+#pult.loading #pultName,
+#pult.loading #pultMeta {
+    display: block; color: transparent; border-radius: var(--r1);
+    background: var(--panel2) linear-gradient(100deg,
+        transparent 40%, color-mix(in srgb, var(--text) 7%, transparent) 50%, transparent 60%) fixed;
+    background-size: 200vw 100%;
+    animation: sk-sweep 1.6s var(--ease) infinite;
+}
+#pult.loading #pultName { width: 120px; height: 18px; margin-bottom: 6px; }
+#pult.loading #pultMeta { width: 160px; height: 12px; }
+#pult.loading .pult-tags,
+#pult.loading .pult-sect h4 > :not(:first-child) { visibility: hidden; }
+.pult-app-skel { display: flex; flex-wrap: wrap; gap: 6px; }
+@media (prefers-reduced-motion: reduce) {
+    #pult.loading #pultName, #pult.loading #pultMeta { animation: none; }
+}
+.scr-load.slow > [data-t="screen.loading"] { display: none; }

@@ -163,6 +163,7 @@ async function pollJobs() {
         return;
     }
     S.jobs = list;
+    S.jobsLoaded = true;
     if (window.syncInteractive) syncInteractive();
     if (window.rdTrialNotice) rdTrialNotice(list);
     const shown = S.runBatch ? list.filter(j => j.batch === S.runBatch) : list;

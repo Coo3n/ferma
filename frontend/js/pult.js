@@ -70,8 +70,15 @@ function pultBack() {
 
 /* ------------------------------------------------------------ содержимое */
 
+/* Заготовки с бликом на месте чипов, пока данных нет: раньше пустые
+   заголовки мигали «команд нет» / «Загружаю…», а потом подменялись. */
+function pultSkelChips(widths) {
+    return widths.map(w => `<span class="sk sk-chip" style="--w:${w}px"></span>`).join('');
+}
+
 function pultRender() {
     const device = S.devices.find(d => d.serial === S.active);
+    $('pult').classList.toggle('loading', !device);
     if (!device) return;
     setText($('pultName'), device.name);
     $('pultName').title = device.name;
@@ -144,7 +151,8 @@ async function pultLoadApps(serial) {
     pultAppsTab('all');
     const box = $('pultApps');
     if (!PULT.apps[serial]) {
-        box.innerHTML = `<span class="dim">${t('pult.zagruzhayu')}</span>`;
+        box.innerHTML = `<div class="pult-app-skel" aria-label="${esc(t('pult.zagruzhayu'))}">${
+            pultSkelChips([64, 96, 80, 72, 104, 60, 88])}</div>`;
         try {
             PULT.apps[serial] = await api(`/api/devices/${serial}/packages`);
         } catch (e) {
@@ -269,6 +277,7 @@ function pultAppsTab(kind) {
 async function pultRecents() {
     const serial = S.active, box = $('pultRecents');
     if (!serial || !box) return;
+    if (!box.querySelector('.chip')) box.innerHTML = pultSkelChips([88, 64, 104]);
     let pkgs;
     try {
         pkgs = await api(`/api/devices/${serial}/recents`);
@@ -299,6 +308,7 @@ async function pultRecents() {
 /* Команды — кнопки в пульте: одно нажатие запускает короткую запись на этом
    телефоне. Список берётся из уже загруженных сценариев, без запросов. */
 function pultCommands() {
+    if (!S.scenariosLoaded) return;   // заготовки из разметки стоят, пока список не пришёл
     const cmds = (S.scenarios || []).filter(s => s.command);
     const sig = cmds.map(s => s.key + s.name).join('|') + '#' + S.active;
     if (sig === PULT.cmdSig) return;
@@ -320,6 +330,7 @@ function pultCommands() {
 }
 
 function pultJobs() {
+    if (!S.jobsLoaded) return;
     const jobs = (S.jobs || []).filter(j => j.serial === S.active)
         .sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).slice(0, 5);
     const sig = jobs.map(j => j.id + j.status).join();

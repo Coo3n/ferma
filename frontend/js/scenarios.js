@@ -20,6 +20,7 @@ async function loadScenarios(reload) {
     scSig = sig;
     scRecipeCache.clear();
     S.scenarios = list;
+    S.scenariosLoaded = true;
 
     scRenderList();
 
