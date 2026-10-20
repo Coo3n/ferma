@@ -253,6 +253,8 @@ def _header(meta: dict, params: dict, today: date) -> list:
     out = [f'"""Записано конструктором фермы {today.strftime("%d.%m.%Y")}."""',
            "RECORDED = True",
            f'NAME = {literal(meta["name"])}']
+    if meta.get("command"):
+        out.append("COMMAND = True")
     if meta.get("description"):
         out.append(f'DESCRIPTION = {literal(meta["description"])}')
     if params:

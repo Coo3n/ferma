@@ -677,6 +677,10 @@
                             <button class="key" data-live onclick="sendKey('power')" data-t="pult.pitanie"><svg class="ic" aria-hidden="true"><use href="#i-power"/></svg>Питание</button>
                         </div>
                     </section>
+                    <section class="pult-sect" id="pultCmdSect" hidden>
+                        <h4 data-t="cmd.komandy">Команды</h4>
+                        <div class="pult-apps" id="pultCmds"></div>
+                    </section>
                     <section class="pult-sect">
                         <h4><span data-t="pult.otkrytye">Открытые</span>
                             <button class="sm ghost" data-live onclick="pultRecents()" data-t="pult.obnovit">Обновить</button></h4>
@@ -726,6 +730,9 @@
                             title="Запустить сценарий на этом телефоне" data-t-title="pult.zapustit_zdes_podskazka">
                         <svg class="ic" aria-hidden="true"><use href="#i-play"/></svg>
                         <span data-t="pult.zapustit_zdes">Запустить</span></button>
+                    <button class="sm" onclick="recBegin(true)" title="Короткое действие до 8 шагов: закрыть всё, очистить кэш, открыть чат" data-t="cmd.zapisat" data-t-title="cmd.hint">
+                        <svg class="ic" aria-hidden="true"><use href="#i-zap"/></svg>
+                        <span data-t="cmd.zapisat">Записать команду</span></button>
                     <button class="primary" id="btnRecBegin" onclick="recBegin()">
                         <svg class="ic dotrec" aria-hidden="true"><use href="#i-record"/></svg>
                         <span data-t="pult.zapisat_stsenariy">Записать сценарий</span></button>
@@ -745,7 +752,7 @@
             </div>
             <span class="stat" id="scenCount"></span>
             <span class="sp"></span>
-            <button class="sm accent" id="btnScenRecord" onclick="recNew()" data-t="scen.sozdat_zapisyu">
+            <button class="sm accent" id="btnScenRecord" onclick="recNew(false)" data-t="scen.sozdat_zapisyu">
                 <svg class="ic" aria-hidden="true">
                     <use href="#i-record"/>
                 </svg>

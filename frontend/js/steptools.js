@@ -205,11 +205,12 @@ for (const name of ['recSubmit', 'recModeOff', 'recTeachSubmit']) {
    recOpen() как есть, и после правки (или «остаться в конструкторе») в
    конструкторе оставался прежний сценарий. Черновик правки лежит под ключом
    сценария и не теряется. */
-function recNew() {
+function recNew(command) {
+    if (command !== undefined) REC.command = !!command;
     if (!S.active || !(S.devices.find(d => d.serial === S.active) || {}).online) {
         return pickPhone('На каком телефоне записывать?', serial => {
             openDevice(serial);
-            recNew();
+            recNew(command);
         });
     }
     if (REC.edit || REC.teach) {

@@ -50,6 +50,8 @@ class Scenario:
     # TEMPLATE = True в модуле: готовый шаблон фермы (прогрев и т.п.) —
     # интерфейс показывает такие отдельной группой сверху списка.
     template: bool = False
+    # COMMAND = True: короткая команда (до COMMAND_MAX_STEPS шагов), не сценарий.
+    command: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -62,6 +64,7 @@ class Scenario:
             "recorded": self.recorded,
             "needs_accounts": self.needs_accounts,
             "template": self.template,
+            "command": self.command,
         }
 
 
@@ -163,6 +166,7 @@ def _load_file(path: Path) -> Scenario:
         sha256=digest,
         needs_accounts=needs_accounts(source),
         template=bool(getattr(module, "TEMPLATE", False)),
+        command=bool(getattr(module, "COMMAND", False)),
     )
 
 

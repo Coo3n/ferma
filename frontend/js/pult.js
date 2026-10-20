@@ -49,8 +49,8 @@ function pultPlace(on) {
 /* «Записать сценарий»: новый сценарий и сразу запись. Если recNew открыл
    диалог (восстановить черновик, выбрать телефон) — запись не начинаем:
    кликать по экрану под диалогом нельзя, человек нажмёт «Запись» сам. */
-function recBegin() {
-    recNew();
+function recBegin(command) {
+    recNew(!!command);
     if (REC.builder && S.view === 'device' && !$('modal').classList.contains('on')) recStart();
 }
 
@@ -91,6 +91,7 @@ function pultRender() {
     if (PULT.appsFor !== device.serial && device.online) { pultLoadApps(device.serial); pultRecents(); }
     if (PULT.recFor !== device.serial) pultRecRestore(device.serial);
     pultJobs();
+    pultCommands();
 }
 
 /* Теги — прямо под именем телефона: здесь о них и думают («этот прогрет»).
@@ -264,6 +265,29 @@ async function pultRecents() {
         for (const pkg of list) await act({type: 'stop', package: pkg});
         if (list.length > 1) toast(t('pult.zakryto_n', {n: list.length}), 'ok');
         pultRecents();
+    };
+    if (window.syncInteractive) syncInteractive();
+}
+
+/* Команды — кнопки в пульте: одно нажатие запускает короткую запись на этом
+   телефоне. Список берётся из уже загруженных сценариев, без запросов. */
+function pultCommands() {
+    const cmds = (S.scenarios || []).filter(s => s.command);
+    const sig = cmds.map(s => s.key + s.name).join('|') + '#' + S.active;
+    if (sig === PULT.cmdSig) return;
+    PULT.cmdSig = sig;
+    $('pultCmdSect').hidden = !cmds.length;
+    $('pultCmds').innerHTML = cmds.map(s => `<button class="chip" data-live data-cmd="${esc(s.key)}"
+        title="${esc(s.description || '')}">${esc(s.name)}</button>`).join('');
+    $('pultCmds').onclick = async ev => {
+        const key = ev.target.closest('button') && ev.target.closest('button').dataset.cmd;
+        if (!key || !S.active) return;
+        try {
+            await post('/api/run', {scenario: key, serials: [S.active]});
+            toast(t('cmd.zapusheno', {name: (cmds.find(s => s.key === key) || {}).name || key}), 'ok');
+        } catch (e) {
+            toast(e.message, 'bad');
+        }
     };
     if (window.syncInteractive) syncInteractive();
 }

@@ -53,7 +53,7 @@ function scRenderList() {
             art: 'scenario',
             title: 'Ни одного сценария',
             text: 'Запишите действия на одном телефоне — ферма повторит на всех.',
-            action: {label: 'Создать записью', icon: 'record', onClick: 'recNew()'},
+            action: {label: 'Создать записью', icon: 'record', onClick: 'recNew(false)'},
         }));
         return;
     }
@@ -84,15 +84,19 @@ function scSetKind(kind) {
    группой сверху: их запускают чаще всего и без правки. Порядок карточек
    в DOM = scOrdered, на нём держится выделение в pickScenario. */
 function scOrdered(list) {
-    return list.filter(s => s.template).concat(list.filter(s => !s.template));
+    return list.filter(s => s.template).concat(list.filter(s => s.command && !s.template),
+        list.filter(s => !s.template && !s.command));
 }
 
 function scListHtml(list) {
     const templates = list.filter(s => s.template);
-    const own = list.filter(s => !s.template);
-    if (!templates.length) return own.map(scenarioCard).join('');
-    return `<div class="sc-group">Готовые шаблоны</div>${templates.map(scenarioCard).join('')}`
-        + (own.length ? `<div class="sc-group">Мои сценарии</div>${own.map(scenarioCard).join('')}` : '');
+    const commands = list.filter(s => s.command && !s.template);
+    const own = list.filter(s => !s.template && !s.command);
+    const group = (title, items) => items.length
+        ? `<div class="sc-group">${esc(title)}</div>${items.map(scenarioCard).join('')}` : '';
+    if (!templates.length && !commands.length) return own.map(scenarioCard).join('');
+    return group('Готовые шаблоны', templates) + group(t('cmd.komandy'), commands)
+        + group('Мои сценарии', own);
 }
 
 /* Вторая строка карточки: сколько в сценарии шагов и развилок. Только у

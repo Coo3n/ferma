@@ -797,12 +797,15 @@ def normalize_meta(raw) -> dict:
     name = _text(raw.get("name"))
     if not name:
         raise StepError("не задано название сценария")
-    return {
+    meta = {
         "name": name,
         "description": _text(raw.get("description")),
         "watch_popups": bool(raw.get("watch_popups", True)),
         "human": bool(raw.get("human", True)),
     }
+    if raw.get("command"):   # ключ только у команд: рецепты обычных сценариев не меняются
+        meta["command"] = True
+    return meta
 
 
 def normalize_params(raw) -> dict:

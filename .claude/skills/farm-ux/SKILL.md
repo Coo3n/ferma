@@ -103,6 +103,7 @@ Four sections: Ферма · Сценарии · Запуски (tabs «Все �
 ## LaiXi parity checklist
 
 Done: preflight before run (accounts/busy/offline), runs filtered by launch batch, mirroring, sync control (+jitter), bulk APK/file/reboot/text/open/clear data, groups + scenario per group, quick phrases, density S/M/L, accounts manager, phone checks in scenarios (`if_phone`), «Приложение готово» step (`ensure_app`), APK library (Сценарии → Приложения). Schedules «смены» (per-phone random slots in a window, Запуски → Расписание), device tags (filter, bulk, run by tag), bulk screenshots, screen off, jobs CSV export. Phone pult (volume, rotate, full-size screenshot, screen video, clipboard paste), drag-and-drop APK/file onto screen or tiles, «farm waits» notifications, stuck-run watchdog with teach-and-continue.
+Added 2026-10-20: команды (`COMMAND = True`, ≤8 шагов, кнопки в пульте), «Открытые» приложения в пульте с закрытием, отчёт запуска по шагам (снимок падения + точка нажатия + слепок цели, `steps.csv`, автоочистка `ARTIFACT_KEEP_DAYS`), поиск/фильтры сценариев, советы перед первой записью.
 Removed 2026-10-17: ready-made warm-up templates (blind taps, untested on real phones — owner records own scenarios).
 Not planned: multi-computer remote control, chat/inbox management.
 When adding a competitor feature, write it into this list.

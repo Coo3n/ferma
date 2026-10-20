@@ -13,6 +13,9 @@ from . import steps as schema
 LONG_SLEEP = 60
 
 
+COMMAND_MAX_STEPS = 8   # команда — короткое действие; длиннее — уже сценарий
+
+
 def validate(payload: dict, blocks: dict | None = None,
              packages: set | None = None, assets: set | None = None,
              library: set | None = None) -> dict:
@@ -49,6 +52,9 @@ def validate(payload: dict, blocks: dict | None = None,
 
     if not raw:
         add("warning", -1, "в сценарии нет шагов")
+    if (payload.get("meta") or {}).get("command") and len(raw) > COMMAND_MAX_STEPS:
+        add("error", -1, f"команда — не больше {COMMAND_MAX_STEPS} шагов, а здесь {len(raw)}: "
+                         "для длинного пишите сценарий")
 
     for i, step in good:
         kind = step["kind"]

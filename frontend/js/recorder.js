@@ -3674,6 +3674,7 @@ function recMeta() {
         description: ($('recDesc') && $('recDesc').value.trim()) || '',
         watch_popups: !$('recPopups') || $('recPopups').checked,
         human: !$('recHuman') || $('recHuman').checked,
+        command: $('recCmd') ? $('recCmd').checked : !!REC.command,
     };
 }
 
@@ -3743,6 +3744,9 @@ function recSaveForm() {
     <div class="row"><label>Описание</label>
       <input type="text" id="recDesc" value="${esc(meta.description || '')}"
              placeholder="что делает сценарий"></div>
+    <div class="row"><label class="kb" title="${esc(t('cmd.hint'))}">
+      <input type="checkbox" id="recCmd" ${(meta.command || REC.command) ? 'checked' : ''} style="accent-color:var(--accent)">
+      ${esc(t('cmd.eto_komanda'))}</label></div>
     <div class="row"><label class="kb">
       <input type="checkbox" id="recPopups" ${popups ? 'checked' : ''} style="accent-color:var(--accent)">
       закрывать всплывающие диалоги</label></div>
@@ -3932,6 +3936,7 @@ async function editScenario(key) {
     recBlocksFromSpan();
     REC.open = null;
     REC.edit = {key: key, meta: рецепт.meta || {}};
+    REC.command = !!(рецепт.meta && рецепт.meta.command);
     /* Ширина устройства записи: кропы приехали с него, и масштаб шаблона на
        прогоне считается от неё. Устройство, на котором правят, может быть
        другим — тогда новые кропы окажутся в чужом масштабе, поэтому дописывать
