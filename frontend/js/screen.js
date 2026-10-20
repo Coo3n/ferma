@@ -371,6 +371,12 @@ function tapRipple(stage, at) {
     window.addEventListener('mousemove', ev => {
         if (!down || !trail) return;
         gestureTrailMove(trail, downPx, stagePoint(ev));
+        /* Палец поехал — это прокрутка, а не долгое нажатие: без этого
+           медленный скролл дольше 600 мс срабатывал как long_tap. */
+        if (!longFired) {
+            const at = normalize(ev);
+            if (Math.hypot(at.x - down.x, at.y - down.y) > SWIPE_MIN_DISTANCE) clearTimeout(timer);
+        }
     });
 
     window.addEventListener('mouseup', ev => {

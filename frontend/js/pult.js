@@ -88,7 +88,7 @@ function pultRender() {
     setText($('btnRecBegin').querySelector('span'),
         continues ? t('pult.prodolzhit_zapis', {n: continues}) : t('pult.zapisat_stsenariy'));
 
-    if (PULT.appsFor !== device.serial && device.online) pultLoadApps(device.serial);
+    if (PULT.appsFor !== device.serial && device.online) { pultLoadApps(device.serial); pultRecents(); }
     if (PULT.recFor !== device.serial) pultRecRestore(device.serial);
     pultJobs();
 }
@@ -232,6 +232,38 @@ function pultAppsRender(serial) {
         } else if (btn.dataset.pkg) {
             act({type: 'launch', package: btn.dataset.pkg});
         }
+    };
+    if (window.syncInteractive) syncInteractive();
+}
+
+/* Открытые приложения (бэкстек), в том числе системные: закрыть можно
+   каждое отдельно или все сразу. Список читается по кнопке, не опросом. */
+async function pultRecents() {
+    const serial = S.active, box = $('pultRecents');
+    if (!serial || !box) return;
+    let pkgs;
+    try {
+        pkgs = await api(`/api/devices/${serial}/recents`);
+    } catch (e) {
+        box.innerHTML = `<span class="dim">${esc(e.message)}</span>`;
+        return;
+    }
+    if (S.active !== serial) return;
+    if (!pkgs.length) {
+        box.innerHTML = `<span class="dim">${t('pult.nichego_ne_otkryto')}</span>`;
+        return;
+    }
+    const chip = p => `<button class="chip" data-live data-close="${esc(p)}" title="${esc(p)}">${
+        esc(pultAppName(serial, p))} ✕</button>`;
+    box.innerHTML = pkgs.map(chip).join('')
+        + `<button class="sm ghost" data-live data-close-all>${esc(t('pult.zakryt_vse'))}</button>`;
+    box.onclick = async ev => {
+        const btn = ev.target.closest('button');
+        if (!btn) return;
+        const list = btn.hasAttribute('data-close-all') ? pkgs : btn.dataset.close ? [btn.dataset.close] : [];
+        for (const pkg of list) await act({type: 'stop', package: pkg});
+        if (list.length > 1) toast(t('pult.zakryto_n', {n: list.length}), 'ok');
+        pultRecents();
     };
     if (window.syncInteractive) syncInteractive();
 }

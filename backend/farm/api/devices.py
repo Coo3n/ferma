@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import os
 import shutil
 import subprocess
 import time
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/api/devices")
 tags_router = APIRouter(prefix="/api/tags")
 
 SCRCPY_MAX_SIZE = "900"
+_scrcpy_procs: dict[str, subprocess.Popen] = {}
 
 
 def _require_device(serial: str):
@@ -179,6 +181,14 @@ def apps(serial: str, all: bool = Query(False)):
         pool.shutdown(wait=False, cancel_futures=True)
 
 
+@router.get("/{serial}/recents")
+def recents(serial: str):
+    try:
+        return control.recent_packages(serial)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(500, str(e))
+
+
 @router.get("/{serial}/hierarchy", response_class=PlainTextResponse)
 def hierarchy(serial: str):
     try:
@@ -223,10 +233,17 @@ def open_scrcpy(serial: str):
         raise HTTPException(400, "scrcpy не установлен: brew install scrcpy")
     device = registry.get(serial)
     title = device.name if device else serial
-    subprocess.Popen(
-        [executable, "-s", serial, "--window-title", title,
+    old = _scrcpy_procs.get(serial)
+    if old and old.poll() is None:
+        return {"ok": True, "message": f"окно {title} уже открыто"}
+    # Свой adb фермы: у scrcpy он может быть другой версии, и тогда он
+    # убивает общий adb-сервер — у всех телефонов рвётся соединение.
+    env = {**os.environ, "ADB": adb.ADB}
+    _scrcpy_procs[serial] = subprocess.Popen(
+        [executable, "-s", serial, "--window-title", title, "--always-on-top",
          "--stay-awake", "--no-audio", "--max-size", SCRCPY_MAX_SIZE],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        env=env,
     )
     return {"ok": True, "message": f"scrcpy запущен для {title}"}

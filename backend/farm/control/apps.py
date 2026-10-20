@@ -1,6 +1,7 @@
 """Приложения: запуск, остановка, установка, права."""
 from __future__ import annotations
 
+import re
 import shlex
 
 from .. import adb
@@ -26,6 +27,21 @@ def launch_app(serial: str, package: str, activity: str | None = None,
 
 def stop_app(serial: str, package: str) -> None:
     adb.shell(serial, ["am", "force-stop", shlex.quote(package)])
+
+
+# Оболочка и лаунчер не закрываем: после этого экран пустой, а не «чистый».
+_KEEP_OPEN = re.compile(r"systemui|launcher|\.miui\.home$|\.home$")
+_RECENT_CMP = re.compile(r"(?:cmp|realActivity)=([\w.]+)/")
+
+
+def recent_packages(serial: str) -> list[str]:
+    """Пакеты из «последних» (бэкстек), свежие первыми, без дублей."""
+    out = adb.shell(serial, ["dumpsys", "activity", "recents"], timeout=15)
+    seen: dict[str, None] = {}
+    for pkg in _RECENT_CMP.findall(out):
+        if not _KEEP_OPEN.search(pkg):
+            seen.setdefault(pkg)
+    return list(seen)
 
 
 def open_url(serial: str, url: str) -> None:
