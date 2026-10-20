@@ -1778,86 +1778,6 @@ function schObstacleLabel(o) {
     return {title: 'Экран без читаемого текста', hint: пакет};
 }
 
-function schSide(карта) {
-    const отводы = (карта.rules || []).filter(r => r.action && r.action.run);
-    const дыры = карта.obstacles || [];
-
-    const строкиОтводов = отводы.length
-        ? отводы.map(r => `<div class="sch-rule">
-             <svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg>
-             <span class="sch-gap-txt">
-               <b>${esc(r.name)}</b>
-               <span class="sch-gap-sub">запускает блок «${esc(r.action.run)}»</span>
-             </span>
-             <span class="sp"></span>
-             ${r.source === 'global'
-            ? '<span class="sch-hits">на всех приложениях</span>' : ''}
-           </div>`).join('')
-        : `<div class="sch-empty">
-             <svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>
-             <span>Пока нет. Покажите ферме раз, как закрыть окно, — дальше сама.</span></div>`;
-
-    /* «Обошли вслепую» показываем отдельно от «уронили»: по журналу задач
-       первого не видно вообще — прогоны доезжают, — и без этой пометки
-       преграда выглядит безобидной. */
-    const строкиДыр = дыры.length
-        ? дыры.map(o => {
-            const {title, hint} = schObstacleLabel(o);
-            /* Счётчик и кнопка — одной группой у правого края. Порознь
-               (счётчик сразу за подписью, кнопка через распорку) между
-               ними зияла пустота во всю строку, и глазу приходилось
-               прыгать через неё, чтобы связать «×1» с «научить». */
-            const встречи = `${o.hits} ${declOfNum(o.hits,
-                ['встреча', 'встречи', 'встреч'])}`;
-            return `<div class="sch-gap">
-             <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>
-             <span class="sch-gap-txt">
-               <b>${esc(title)}</b>
-               ${hint ? `<span class="sch-gap-sub">${esc(hint)}</span>` : ''}
-             </span>
-             <span class="sp"></span>
-             <span class="sch-hits tnum">${встречи}${o.escapes
-                ? ` · вслепую ${o.escapes}` : ''}</span>
-             <button class="sm" onclick="teachDetour('${esc(o.job || '')}',
-                     '${esc(o.file || '')}')"
-                     ${o.job ? '' : 'disabled'}>научить обходить</button></div>`;
-        }).join('')
-        : `<div class="sch-empty">
-             <svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>
-             <span>Чисто: незнакомых экранов не было.</span></div>`;
-
-    /* Тот же концепт преград виден и на вкладке «Отклонения» — но по всей
-       ферме и по всем пакетам, а не только по этому. Разные срезы одних и
-       тех же данных должны знать друг о друге, а не выглядеть как две
-       разные фичи. */
-    /* Счётчик в заголовке — чтобы свёрнутый подвал можно было оценить, не
-       разворачивая: «преград 2» видно сразу, а список уже по желанию. */
-    const счёт = n => n
-        ? `<span class="sch-count">${n}</span>`
-        : '<span class="sch-count ok">0</span>';
-
-    /* Шапка карточки — div, а не <header>: в layout.css есть правило на
-       голый тег header (это шапка приложения, display:flex), и оно ловит
-       любой header на странице. Внутри карточки из-за него заголовок и
-       пояснение вставали в строку вместо друг друга. */
-    return `<section class="sch-side">
-      <div class="sch-side-head">
-        <h4>Закрываются сами ${счёт(отводы.length)}</h4>
-        <p>Окна, которые ферма закрывает сама.</p>
-      </div>
-      ${строкиОтводов}
-    </section>
-    <section class="sch-side">
-      <div class="sch-side-head">
-        <h4>Мешают сценарию ${счёт(дыры.length)}
-          <button class="sch-side-link" onclick="showView('deviations')"
-                  title="Все помехи фермы">
-            все по ферме →</button></h4>
-        <p>Экраны, которые ферма ещё не умеет обходить.</p>
-      </div>
-      ${строкиДыр}
-    </section>`;
-}
 
 /* Схема — постоянная панель, а не модалка: растёт по мере кликов по экрану
    устройства, а не открывается по отдельной команде. Холст (grRender)
@@ -2172,7 +2092,7 @@ async function recSchemeSideLoad() {
         return;
     }
     /* Зовётся после каждого шага записи — тот же список не пересобираем. */
-    setHTML(side, schSide(карта));
+    setHTML(side, popSideHtml(карта, (REC.teach && REC.teach.package) || recGuessPackage()));
 }
 
 /* Пакет берём из шага запуска приложения: отводы хранятся по пакетам, и
@@ -2813,12 +2733,10 @@ function recMark(step, open) {
     if (step.warn) return `<div class="rs-warn">⚠ ${esc(step.warn)}</div>`;
     if (!open) return '';
     if (step.kind !== 'click') return '';
-    const layers = recLayers(step);
-    const tail = layers.length ? ' · ' + t('rec.zapasnoy_put', {list: layers.join(', ')}) : '';
-    /* Про шаг из файла мы не знаем, однозначен ли его селектор: дампа того
-       экрана давно нет. Писать «✓ уникален» было бы враньём. */
-    if (step.adopted) return `<div class="rs-ok">из файла${esc(tail)}</div>`;
-    return `<div class="rs-ok">✓ уникален на экране${esc(tail)}</div>`;
+    /* Запасные слои теперь видны в «Как нажимать» (findhow.js) — здесь
+       только «✓ уникален», без повтора той же строки. */
+    if (step.adopted) return '';
+    return `<div class="rs-ok">✓ уникален на экране</div>`;
 }
 
 /* Признак поиска словами: description="Закрыть" → по подписи «Закрыть».
@@ -3124,7 +3042,7 @@ function recRow(step, index) {
    «Дополнительно» — код строки и запасные признаки «как искать». Раскрыт
    сам, если запасные уже выбраны: спрятать заданное — потерять его из виду. */
 function recStepBody(step, index) {
-    const main = recThumb(step) + recAnchorEditor(step) + recBranchEditor(step)
+    const main = recThumb(step) + recHowHtml(step) + recAnchorEditor(step) + recBranchEditor(step)
         + recValueEditor(step) + recEnsureEditor(step) + recBlockEditor(step) + recScrollEditor(step, index)
         + recFlexEditor(step);
     /* «Дополнительно» закрыто всегда: запасные способы — для того, кто их

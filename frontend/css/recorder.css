@@ -1272,3 +1272,89 @@ body.rec-picking .stage, body.rec-picking #recLayer { cursor: crosshair; }
 .addpick-ic .ic, .addpick-card.compact .addpick-ic .ic { width: 18px; height: 18px; }
 .addpick-card.compact { min-height: 52px; }
 .rs-more-btn .ic { width: 18px; height: 18px; }
+
+/* «Как нажимать» (findhow.js): режим, способы поиска по порядку, «указать
+   на экране». На виду в раскрытом шаге, а не под «Дополнительно». */
+.how { margin: var(--s3) 0; padding: var(--s3) var(--s4); border-radius: var(--r2); background: var(--panel2); max-width: 640px; }
+.how-head { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.how-head b { font-size: var(--fs-2); }
+.how-mode { display: inline-flex; padding: 2px; border-radius: var(--pill); background: var(--bg); }
+.how-mode button { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 var(--s3);
+    border: 0; border-radius: var(--pill); background: transparent; color: var(--dim); font-size: var(--fs-2); }
+.how-mode button::before { content: none; }
+.how-mode button .ic { width: 14px; height: 14px; }
+.how-mode button[aria-checked="true"] { background: var(--accent-dim); color: var(--text); font-weight: 600; }
+.how-mode button[aria-checked="true"] .ic { color: var(--accent); }
+.how-h { margin: var(--s3) 0 var(--s2); color: var(--text2); font-size: var(--fs-2); }
+.how-note { margin: 0 0 var(--s2); color: var(--dim); font-size: var(--fs-1); line-height: 1.45; }
+.how-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.how-list li { display: flex; align-items: center; gap: var(--s2); min-height: 34px; padding: 0 var(--s2) 0 var(--s3);
+    border-radius: var(--r1); background: var(--bg); font-size: var(--fs-2); }
+.how-n { color: var(--dim); font-size: var(--fs-1); font-variant-numeric: tabular-nums; min-width: 1.5ch; }
+.how-feat { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.how-tag { color: var(--accent); font-size: var(--fs-1); }
+.how-x { width: 26px; height: 26px; min-height: 26px; padding: 0; justify-content: center; border: 0;
+    background: transparent; color: var(--dim); }
+.how-x::before { content: none; }
+.how-x:hover { color: var(--bad); background: var(--bad-dim); }
+.how-x .ic { width: 14px; height: 14px; }
+.how-add { display: flex; gap: var(--s2); align-items: center; margin-top: var(--s2); flex-wrap: wrap; }
+.how-last { display: flex; align-items: center; gap: 6px; margin: var(--s2) 0 0; color: var(--dim); font-size: var(--fs-1); }
+.how-last .ic { width: 13px; height: 13px; color: var(--ok); }
+.how-point { display: flex; gap: var(--s4); align-items: flex-start; margin-top: var(--s3); }
+.how-phone .sc-phone { width: 28px; height: 50px; }
+
+/* Окно выбора на снимке: снимок слева, что выбрали — справа. */
+.how-pick { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: var(--s5, 24px); align-items: start; }
+.how-side { display: grid; gap: var(--s2); align-content: start; }
+.how-cands { display: grid; gap: 6px; }
+.how-cand { justify-content: space-between; gap: var(--s3); min-height: 40px; padding: 0 var(--s3);
+    border: 1px solid var(--line-soft); border-radius: var(--r1); background: var(--panel2); text-align: left; }
+.how-cand::before { content: none; }
+.how-cand:hover:not(:disabled) { border-color: var(--accent-line); background: var(--accent-dim); }
+.how-cand small { color: var(--dim); font-size: var(--fs-1); white-space: nowrap; }
+.how-dot { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%;
+    border: 3px solid var(--accent); box-shadow: 0 0 0 2px var(--bg); pointer-events: none; }
+#howLayer .rp-box.on { outline: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+@media (max-width: 720px) { .how-pick { grid-template-columns: 1fr; } }
+.how-cand { width: 100%; white-space: normal; display: flex; align-items: center; padding: var(--s2) var(--s3); line-height: 1.35; }
+.how-cand span { flex: 1; min-width: 0; color: var(--text); font-size: var(--fs-2); }
+.how-cand.shaky span { color: var(--text2); }
+.how-cand.shaky small { color: var(--warn); }
+.how-cand:disabled { opacity: .55; }
+#howLayer .rp-box { border-color: transparent; background: transparent; }
+#howLayer .rp-box.hov { border-color: var(--accent-line); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+/* «Окна-помехи» (popups.js): правило одной строкой «Если X → сделать Y»,
+   где действует, удалить; ниже — встреченные, но не разобранные окна. */
+.pop { display: grid; gap: var(--s3); padding: var(--s3) var(--s4) var(--s4); }
+.pop-head { display: flex; gap: var(--s4); align-items: flex-start; justify-content: space-between; }
+.pop-head p { margin: 0; max-width: 64ch; color: var(--text2); font-size: var(--fs-2); line-height: 1.45; }
+.pop-head .primary { flex: none; }
+.pop-rules, .pop-gaps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.pop-rule { display: flex; align-items: center; gap: var(--s2); min-height: 40px; padding: 0 var(--s2) 0 var(--s3);
+    border-radius: var(--r1); background: var(--panel2); font-size: var(--fs-2); }
+.pop-if { color: var(--dim); }
+.pop-when { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pop-arrow { width: 14px; height: 14px; color: var(--dim); flex: none; }
+.pop-act { color: var(--accent); white-space: nowrap; }
+.pop-where { margin-left: auto; color: var(--dim); font-size: var(--fs-1); white-space: nowrap; }
+.pop-x { width: 28px; height: 28px; min-height: 28px; padding: 0; justify-content: center; border: 0; background: transparent; color: var(--dim); }
+.pop-x::before { content: none; }
+.pop-x:hover, .pop-x[data-armed] { color: var(--bad); background: var(--bad-dim); }
+.pop-x .ic { width: 14px; height: 14px; }
+.pop-empty { margin: 0; color: var(--dim); font-size: var(--fs-2); }
+.pop-sub { margin: var(--s2) 0 0; color: var(--dim); font-size: var(--fs-1); font-weight: 600; }
+.pop-gap { display: flex; align-items: center; gap: var(--s3); min-height: 44px; padding: 0 var(--s2) 0 var(--s3);
+    border-radius: var(--r1); border: 1px dashed var(--line); font-size: var(--fs-2); }
+.pop-gap > .ic { width: 16px; height: 16px; color: var(--warn); flex: none; }
+.pop-gap-tx { display: grid; min-width: 0; }
+.pop-gap-tx small { color: var(--dim); font-size: var(--fs-1); }
+.pop-hits { margin-left: auto; color: var(--dim); font-size: var(--fs-1); white-space: nowrap; }
+.pop-opt { display: flex; align-items: center; gap: var(--s2); min-height: 32px; font-size: var(--fs-2); }
+.pop-opt input { accent-color: var(--accent); }
+.pop-opt select { min-width: 0; max-width: 220px; }
+.how-cand.on { border-color: var(--accent); background: var(--accent-dim); }
+#popLayer .rp-box { border-color: transparent; background: transparent; }
+#popLayer .rp-box.hov { border-color: var(--accent-line); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+#popLayer .rp-box.on { outline: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }

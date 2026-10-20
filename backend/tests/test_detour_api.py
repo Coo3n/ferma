@@ -196,3 +196,31 @@ def test_scan_obstacles_без_папки_артефактов_не_падает
 
     monkeypatch.setattr(config, "ARTIFACTS_DIR", tmp_path / "нет-такой-папки")
     assert scan_obstacles("com.app") == []
+
+
+def test_правило_без_обучения_добавляется_и_удаляется(песочница):
+    _, grd = песочница
+    r = api.add_rule({"package": "com.app", "name": "Не сейчас",
+                      "when": [{"text": "Не сейчас"}], "action": {"click": {"text": "Не сейчас"}}})
+    assert r["name"] == "Не сейчас"
+    # одноимённое — с номером, а не затирает первое
+    r2 = api.add_rule({"package": "com.app", "name": "Не сейчас",
+                       "when": [{"text": "Позже"}], "action": {"key": "back"}})
+    assert r2["name"] == "Не сейчас (2)"
+    names = [g.name for g in guards.load("com.app")]
+    assert names == ["Не сейчас", "Не сейчас (2)"]
+    api.delete_rule("Не сейчас", "com.app")
+    assert [g.name for g in guards.load("com.app")] == ["Не сейчас (2)"]
+
+
+def test_правило_для_всех_приложений_и_проверка(песочница):
+    _, grd = песочница
+    api.add_rule({"package": "", "name": "Разрешить", "when": [{"text": "Разрешить"}],
+                  "action": {"click": {"text": "Разрешить"}}})
+    assert (grd / "global.json").exists()
+    with pytest.raises(HTTPException):
+        api.add_rule({"package": "com.app", "when": [], "action": {"key": "back"}})
+    with pytest.raises(HTTPException):
+        api.add_rule({"package": "com.app", "when": [{"text": "x"}], "action": {"run": "Bad Key"}})
+    with pytest.raises(HTTPException):
+        api.delete_rule("нет такого", "com.app")

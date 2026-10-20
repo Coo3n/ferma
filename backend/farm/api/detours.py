@@ -94,6 +94,62 @@ def create_detour(payload: dict = Body(...)):
     return {"key": key, "rules": str(path)}
 
 
+def _read_rules(path: Path) -> list:
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text("utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _write_rules(path: Path, rules: list) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(rules, ensure_ascii=False, indent=1), "utf-8")
+    guards._cache.pop(str(path), None)   # горячая перезагрузка ждёт смены mtime
+
+
+@router.post("/rules")
+def add_rule(payload: dict = Body(...)):
+    """Правило «окно → что сделать» без обучения записью: «если видно
+    «Не сейчас» — нажать её», «— клавиша Назад», «— запустить команду».
+
+    package пустой — для всех приложений (global.json)."""
+    package = payload.get("package") or ""
+    path = _rules_path(package)
+    rules = _read_rules(path)
+    base = str(payload.get("name") or "окно").strip()[:60] or "окно"
+    names = {r.get("name") for r in rules if isinstance(r, dict)}
+    name, n = base, 2
+    while name in names:
+        name, n = f"{base} ({n})", n + 1
+    raw = {"name": name, "when": {"any": payload.get("when") or []},
+           "action": payload.get("action") or {},
+           "max_fires": int(payload.get("max_fires") or guards.DEFAULT_MAX_FIRES)}
+    try:
+        guards._parse_guard(raw, path.stem)
+    except guards.GuardError as e:
+        raise HTTPException(400, str(e))
+    run = raw["action"].get("run")
+    if run and not re.match(r"^[a-z][a-z0-9_]{0,47}$", run):
+        raise HTTPException(400, f"неизвестный сценарий «{run}»")
+    rules.append(raw)
+    _write_rules(path, rules)
+    return {"ok": True, "name": name, "source": path.stem}
+
+
+@router.delete("/rules")
+def delete_rule(name: str, package: str = ""):
+    path = _rules_path(package)
+    rules = _read_rules(path)
+    left = [r for r in rules if not (isinstance(r, dict) and r.get("name") == name)]
+    if len(left) == len(rules):
+        raise HTTPException(404, f"правила «{name}» нет")
+    _write_rules(path, left)
+    return {"ok": True}
+
+
 def scan_obstacles(package: str = "") -> list:
     """Слепки преград из артефактов последних задач, свежие первыми.
 
