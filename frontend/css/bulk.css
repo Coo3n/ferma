@@ -1314,3 +1314,17 @@ button.rd-ph.on {
 
 .bulk-oks summary { cursor: pointer; color: var(--dim); font-size: var(--fs-2); }
 .bulk-oks p { margin: var(--s1) 0 0; color: var(--text2); font-size: var(--fs-2); }
+
+/* Мелко: флаг «тревога / занято / ждёт решения» словом не помещался и
+   наезжал на галочку — здесь он точка в углу (слово — в подсказке плитки и
+   в списке «Требуют внимания»), строка предупреждения тоже лишняя: рамка
+   плитки уже красная. */
+.tiles[data-density="s"] .tile .flag {
+    top: 6px; left: 6px; width: 10px; height: 10px; padding: 0;
+    font-size: 0; gap: 0; box-shadow: 0 0 0 2px var(--panel);
+}
+.tiles[data-density="s"] .tile .flag.err { background: var(--bad); }
+.tiles[data-density="s"] .tile .flag.busy { background: var(--busy); }
+.tiles[data-density="s"] .tile .flag.held { background: var(--warn); }
+.tiles[data-density="s"] .tile .alert { display: none; }
+.tiles[data-density="s"] .tile .pick { top: 4px; right: 4px; width: 20px; height: 20px; }

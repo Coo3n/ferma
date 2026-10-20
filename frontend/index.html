@@ -824,20 +824,19 @@
                         onclick="showView('schedule')" data-t="jobs.raspisanie">Расписание</button>
             </div>
             <span class="sp"></span>
-            <a class="btn sm" href="/api/jobs/export.csv" download
-               title="Таблица запусков для Excel" data-t="jobs.skachat_tablitsu" data-t-title="jobs.tablitsa_zapuskov_dlya_excel">
-                <svg class="ic" aria-hidden="true">
-                    <use href="#i-download"/>
-                </svg>
-                Скачать таблицу
-            </a>
-            <a class="btn sm" href="/api/jobs/steps.csv" download
-               title="Каждый шаг каждого запуска для Excel, у упавшего — ссылка на снимок" data-t="jobs.tablitsa_shagov" data-t-title="jobs.tablitsa_shagov_title">
-                <svg class="ic" aria-hidden="true">
-                    <use href="#i-sheet"/>
-                </svg>
-                Таблица по шагам
-            </a>
+            <!-- Одна кнопка «Скачать» с выбором, что именно: две кнопки
+                 «Скачать таблицу» и «Таблица по шагам» рядом читались как одно. -->
+            <details class="dl-menu">
+                <summary class="btn sm"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg><span data-t="jobs.skachat">Скачать</span><svg class="ic chev" aria-hidden="true"><use href="#i-down"/></svg></summary>
+                <div class="dl-pop" role="menu">
+                    <a role="menuitem" href="/api/jobs/export.csv" download onclick="this.closest('details').open=false">
+                        <svg class="ic" aria-hidden="true"><use href="#i-sheet"/></svg>
+                        <span><b data-t="jobs.dl_runs_t">Запуски</b><small data-t="jobs.dl_runs">Строка на запуск: сценарий, телефон, итог</small></span></a>
+                    <a role="menuitem" href="/api/jobs/steps.csv" download onclick="this.closest('details').open=false">
+                        <svg class="ic" aria-hidden="true"><use href="#i-list-checks"/></svg>
+                        <span><b data-t="jobs.dl_steps_t">Шаги</b><small data-t="jobs.dl_steps">Каждый шаг; у упавшего — ссылка на снимок</small></span></a>
+                </div>
+            </details>
             <button class="sm" id="btnClearJobs" onclick="clearJobs()" data-t="jobs.ochistit_zavershennye">
                 <svg class="ic" aria-hidden="true">
                     <use href="#i-trash"/>

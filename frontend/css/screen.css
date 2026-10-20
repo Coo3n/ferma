@@ -821,7 +821,7 @@ button.pult-tag-add {
     background: var(--panel2) linear-gradient(100deg,
         transparent 40%, color-mix(in srgb, var(--text) 7%, transparent) 50%, transparent 60%) fixed;
     background-size: 200vw 100%;
-    animation: sk-sweep 1.6s var(--ease) infinite;
+    animation: sk-sweep 1.6s var(--ease) infinite, sk-late 0s 450ms both;
 }
 #pult.loading #pultName { width: 120px; height: 18px; margin-bottom: 6px; }
 #pult.loading #pultMeta { width: 160px; height: 12px; }

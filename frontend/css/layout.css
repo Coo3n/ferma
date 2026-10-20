@@ -708,3 +708,22 @@ body:has(#view-device.on) #stJobs {
 /* Число во вкладке («Сценарии 12») вместо отдельного «всего: 12» в полосе. */
 .tab-n { margin-left: 6px; color: var(--dim); font-weight: 500; font-variant-numeric: tabular-nums; }
 .tab-n:empty { display: none; }
+
+/* «Скачать ▾»: выбор, какую таблицу — запуски или шаги. */
+.dl-menu { position: relative; }
+.dl-menu > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.dl-menu > summary::-webkit-details-marker { display: none; }
+.dl-menu > summary .chev { width: 14px; height: 14px; color: var(--dim); transition: transform var(--fast) var(--ease); }
+.dl-menu[open] > summary .chev { transform: rotate(180deg); }
+.dl-pop {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 300px;
+    display: grid; gap: 2px; padding: var(--s2);
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--r2);
+    box-shadow: 0 10px 30px color-mix(in srgb, var(--bg) 70%, transparent);
+}
+.dl-pop a { display: flex; align-items: flex-start; gap: var(--s3); padding: var(--s2) var(--s3);
+    border-radius: var(--r1); color: var(--text); text-decoration: none; }
+.dl-pop a:hover, .dl-pop a:focus-visible { background: var(--panel2); }
+.dl-pop a .ic { flex: none; width: 18px; height: 18px; margin-top: 2px; color: var(--accent); }
+.dl-pop b { display: block; font-size: var(--fs-2); font-weight: 600; }
+.dl-pop small { display: block; color: var(--dim); font-size: var(--fs-1); line-height: 1.4; }

@@ -101,6 +101,10 @@ def _stop(serial, p):
     control.stop_app(serial, p["package"])
 
 
+def _close_recent(serial, p):
+    control.close_recent(serial, p["package"])
+
+
 def _url(serial, p):
     control.open_url(serial, p["url"])
 
@@ -136,6 +140,7 @@ ACTIONS = {
     "key": _key,
     "launch": _launch,
     "stop": _stop,
+    "close_recent": _close_recent,
     "url": _url,
     "unlock": _unlock,
     "shell": _shell,

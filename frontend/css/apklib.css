@@ -90,3 +90,4 @@
 @media (max-width: 720px) { .apk-how { grid-template-columns: 1fr; } }
 
 #apkList:has(> .apk-empty) { display: grid; place-items: center; }
+#apkList { flex: 1; }

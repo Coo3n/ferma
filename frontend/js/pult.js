@@ -24,7 +24,10 @@ function pultOn() {
 function pultSync() {
     const work = $('work');
     if (!work || !window.REC) return;
-    const on = !(REC.builder || REC.on || REC.edit || REC.teach);
+    /* Правка или обучение сами по себе пульт не прячут: открыли телефон с
+       фермы — показываем пульт, а к начатой правке ведёт кнопка внизу
+       («Продолжить правку»). Раньше вход с фермы попадал прямо в конструктор. */
+    const on = !(REC.builder || REC.on);
     if (work.classList.contains('pult-on') !== on) {
         work.classList.toggle('pult-on', on);
         pultPlace(on);
@@ -53,6 +56,11 @@ function pultPlace(on) {
    диалог (восстановить черновик, выбрать телефон) — запись не начинаем:
    кликать по экрану под диалогом нельзя, человек нажмёт «Запись» сам. */
 function recBegin(command) {
+    if (!command && (REC.edit || REC.teach)) {   // вернуться к начатой правке, а не начинать новую
+        REC.builder = true;
+        pultSync();
+        return;
+    }
     recNew(!!command);
     if (REC.builder && S.view === 'device' && !$('modal').classList.contains('on')) recStart();
 }
@@ -60,10 +68,6 @@ function recBegin(command) {
 /* Из конструктора обратно к пульту. Шаги не теряются — остаются черновиком. */
 function pultBack() {
     if (REC.on) recPause();
-    if (REC.edit || REC.teach) {
-        toast(t('pult.snachala_sohranite_pravku'), 'bad');
-        return;
-    }
     REC.builder = false;
     pultSync();
 }
@@ -95,8 +99,9 @@ function pultRender() {
     pultTagsRender(device);
 
     const continues = REC.steps.length;
-    setText($('btnRecBegin').querySelector('span'),
-        continues ? t('pult.prodolzhit_zapis', {n: continues}) : t('pult.zapisat_stsenariy'));
+    setText($('btnRecBegin').querySelector('span'), REC.edit ? t('pult.prodolzhit_pravku')
+        : continues ? t('pult.prodolzhit_zapis', {n: continues}) : t('pult.zapisat_stsenariy'));
+    $('btnRecBegin').title = REC.edit ? t('pult.prodolzhit_pravku_title', {name: REC.edit.meta.name || REC.edit.key}) : '';
 
     if (PULT.appsFor !== device.serial && device.online) pultLoadApps(device.serial);
     if (PULT.recFor !== device.serial) pultRecRestore(device.serial);
@@ -313,7 +318,7 @@ async function pultRecents() {
         const btn = ev.target.closest('button');
         if (!btn) return;
         const list = btn.hasAttribute('data-close-all') ? pkgs : btn.dataset.close ? [btn.dataset.close] : [];
-        for (const pkg of list) await act({type: 'stop', package: pkg});
+        for (const pkg of list) await act({type: 'close_recent', package: pkg});
         if (list.length > 1) toast(t('pult.zakryto_n', {n: list.length}), 'ok');
         pultRecents();
     };

@@ -1254,3 +1254,20 @@ body.rec-picking .stage, body.rec-picking #recLayer { cursor: crosshair; }
     .addpick-nav { flex-direction: row; flex-wrap: wrap; border-right: 0; padding: 0; }
 }
 .rs-menu.up { top: auto; bottom: calc(100% + 4px); }
+
+/* «Добавить шаг», заметнее: разделы крупнее, у выбранного — полоска акцента;
+   значок карточки — в цветном квадрате, карточка с тонкой рамкой. */
+.addpick-nav button { min-height: 40px; font-size: var(--fs-3); font-weight: 500; color: var(--text2); position: relative; }
+.addpick-nav button .ic { width: 18px; height: 18px; }
+.addpick-nav button[aria-selected="true"]::after {
+    content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px;
+    border-radius: var(--pill); background: var(--accent);
+}
+.addpick-card { border: 1px solid var(--line-soft); }
+.addpick-card:hover:not(:disabled) { border-color: var(--accent-line); background: var(--panel3); }
+.addpick-ic {
+    display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+    border-radius: var(--r1); background: var(--accent-dim); color: var(--accent);
+}
+.addpick-ic .ic, .addpick-card.compact .addpick-ic .ic { width: 18px; height: 18px; }
+.addpick-card.compact { min-height: 52px; }

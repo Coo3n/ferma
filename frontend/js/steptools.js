@@ -162,7 +162,7 @@ document.addEventListener('pointerdown', ev => {
    висели открытыми, пока не нажмёшь на заголовок ещё раз. Фаза перехвата:
    экран телефона и холст схемы гасят всплытие своих нажатий. */
 document.addEventListener('pointerdown', ev => {
-    document.querySelectorAll('details.recmore[open], details.selbar-menu[open]').forEach(menu => {
+    document.querySelectorAll('details.recmore[open], details.selbar-menu[open], details.dl-menu[open]').forEach(menu => {
         if (!menu.contains(ev.target)) menu.open = false;
     });
     if (REC.menuFor != null && !ev.target.closest('.rs-menu, .rs-more-btn')) recRowMenuClose();

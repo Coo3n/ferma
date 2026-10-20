@@ -772,3 +772,15 @@ input[type=password], input[type=url], input[type=email], input[type=tel], selec
     from { background-position: 120% 0; }
     to { background-position: -120% 0; }
 }
+
+/* Заготовки — только если ждать заметно (дольше ~0.45 с). Быстрый ответ
+   приходит раньше, и на обновлении страницы не мигает «серая» страница. */
+@keyframes sk-late { from { visibility: hidden; } to { visibility: visible; } }
+.skel-list,
+.fleet-skel > *,
+.pult-app-skel,
+#pultCmds:has(> .sk),
+#pultJobs:has(> .sk),
+.scr-load:not([hidden]) {
+    animation: sk-late 0s 450ms both;
+}

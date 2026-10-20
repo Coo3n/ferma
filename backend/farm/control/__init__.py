@@ -4,7 +4,7 @@
 откатывается на `adb shell` — см. fallback.py.
 """
 from .apps import (
-    current_app, grant, install, launch_app, open_url, recent_packages, stop_app, uninstall,
+    close_recent, current_app, grant, install, launch_app, open_url, recent_packages, stop_app, uninstall,
 )
 from .capture import save_screenshot, screenshot
 from .diagnostics import clear_logcat, dump_hierarchy, logcat_tail
@@ -19,7 +19,7 @@ from .stability import wait_stable
 __all__ = [
     "size", "forget_size", "to_pixels", "humanize",
     "tap", "long_tap", "swipe", "text", "key", "wake", "unlock", "KEYCODES",
-    "launch_app", "stop_app", "recent_packages", "open_url", "install", "uninstall", "grant",
+    "launch_app", "stop_app", "recent_packages", "close_recent", "open_url", "install", "uninstall", "grant",
     "current_app",
     "screenshot", "save_screenshot",
     "dump_hierarchy", "logcat_tail", "clear_logcat",
