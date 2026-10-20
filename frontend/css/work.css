@@ -1026,3 +1026,19 @@ button.held-shot:hover {
 .inbox-item h4 { margin: 0 0 var(--s2); font-size: var(--fs-3); }
 .inbox-failed p { margin: 0 0 var(--s2); color: var(--bad); font-size: var(--fs-2); }
 .inbox-acts { display: flex; gap: var(--s2); flex-wrap: wrap; }
+
+/* Советы перед первой записью. */
+.tips { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s3); }
+.tips li { display: flex; gap: var(--s3); align-items: flex-start; }
+.tips p { margin: var(--s1) 0 0; color: var(--dim); font-size: var(--fs-2); }
+.tips-n {
+    flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: var(--fs-2);
+}
+
+/* Поиск и фильтры списка сценариев. */
+#scTools {
+    position: sticky; top: 0; z-index: 1; display: grid; gap: var(--s2);
+    padding: var(--s3) var(--s4); background: var(--bg); border-bottom: 1px solid var(--line-soft);
+}
+#scTools .seg { flex-wrap: wrap; }

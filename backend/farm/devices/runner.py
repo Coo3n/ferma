@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import shutil
@@ -509,7 +510,7 @@ def sweep_artifacts(now: float | None = None) -> int:
     return removed
 
 
-def _mark_failed_step(job: Job, ctx) -> None:
+def _mark_failed_step(job: Job, ctx, art_dir: Path | None = None, sc=None) -> None:
     """Снимок падения и точка последнего нажатия — к упавшему шагу отчёта.
 
     Фото одно на запуск (его и так снимает `_collect_failure_artifacts`):
@@ -520,6 +521,16 @@ def _mark_failed_step(job: Job, ctx) -> None:
     last = job.timeline[-1]
     last["status"] = "failed"
     last["shot"] = "99_failure.jpg"
+    # Слепок цели из записи («что ожидали увидеть») — рядом с кадром падения.
+    try:
+        if art_dir is not None and sc is not None and getattr(sc, "recorded", False):
+            steps = (recorder_save.load_recipe(sc.key) or {}).get("steps", [])
+            crop = steps[last["i"]].get("crop") if 0 <= last["i"] < len(steps) else None
+            if crop:
+                (art_dir / "99_expected.png").write_bytes(base64.b64decode(crop))
+                last["expected"] = "99_expected.png"
+    except Exception as e:  # noqa: BLE001 — отчёт важнее слепка
+        job.add_line(f"слепок шага не сохранён: {e}")
     tap = getattr(ctx, "last_tap", None)
     if tap:
         last["tap"] = [round(min(1, max(0, tap[0])), 4), round(min(1, max(0, tap[1])), 4)]
@@ -637,7 +648,7 @@ def _execute(job: Job) -> None:
         # Сначала артефакты, потом отклонение: оно ссылается на слепок
         # преграды, и до его записи ссылаться было бы не на что.
         _collect_failure_artifacts(job, art_dir)
-        _mark_failed_step(job, ctx)
+        _mark_failed_step(job, ctx, art_dir, sc)
         try:
             idx = (step_index_from_exc(e, sc.path, verified_line_map(sc))
                    if sc is not None else -1)

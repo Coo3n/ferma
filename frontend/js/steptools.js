@@ -1157,7 +1157,9 @@ function jobStepListHtml(job) {
         const shot = st.shot ? `<figure class="jshot"><div class="jimg">
             <img src="/api/jobs/${esc(job.id)}/artifacts/${encodeURIComponent(st.shot)}" alt="" loading="lazy">
             ${st.tap ? `<i class="jtap" style="left:${st.tap[0] * 100}%;top:${st.tap[1] * 100}%"></i>` : ''}</div>
-            <figcaption>${esc(st.tap ? t('job.shot_tap') : t('job.shot_fail'))}</figcaption></figure>` : '';
+            <figcaption>${esc(st.tap ? t('job.shot_tap') : t('job.shot_fail'))}</figcaption></figure>`
+            + (st.expected ? `<figure class="jshot jexp"><div class="jimg"><img src="/api/jobs/${esc(job.id)}/artifacts/${encodeURIComponent(st.expected)}" alt="" loading="lazy"></div>
+            <figcaption>${esc(t('job.shot_expected'))}</figcaption></figure>` : '') : '';
         return `<li class="jstep ${esc(st.status)}"><span class="jn">${st.i + 1}</span>
             <span class="jl">${esc(st.label || '')}</span>
             <small>${esc(JSTEP_WORDS[st.status] || st.status)} · ${st.secs != null ? st.secs + ' с' : ''}${st.n > 1 ? ' · ×' + st.n : ''}</small>${shot}</li>`;

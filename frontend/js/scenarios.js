@@ -21,14 +21,7 @@ async function loadScenarios(reload) {
     scRecipeCache.clear();
     S.scenarios = list;
 
-    setHTML($('scList'), S.scenarios.length
-        ? scListHtml(S.scenarios)
-        : emptyBig({
-            art: 'scenario',
-            title: 'Ни одного сценария',
-            text: 'Запишите действия на одном телефоне — ферма повторит на всех.',
-            action: {label: 'Создать записью', icon: 'record', onClick: 'recNew()'},
-        }));
+    scRenderList();
 
     setText($('scenCount'), S.scenarios.length ? `всего: ${S.scenarios.length}` : '');
 
@@ -36,6 +29,55 @@ async function loadScenarios(reload) {
     if (!S.scenario && S.scenarios.length) pickScenario(scOrdered(S.scenarios)[0].key);
     else renderParams();
     renderRunbar();
+}
+
+/* Поиск и фильтры: сценариев набегает много, а искать глазами по списку
+   тяжело. Панель собирается один раз, чтобы набор текста не терял фокус;
+   перерисовываются только карточки. */
+const SC_FILTER = {q: '', kind: 'all'};
+const scKinds = () => [['all', t('scen.f_all')], ['bad', t('scen.f_bad')], ['mine', t('scen.f_mine')]];
+
+function scVisible(list) {
+    const q = SC_FILTER.q.trim().toLowerCase();
+    return list.filter(s => {
+        if (SC_FILTER.kind === 'bad' && !(s.failed || s.error)) return false;
+        if (SC_FILTER.kind === 'mine' && s.template) return false;
+        return !q || (s.name + ' ' + (s.description || '')).toLowerCase().includes(q);
+    });
+}
+
+function scRenderList() {
+    const box = $('scList');
+    if (!S.scenarios.length) {
+        setHTML(box, emptyBig({
+            art: 'scenario',
+            title: 'Ни одного сценария',
+            text: 'Запишите действия на одном телефоне — ферма повторит на всех.',
+            action: {label: 'Создать записью', icon: 'record', onClick: 'recNew()'},
+        }));
+        return;
+    }
+    if (!$('scTools')) {
+        box.innerHTML = `<div id="scTools">
+            <input type="search" id="scQ" placeholder="${esc(t('scen.poisk'))}" aria-label="${esc(t('scen.poisk'))}">
+            <div class="seg" role="group">${scKinds().map(([k, label]) =>
+                `<button class="sm" data-k="${k}" onclick="scSetKind('${k}')">${esc(label)}</button>`).join('')}</div>
+            <button class="sm ghost" onclick="recTipsOpen()">${esc(t('tips.link'))}</button></div>
+            <div id="scCards"></div>`;
+        $('scQ').addEventListener('input', ev => {
+            SC_FILTER.q = ev.target.value;
+            scRenderList();
+        });
+    }
+    box.querySelectorAll('#scTools .seg button').forEach(b => b.classList.toggle('on', b.dataset.k === SC_FILTER.kind));
+    const shown = scVisible(S.scenarios);
+    setHTML($('scCards'), shown.length ? scListHtml(shown)
+        : `<p class="dim" style="padding:var(--s4)">${esc(t('scen.nichego'))}</p>`);
+}
+
+function scSetKind(kind) {
+    SC_FILTER.kind = kind;
+    scRenderList();
 }
 
 /* Готовые шаблоны (TEMPLATE = True в файле: прогрев и т.п.) — отдельной
@@ -141,7 +183,7 @@ function pickScenario(key) {
     renderParams();
     const cards = document.querySelectorAll('#scList .sc');
     cards.forEach(el => el.classList.remove('on'));
-    const index = scOrdered(S.scenarios).findIndex(s => s.key === key);
+    const index = scOrdered(scVisible(S.scenarios)).findIndex(s => s.key === key);
     if (cards[index]) cards[index].classList.add('on');
 }
 
