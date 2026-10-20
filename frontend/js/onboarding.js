@@ -6,6 +6,7 @@
 
 const ONB_SEEN_KEY = 'farm.onb.tour';        // sessionStorage: тур уже показан
 const ONB_OFF_KEY = 'farm.onb.off';          // localStorage: «больше не показывать»
+const ONB_DONE_KEY = 'farm.onb.done';        // localStorage: знакомство уже было — один раз навсегда
 const ONB = {tour: null, step: 0, opener: null};
 
 function onbSession(key, value) {
@@ -163,6 +164,8 @@ function onbOpen() {
     ONB.tour = onbSlides();
     ONB.step = 0;
     onbSession(ONB_SEEN_KEY, '1');
+    if (window.coachAutoUsed) coachAutoUsed(true);   // после знакомства экранные туры сами не лезут
+    if (window.store) store.set(ONB_DONE_KEY, true);
     const root = document.createElement('div');
     root.className = 'onb';
     root.id = 'onb';
@@ -261,12 +264,12 @@ document.addEventListener('keydown', ev => {
 /* Приветствие: после загрузки, когда ничто не мешает. Метим «показано» только
    в момент показа — тогда занятый экран (модалка, запись) не съедает тур. */
 (function autoTour() {
-    if (onbOff() || onbSession(ONB_SEEN_KEY)) return;
+    if (onbOff() || onbSession(ONB_SEEN_KEY) || (window.store && store.get(ONB_DONE_KEY, false))) return;
     let tries = 0;
     const timer = setInterval(() => {
-        if (++tries > 20) return clearInterval(timer);
+        if (++tries > 100) return clearInterval(timer);
         if (document.hidden || onbBusy() || document.documentElement.classList.contains('boot')) return;
         clearInterval(timer);
         onbOpen();
-    }, 800);
+    }, 200);
 })();

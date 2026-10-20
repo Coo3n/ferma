@@ -9,7 +9,8 @@
    список), молча пропускается — подсвечивать пустоту хуже, чем промолчать.
    Тексты — литералами t('…') внутри функций: так их видит тест строк. */
 
-const COACH_SEEN_KEY = 'farm.coach.seen';   // sessionStorage: экраны, где тур уже был
+const COACH_SEEN_KEY = 'farm.coach.seen';   // localStorage: экраны, где тур уже был — навсегда
+const COACH_AUTO_KEY = 'farm.coach.auto';   // sessionStorage: сам тур за сессию уже показан
 const COACH_OFF_KEY = 'farm.onb.off';       // общий с onboarding.js «больше не показывать»
 const COACH = {key: '', steps: [], i: 0, opener: null, raf: 0, lastScreen: ''};
 
@@ -32,7 +33,7 @@ const COACH_TOURS = {
     builder: () => [
         {sel: '#btnRecStart', title: t('coach.build_rec_t'), text: t('coach.build_rec')},
         {sel: ['#recSteps', '#recScheme'], title: t('coach.build_steps_t'), text: t('coach.build_steps')},
-        {sel: '#recSteps .rs-acts button', title: t('coach.build_one_t'), text: t('coach.build_one')},
+        {sel: '#recSteps .rs', title: t('coach.build_one_t'), text: t('coach.build_one')},
         {sel: 'button[onclick="recLibOpen()"]', title: t('coach.build_add_t'), text: t('coach.build_add')},
         {sel: '#btnRecRun', title: t('coach.build_check_t'), text: t('coach.build_check')},
         {sel: '#btnRecSave', title: t('coach.build_save_t'), text: t('coach.build_save')},
@@ -45,7 +46,7 @@ const COACH_TOURS = {
     jobs: () => [
         {sel: '#view-jobs .runs-seg', title: t('coach.jobs_tabs_t'), text: t('coach.jobs_tabs')},
         {sel: '#jobList .rgroup', title: t('coach.jobs_group_t'), text: t('coach.jobs_group')},
-        {sel: '#jobList', title: t('coach.jobs_list_t'), text: t('coach.jobs_list')},
+        {sel: '#jobList', part: true, title: t('coach.jobs_list_t'), text: t('coach.jobs_list')},
         {sel: '#btnCancelAll', title: t('coach.jobs_stop_t'), text: t('coach.jobs_stop')},
     ],
     deviations: () => [
@@ -56,7 +57,7 @@ const COACH_TOURS = {
         {sel: 'button[onclick="accAdd()"]', title: t('coach.acc_add_t'), text: t('coach.acc_add')},
         {sel: 'button[onclick="accImport()"]', title: t('coach.acc_import_t'), text: t('coach.acc_import')},
         {sel: '#btnAccAutobind', title: t('coach.acc_bind_t'), text: t('coach.acc_bind')},
-        {sel: '#accList', title: t('coach.acc_list_t'), text: t('coach.acc_list')},
+        {sel: '#accList', part: true, title: t('coach.acc_list_t'), text: t('coach.acc_list')},
     ],
     run: () => [
         {sel: '#rdScen', title: t('coach.run_scen_t'), text: t('coach.run_scen')},
@@ -67,12 +68,24 @@ const COACH_TOURS = {
     ],
 };
 
+/* Какие экраны уже показывали — помним навсегда: одно и то же дважды
+   человеку не надо, «?» всегда покажет снова. */
 function coachSession(value) {
+    if (value === undefined) {
+        const seen = window.store ? store.get(COACH_SEEN_KEY, []) : [];
+        return Array.isArray(seen) ? seen : [];
+    }
+    if (window.store) store.set(COACH_SEEN_KEY, value);
+}
+
+/* Сам тур — не чаще одного за сессию, и не после приветствия: иначе подряд
+   идут два «знакомства». Остальные ждут своего часа по «?». */
+function coachAutoUsed(mark) {
     try {
-        if (value === undefined) return (sessionStorage.getItem(COACH_SEEN_KEY) || '').split(',').filter(Boolean);
-        sessionStorage.setItem(COACH_SEEN_KEY, value.join(','));
+        if (mark) sessionStorage.setItem(COACH_AUTO_KEY, '1');
+        return !!sessionStorage.getItem(COACH_AUTO_KEY);
     } catch (e) {
-        return [];
+        return false;
     }
 }
 
@@ -81,12 +94,12 @@ function coachOff() {
 }
 
 /* Какой экран сейчас перед человеком — ключ тура или ''. */
-function coachScreen() {
+function coachScreen(force) {
     const modal = $('modal');
     if (modal && modal.classList.contains('on')) return $('rdGo') ? 'run' : '';
     if (S.view === 'device') {
         if (!window.REC) return '';
-        if (REC.on) return '';   // идёт запись шагов — не мешаем
+        if (REC.on && !force) return '';   // идёт запись шагов — сами не мешаем, по «?» покажем
         return window.pultOn && pultOn() ? 'pult' : 'builder';
     }
     return COACH_TOURS[S.view] ? S.view : '';
@@ -95,9 +108,14 @@ function coachScreen() {
 function coachVisible(el) {
     if (!el) return false;
     const r = el.getBoundingClientRect();
-    if (r.width < 4 || r.height < 4) return false;
+    if (r.width < 24 || r.height < 16) return false;   // точка-пустышка не в счёт
     const st = getComputedStyle(el);
-    return st.visibility !== 'hidden' && st.display !== 'none';
+    if (st.visibility === 'hidden' || st.display === 'none') return false;
+    /* Тихие кнопки строки прозрачны до наведения — подсвечивать пустоту нельзя. */
+    for (let n = el; n && n !== document.body; n = n.parentElement) {
+        if (parseFloat(getComputedStyle(n).opacity) < .3) return false;
+    }
+    return true;
 }
 
 function coachFind(step) {
@@ -110,13 +128,14 @@ function coachFind(step) {
     return null;
 }
 
-function coachStart(key, manual) {
+function coachStart(key, manual, auto) {
     const make = COACH_TOURS[key];
     if (!make || COACH.key) return false;
     const steps = make().filter(step => coachFind(step));
     if (!steps.length) return false;
     const seen = coachSession();
     if (!seen.includes(key)) coachSession([...seen, key]);
+    if (auto) coachAutoUsed(true);
     COACH.key = key;
     COACH.steps = steps;
     COACH.i = 0;
@@ -174,12 +193,21 @@ const COACH_PAD = 6, COACH_GAP = 14, COACH_EDGE = 12;
 function coachPlace() {
     const root = $('coach');
     if (!root || !COACH.el) return;
+    if (!COACH.el.isConnected || !coachVisible(COACH.el)) {
+        /* Список перерисовали или элемент исчез — ищем заново, иначе рамка висит в пустоте. */
+        const again = coachFind(COACH.steps[COACH.i]);
+        if (!again) return coachGo(1);
+        COACH.el = again;
+    }
     const r = COACH.el.getBoundingClientRect();
     const vw = innerWidth, vh = innerHeight;
     const hole = root.querySelector('.coach-hole');
     const x = Math.max(COACH_EDGE / 2, r.left - COACH_PAD), y = Math.max(COACH_EDGE / 2, r.top - COACH_PAD);
     const w = Math.min(vw - x - COACH_EDGE / 2, r.right + COACH_PAD - x);
-    const h = Math.min(vh - y - COACH_EDGE / 2, r.bottom + COACH_PAD - y);
+    let h = Math.min(vh - y - COACH_EDGE / 2, r.bottom + COACH_PAD - y);
+    /* Список на весь экран: рамка — только на верх (первые строки), иначе
+       карточка ляжет поверх подсвеченного и читать нечего. */
+    if (COACH.steps[COACH.i].part && r.height > vh * .5) h = Math.min(h, Math.round(vh * .4));
     Object.assign(hole.style, {left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px'});
 
     const card = root.querySelector('.coach-card');
@@ -234,7 +262,7 @@ function coachClose() {
 /* «?» в шапке: тур текущего экрана; где своего нет — общий тур. */
 function coachHelp() {
     if (COACH.key) coachClose();
-    if (!coachStart(coachScreen(), true) && window.onbOpen) onbOpen();
+    if (!coachStart(coachScreen(true), true) && window.onbOpen) onbOpen();
 }
 
 /* Из карточки тура — к общему знакомству со всей фермой. */
@@ -275,11 +303,12 @@ document.addEventListener('keydown', ev => {
     if (ev.key !== 'Tab') ev.preventDefault();
 }, true);
 
-/* Показ сам собой: раз в секунду смотрим, какой экран перед человеком.
+/* Показ сам собой: четыре раза в секунду смотрим, какой экран перед человеком.
    Сменился и тура тут ещё не было — ждём, пока экран дорисуется, и
    показываем. Дёшево: ни одного запроса, только чтение DOM. */
 setInterval(() => {
-    if (COACH.key || document.hidden || coachOff()) return;
+    if (COACH.key) return coachReflow();   // рамка следует за элементом, если экран двигается сам
+    if (document.hidden || coachOff() || coachAutoUsed()) return;
     if ($('onb')) return;   // идёт общий тур
     const key = coachScreen();
     if (key !== COACH.lastScreen) {
@@ -287,7 +316,7 @@ setInterval(() => {
         COACH.since = Date.now();
         return;
     }
-    if (!key || Date.now() - COACH.since < 900) return;
+    if (!key || Date.now() - COACH.since < 350) return;
     if (coachSession().includes(key)) return;
-    coachStart(key);
-}, 1000);
+    coachStart(key, false, true);
+}, 250);
