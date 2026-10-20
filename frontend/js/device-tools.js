@@ -89,7 +89,7 @@ function devToolsOpen() {
    вписали код приложения руками. */
 function packageField() {
     const typed = $('pkgInput').value.trim();
-    const hit = (APP_PICK.byDevice[S.active] || []).find(a => a.label.toLowerCase() === typed.toLowerCase());
+    const hit = ((APP_PICK.byDevice[S.active] || {}).rows || []).find(a => a.label.toLowerCase() === typed.toLowerCase());
     return hit ? hit.package : typed;
 }
 

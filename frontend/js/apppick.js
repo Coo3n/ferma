@@ -10,6 +10,36 @@ const APP_OTHER = '__other__';
 /* [{package, label}] по телефону + приложения из библиотеки APK: шагу
    «Приложение готово» нужно выбрать и то, чего на телефоне ещё нет.
    Кэш на телефон: форма открывается часто. */
+/* Подписи приложений без повторов — везде одним способом: выбор приложения
+   в шаге, массовые действия, пульт. Настоящие имена бывают одинаковыми (у
+   Яндекса несколько «Яндекс»): тогда дописываем слово из пакета. */
+function appTail(pkg) {
+    const parts = String(pkg).split('.').filter(p => p.length > 1 && !REC_PKG_NOISE.has(p.toLowerCase()));
+    const w = parts[parts.length - 1] || String(pkg);
+    return w[0].toUpperCase() + w.slice(1);
+}
+
+function appDistinct(list) {
+    const count = {};
+    list.forEach(a => { const k = a.label.toLowerCase(); count[k] = (count[k] || 0) + 1; });
+    return list.map(a => count[a.label.toLowerCase()] > 1
+        ? Object.assign({}, a, {label: `${a.label} · ${appTail(a.package)}`}) : a);
+}
+
+/* Настоящее имя, если его уже где-то узнали (пульт, выбор приложения). */
+function appKnownLabel(pkg) {
+    for (const map of Object.values((window.PULT && PULT.labels) || {})) if (map[pkg]) return map[pkg];
+    for (const entry of Object.values(APP_PICK.byDevice)) {
+        const hit = (entry.rows || []).find(a => a.package === pkg && a.real);
+        if (hit) return hit.label;
+    }
+    return '';
+}
+
+function appLabel(pkg) {
+    return appKnownLabel(pkg) || recApp(pkg).replace(/[«»]/g, '');
+}
+
 async function appChoices(serial) {
     let lib = [];
     try {
@@ -17,8 +47,11 @@ async function appChoices(serial) {
     } catch (e) {
         lib = [];
     }
-    if (!serial) return lib;
-    if (!APP_PICK.byDevice[serial]) {
+    if (!serial) return appDistinct(lib);
+    const cached = APP_PICK.byDevice[serial];
+    /* Сервер отдаёт названия, какие успел; остальные доберёт — неполный
+       список через 5 с спрашиваем снова, а не держим «Yandex» навсегда. */
+    if (!cached || (cached.partial && Date.now() - cached.at > 5000)) {
         let rows = [];
         try {
             rows = await api(`/api/devices/${serial}/apps`);
@@ -31,12 +64,13 @@ async function appChoices(serial) {
         }
         const mapped = rows.map(r => ({
             package: r.package,
-            label: r.label || recApp(r.package).replace(/[«»]/g, ''),
+            label: r.label || appLabel(r.package),
+            real: !!r.label,
         }));
-        if (!rows.length) return mergeApps(mapped, lib);   // сбой не запоминаем
-        APP_PICK.byDevice[serial] = mapped;
+        if (!rows.length) return appDistinct(mergeApps(mapped, lib));   // сбой не запоминаем
+        APP_PICK.byDevice[serial] = {rows: mapped, at: Date.now(), partial: mapped.some(a => !a.real)};
     }
-    return mergeApps(APP_PICK.byDevice[serial], lib);
+    return appDistinct(mergeApps(APP_PICK.byDevice[serial].rows, lib));
 }
 
 function mergeApps(base, lib) {
@@ -47,8 +81,8 @@ function mergeApps(base, lib) {
 }
 
 function appLabelOf(serial, pkg) {
-    const hit = ((APP_PICK.byDevice[serial] || []).find(a => a.package === pkg));
-    return hit ? hit.label : recApp(pkg).replace(/[«»]/g, '');
+    const hit = (((APP_PICK.byDevice[serial] || {}).rows) || []).find(a => a.package === pkg);
+    return hit ? hit.label : appLabel(pkg);
 }
 
 /* Разметка: список приложений + поле «другое», пока скрытое. Заполняется
@@ -70,7 +104,7 @@ async function appPickFill(id) {
     const draw = list => {
         const known = list.some(a => a.package === current);
         const rows = list.slice();
-        if (current && !known) rows.unshift({package: current, label: recApp(current).replace(/[«»]/g, '')});
+        if (current && !known) rows.unshift({package: current, label: appLabel(current)});
         select.innerHTML = (current ? '' : `<option value="" disabled selected>${esc(t('app.vyberite'))}</option>`)
             + rows.map(a => `<option value="${esc(a.package)}" title="${esc(a.package)}"
                 ${a.package === current ? 'selected' : ''}>${esc(a.label)}</option>`).join('')

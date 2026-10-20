@@ -22,6 +22,10 @@ assert.strictEqual(app('com.samsung.android.messaging'), '«Messaging»');
 assert.strictEqual(app('com.google.android.apps.maps'), '«Maps»');
 assert.strictEqual(app('com.example.app.dev'), '«Example»');
 assert.notStrictEqual(app('com.samsung.android.dialer'), app('com.samsung.android.calendar'));
+// Разные приложения одной компании не сливаются в одно «Yandex».
+assert.strictEqual(app('com.yandex.music'), '«Yandex Music»');
+assert.strictEqual(app('ru.yandex.searchplugin'), '«Yandex Searchplugin»');
+assert.strictEqual(app('ru.yandex.yandexmaps'), '«Yandex Maps»');
 """
 
 

@@ -304,10 +304,22 @@ const REC_PKG_BRANDS = new Set(['samsung', 'sec', 'google', 'miui', 'xiaomi', 'h
     'sonymobile', 'asus', 'honor', 'meizu', 'zte', 'htc', 'lge', 'nokia', 'hmd', 'qualcomm',
     'mediatek', 'tecno', 'infinix', 'transsion']);
 
+/* Компания + продукт: ru.yandex.searchplugin → «Yandex Searchplugin»,
+   com.yandex.music → «Yandex Music». Раньше бралось первое слово, и у всех
+   приложений Яндекса подпись была одна — «Yandex». */
 function recAppWord(pkg) {
     const parts = String(pkg || '').split('.').filter(p => p.length > 2
         && !REC_PKG_NOISE.has(p.toLowerCase()));
-    return parts.find(p => !REC_PKG_BRANDS.has(p.toLowerCase())) || parts[0] || '';
+    const own = parts.filter(p => !REC_PKG_BRANDS.has(p.toLowerCase()));
+    if (!own.length) return parts[0] || '';
+    const cap = w => w[0].toUpperCase() + w.slice(1);
+    if (own.length < 2) return own[0];
+    /* yandexmaps → Maps: продукт без повтора имени компании. */
+    let product = own[own.length - 1];
+    if (product.toLowerCase().startsWith(own[0].toLowerCase()) && product.length > own[0].length + 2) {
+        product = product.slice(own[0].length);
+    }
+    return `${cap(own[0])} ${cap(product)}`;
 }
 
 function ensureAppLabel(a) {
@@ -320,6 +332,8 @@ function ensureAppLabel(a) {
 
 function recApp(pkg) {
     if (REC_APPS[pkg]) return `«${REC_APPS[pkg]}»`;
+    const known = typeof appKnownLabel === 'function' ? appKnownLabel(pkg) : '';   // имя с телефона, если уже узнали
+    if (known) return `«${known}»`;
     const word = recAppWord(pkg);
     return word ? `«${word[0].toUpperCase()}${word.slice(1)}»` : pkg;
 }

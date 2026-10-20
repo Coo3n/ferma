@@ -202,7 +202,7 @@ async function pultAppLabels(serial) {
 
 function pultAppName(serial, pkg) {
     const real = ((PULT.labels || {})[serial] || {})[pkg];
-    return real || recApp(pkg).replace(/[«»]/g, '');
+    return real || appLabel(pkg);
 }
 
 function pultAppsRender(serial) {
@@ -249,7 +249,7 @@ function pultAppsRender(serial) {
     const match = r => !needle || r.name.toLowerCase().includes(needle) || r.pkg.toLowerCase().includes(needle);
     const shown = tabRows.filter(match);
     const chip = r => `<button class="chip" data-live data-pkg="${esc(r.pkg)}" title="${esc(r.pkg)}">${pultAvatar(r.name, r.pkg)}${esc(r.name)}${
-        r.dup ? ` <small class="dim">${esc(r.pkg.split('.').slice(-2).join('.'))}</small>` : ''}</button>`;
+        r.dup ? ` <small class="dim">${esc(appTail(r.pkg))}</small>` : ''}</button>`;
     let html = shown.map(chip).join('');
     if (!shown.length) html = `<span class="dim">${t('pult.nichego_ne_nashlos')}</span>`;
     const list = box.querySelector('.pult-app-list');

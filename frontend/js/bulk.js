@@ -434,9 +434,10 @@ async function bulkLoadApps() {
     try {
         const res = await api('/api/bulk/packages?serials=' + encodeURIComponent(serials.join(',')));
         if (!$('bulkApp')) return;   // окно уже закрыли
-        sel.innerHTML = res.apps.length
-            ? res.apps.map(a => `<option value="${esc(a.package)}" title="${esc(a.package)}">${
-                esc(recApp(a.package).replace(/[«»]/g, ''))} — ${a.count === res.total ? 'на всех' : `на ${a.count} из ${res.total}`}</option>`).join('')
+        const named = appDistinct(res.apps.map(a => Object.assign({label: appLabel(a.package)}, a)));
+        sel.innerHTML = named.length
+            ? named.map(a => `<option value="${esc(a.package)}" title="${esc(a.package)}">${
+                esc(a.label)} — ${a.count === res.total ? 'на всех' : `на ${a.count} из ${res.total}`}</option>`).join('')
             : '<option value="">на телефонах нет установленных приложений</option>';
     } catch (e) {
         sel.innerHTML = `<option value="">не удалось получить список: ${esc(e.message)}</option>`;
