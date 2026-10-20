@@ -910,5 +910,22 @@
   "jobs.dl_steps_t": "Шаги",
   "jobs.dl_steps": "Каждый шаг; у упавшего — ссылка на снимок",
   "pult.prodolzhit_pravku": "Продолжить правку",
-  "pult.prodolzhit_pravku_title": "Вернуться к правке сценария «{name}»"
+  "pult.prodolzhit_pravku_title": "Вернуться к правке сценария «{name}»",
+  "held.pokazat_kak": "Показать, как быть",
+  "held.popravil": "Я поправил — продолжить",
+  "held.ekran_nuzhnyy": "Экран тот — продолжить",
+  "held.ukazat": "Указать на снимке, куда нажать",
+  "held.povtorit": "Повторить шаг",
+  "held.otkryt_telefon": "Открыть телефон",
+  "held.zavershit": "Завершить со сбоем",
+  "held.shag_n": "Шаг {n}",
+  "held.zhdet_min": "ждёт {n} мин",
+  "held.eshe": "Ещё",
+  "held.chto_lost": "Телефон ушёл с нужного экрана. Поправьте экран или покажите, как быть.",
+  "held.chto_blind": "Кнопку не нашли — нажали туда, где она была при записи. Посмотрите на снимок: экран тот?",
+  "held.chto_miss": "Не нашли, куда нажать. Поправьте экран на телефоне или укажите кнопку на снимке.",
+  "held.k_zapusku": "К запуску",
+  "held.k_stsenariyu": "К сценарию",
+  "job.nazhat_x": "Нажать «{x}»",
+  "job.nazhat": "Нажать"
 }

@@ -1271,3 +1271,4 @@ body.rec-picking .stage, body.rec-picking #recLayer { cursor: crosshair; }
 }
 .addpick-ic .ic, .addpick-card.compact .addpick-ic .ic { width: 18px; height: 18px; }
 .addpick-card.compact { min-height: 52px; }
+.rs-more-btn .ic { width: 18px; height: 18px; }

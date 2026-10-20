@@ -3112,7 +3112,7 @@ function recRow(step, index) {
                 onclick="event.stopPropagation();recRunStep(${index})">${recIcon('play')}</button>
         <button class="sm ghost rs-more-btn" title="${esc(t('rec.m_esche'))}" aria-label="${esc(t('rec.m_esche'))}"
                 aria-haspopup="menu"
-                onclick="event.stopPropagation();recRowMenu(event, ${step.id})">⋯</button>
+                onclick="event.stopPropagation();recRowMenu(event, ${step.id})">${recIcon('more')}</button>
       </span>
     </div>
     <div class="rs-body">${recMark(step, open)}${open ? recStepBody(step, index) : ''}</div>

@@ -1082,3 +1082,59 @@ button.held-shot:hover {
 .ta-pill-bad { fill: var(--panel2); stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .ta-arrow { fill: none; stroke: var(--dim); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 560px) { .tips { grid-template-columns: 1fr; } }
+
+/* Карточка решения: какой шаг · что случилось одной строкой · одна главная
+   кнопка и пара простых; редкое и необратимое — в «⋯». */
+.held-step { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; font-size: var(--fs-3); color: var(--text); }
+.held-step b { font-weight: 700; }
+.held-step span:not(.held-age) { color: var(--text2); }
+.held-age { margin-left: auto; color: var(--warn); font-size: var(--fs-1); font-variant-numeric: tabular-nums; }
+.held-what { margin: 4px 0 0; color: var(--text2); font-size: var(--fs-2); line-height: 1.45; max-width: 62ch; }
+.held-choice .held-acts { gap: var(--s2); margin-top: var(--s3); }
+.held-choice .held-main { font-size: var(--fs-2); padding: 0 var(--s3); }
+.held-more { position: relative; }
+.held-more > summary { list-style: none; cursor: pointer; min-width: 30px; justify-content: center; font-size: 16px; }
+.held-more > summary::-webkit-details-marker { display: none; }
+.held-pop {
+    position: absolute; left: 0; top: calc(100% + 4px); z-index: 30; min-width: 220px;
+    display: grid; gap: 2px; padding: var(--s2);
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--r2);
+    box-shadow: 0 10px 30px color-mix(in srgb, var(--bg) 70%, transparent);
+}
+.held-pop button { justify-content: flex-start; gap: var(--s2); min-height: 34px; border: 0; background: transparent;
+    font-size: var(--fs-2); color: var(--text); }
+.held-pop button::before { content: none; }
+.held-pop button:hover { background: var(--panel2); }
+.held-pop button.danger { color: var(--bad); }
+.held-pop .ic { width: 16px; height: 16px; color: var(--dim); }
+.held-pop button.danger .ic { color: var(--bad); }
+.held-bar .held-shot { width: 64px; height: 116px; }
+
+/* Карточка проблемы: миниатюра | главное. Где и когда — строкой под
+   заголовком (dvnMeta), колонки фактов справа больше нет. */
+#dvnList .dvn { grid-template-columns: auto minmax(0, 1fr); padding: var(--s4); gap: var(--s4); }
+#dvnList .dvn:not(.has-shot) { grid-template-columns: minmax(0, 1fr); }
+#dvnList .dvn-shot { width: 72px; }
+.dvn-title { margin: 2px 0 0; font-size: var(--fs-4); }
+.dvn-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin-top: 4px;
+    color: var(--dim); font-size: var(--fs-2); }
+.dvn-meta i { font-style: normal; color: var(--line-hover); }
+.dvn--hold .held-choice { margin-top: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--line-soft); }
+.dvn--hold .held-step { font-size: var(--fs-3); }
+
+/* «⋯» в карточке решения — квадратная кнопка в ряд с остальными. */
+.held-more > summary {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: var(--ctl, 32px); padding: 0; border-radius: var(--r1);
+    background: transparent; color: var(--text2); line-height: 1;
+}
+.held-more > summary:hover, .held-more[open] > summary { background: var(--panel2); color: var(--text); }
+.held-choice .held-acts { align-items: center; }
+
+/* Шапка: «работает N · ждёт вас» — ровный зазор между частями. */
+#stJobs { display: inline-flex; align-items: center; gap: var(--s3); }
+#stJobs:empty { display: none; }
+#stJobs .inbox-btn { margin: 0; }
+#dvnList { scrollbar-gutter: stable; }
+.held-more > summary .ic { width: 18px; height: 18px; }
+.held-pop { position: fixed; }

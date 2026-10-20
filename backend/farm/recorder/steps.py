@@ -108,7 +108,7 @@ FLEXIBLE = {"click", "tap", "long_tap", "swipe", "type", "key", "launch_app",
 RETRIES_MAX = 5
 
 _LABELS = {
-    "click": "Тап по элементу", "tap": "Тап", "long_tap": "Долгое нажатие",
+    "click": "Нажать", "tap": "Нажать в точку", "long_tap": "Долгое нажатие",
     "swipe": "Свайп", "type": "Ввод текста", "key": "Клавиша",
     "unlock": "Разблокировать", "launch_app": "Запуск приложения",
     "stop_app": "Остановка приложения", "open_url": "Открыть ссылку",
@@ -172,9 +172,15 @@ def label_of(step: dict) -> str:
     elif kind == "finish":
         tail = "с ошибкой" if args.get("result") == "fail" else "успешно"
     elif kind == "click":
-        m = re.search(r'(?:text|description|resourceId)\w*="([^"]{1,40})"',
-                      ((step.get("selector") or {}).get("args") or ""))
-        tail = m.group(1) if m else ""
+        # «Нажать «Нравится»» — по тексту на кнопке; нет текста — по имени
+        # элемента без пакета: com.vkontakte.android:id/iv_likes → iv_likes.
+        sel = ((step.get("selector") or {}).get("args") or "")
+        texts = [t for t in (step.get("texts") or []) if isinstance(t, str) and t.strip()]
+        m = re.search(r'(?:text|description)\w*="([^"]{1,40})"', sel)
+        rid = re.search(r'resourceId\w*="(?:[\w.]+:id/)?([^"]{1,40})"', sel)
+        word = texts[0][:40] if texts else m.group(1) if m else rid.group(1) if rid else ""
+        if word:
+            return f"{base} «{word}»" + (f" — {step['note']}" if step.get("note") and step["note"] != word else "")
     note = step.get("note")
     text = f"{base}: {tail}" if tail else base
     return f"{text} — {note}" if note else text

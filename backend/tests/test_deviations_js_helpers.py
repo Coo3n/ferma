@@ -12,7 +12,9 @@ const fs = require('fs'), vm = require('vm'), assert = require('assert');
 const esc = v => String(v ?? '').replace(/[&<>"]/g,
     c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const toasts = [];
-const ctx = {esc, S: {}, $: () => null, document: {}, window: {}, console,
+const STR = JSON.parse(fs.readFileSync(require('path').join(require('path').dirname(process.argv[1]), '..', 'strings', 'ru.json'), 'utf8'));
+const t = (k, p) => String(STR[k] ?? k).replace(/\{(\w+)\}/g, (_, n) => (p || {})[n] ?? '');
+const ctx = {esc, t, recIcon: id => `<svg data-i="${id}"></svg>`, S: {}, $: () => null, document: {}, window: {}, console,
              toast: (m, k) => toasts.push([m, k])};
 vm.createContext(ctx);
 vm.runInContext('let modalReturn = null;', ctx);
@@ -98,18 +100,19 @@ assert.strictEqual(got.mode, 'hold'); assert.strictEqual(got.jobId, 'j1');
 assert.strictEqual(got.dumpUrl, '/api/devices/a%2Fb%20c/inspect');
 assert.strictEqual(got.stepIndex, 0); assert.strictEqual(got.scenarioKey, 'k');
 const hh = h.holdActions(hold);
-// главное — указать на скрине; остальное мелким «или:», «уронить» последним
+// главное — указать на скрине; рядом пара простых ответов, остальное в «⋯»,
+// «завершить со сбоем» — последним пунктом меню
 assert(hh.includes('Указать на снимке, куда нажать'));
-assert(/class="sm accent held-main" onclick="deviationRepairHold\('cd34'\)"/.test(hh));
-assert(hh.indexOf('Указать') < hh.indexOf('или:'));
-assert(hh.indexOf('или:') < hh.indexOf('повторить шаг'));
-assert(hh.indexOf('открыть устройство') < hh.indexOf('завершить со сбоем'));
+assert(/class="sm primary held-main" onclick="deviationRepairHold\('cd34'\)"/.test(hh));
+assert(hh.indexOf('Указать') < hh.indexOf('повторить шаг'));
+assert(hh.indexOf('повторить шаг') < hh.indexOf('held-more'));
+assert(hh.indexOf('Открыть телефон') < hh.indexOf('Завершить со сбоем'));
 assert(!hh.includes('продолжить как есть'));
 // fail-кнопка только у fail: hold со скриншотом её не получает
 assert.strictEqual(h.deviationRepairButton({...hold, shot: 's.png'}), '');
 assert(!h.deviationCard({...hold, shot: 's.png'}).includes('Починить шаг'));
-assert.strictEqual((hh.match(/sm accent/g) || []).length, 1);
-assert.strictEqual((h.holdActions({...hold, scenario_key: ''}).match(/sm accent/g) || []).length, 1);
+assert.strictEqual((hh.match(/held-main/g) || []).length, 1);
+assert.strictEqual((h.holdActions({...hold, scenario_key: ''}).match(/held-main/g) || []).length, 1);
 // сервер сказал «кликом не чинится» — кнопки нет, хоть данные и есть
 ctx.S.jobs[0].repairable = false;
 assert(!h.holdActions(hold).includes('Указать на снимке'));
@@ -151,7 +154,7 @@ assert(/held-main" onclick="jobRepairHold\('j9'\)"/.test(bar));
 // миниатюра ведёт туда же, куда главная кнопка, а не в новую вкладку
 assert(/<button type="button" class="held-shot" onclick="jobRepairHold\('j9'\)"/.test(bar));
 assert(bar.includes("openDevice('s1')"));
-assert.strictEqual((bar.match(/accent/g) || []).length, 1);
+assert.strictEqual((bar.match(/held-main/g) || []).length, 1);
 // на самом устройстве «открыть устройство» лишнее
 const onDev = ctx.decisionBar(job, {onDevice: true});
 assert(!onDev.includes('openDevice'));

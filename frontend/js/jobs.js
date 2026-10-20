@@ -363,36 +363,38 @@ function heldChoiceHtml(job, opts) {
     const lost = job.held_kind === 'lost';
     const decide = код => `decideJob('${esc(job.id)}','${код}')`;
     const решения = jobDecisions(job.held_kind);
+    /* Одна главная кнопка — по тому, что вообще возможно (см. выше). */
     const главное = lost && job.held_obstacle ? {onclick: `teachDetour('${esc(job.id)}','${esc(job.held_obstacle)}')`,
-        icon: 'crosshair', label: 'Показать, как быть',
-        hint: 'Покажите кликами на телефоне, что делать на этом экране. Ферма запомнит и продолжит сама.'}
-        : lost ? {onclick: decide('retry'), icon: 'check', label: 'Я поправил — продолжить',
-            hint: 'Поправьте экран мышью на телефоне и продолжите.'}
-        : blind ? {onclick: decide('go'), icon: 'check', label: 'Экран нужный — продолжить',
-        hint: 'Шаг пройден вслепую. Экран на снимке верный — продолжайте.'}
-        : o.repair ? {onclick: o.repair, icon: 'crosshair', label: 'Указать на снимке, куда нажать',
-            hint: 'Кликните нужный элемент — шаг исправится и повторится.'}
-        : o.open ? {onclick: o.open, icon: 'external', label: 'Открыть телефон',
-            hint: 'Поправьте экран и нажмите «повторить шаг».'}
-        : {onclick: decide('retry'), icon: 'refresh', label: 'Повторить шаг',
-            hint: 'Поправьте экран мышью и повторите шаг.'};
-    const мелкие = решения
-        .filter(([код]) => код !== 'drop' && !(blind && код === 'go')
-            && !(!blind && !lost && !o.repair && !o.open && код === 'retry')
-            && !(lost && !job.held_obstacle && код === 'retry'))
-        .map(([код, подпись, зачем]) =>
-            `<button class="sm ghost" title="${esc(зачем)}" onclick="${decide(код)}">${esc(подпись)}</button>`);
-    if (o.open && главное.onclick !== o.open) {
-        мелкие.push(`<button class="sm ghost" title="Поправить экран руками" onclick="${o.open}">открыть телефон</button>`);
-    }
+        icon: 'crosshair', label: t('held.pokazat_kak'), code: 'teach'}
+        : lost ? {onclick: decide('retry'), icon: 'check', label: t('held.popravil'), code: 'retry'}
+        : blind ? {onclick: decide('go'), icon: 'check', label: t('held.ekran_nuzhnyy'), code: 'go'}
+        : o.repair ? {onclick: o.repair, icon: 'crosshair', label: t('held.ukazat'), code: 'repair'}
+        : o.open ? {onclick: o.open, icon: 'phone', label: t('held.otkryt_telefon'), code: 'open'}
+        : {onclick: decide('retry'), icon: 'refresh', label: t('held.povtorit'), code: 'retry'};
+    /* Рядом — не больше двух простых ответов; редкое и необратимое — в «⋯». */
+    const простые = решения.filter(([код]) => код !== 'drop' && код !== 'go' && код !== главное.code)
+        .slice(0, 2)
+        .map(([код, подпись, зачем]) => `<button class="sm" title="${esc(зачем)}" onclick="${decide(код)}">${esc(подпись)}</button>`);
+    const меню = [];
+    if (o.open && главное.code !== 'open') меню.push(`<button type="button" onclick="${o.open}">${recIcon('phone')}${esc(t('held.otkryt_telefon'))}</button>`);
+    (o.extra || []).forEach(([label, onclick, icon]) =>
+        меню.push(`<button type="button" onclick="${onclick}">${recIcon(icon || 'external')}${esc(label)}</button>`));
     const уронить = решения.find(([код]) => код === 'drop');
+    if (уронить) меню.push(`<button type="button" class="danger" onclick="${decide('drop')}">${recIcon('x')}${esc(t('held.zavershit'))}</button>`);
+    const step = Number.isInteger(job.step_index) && job.step_index >= 0
+        ? `<b>${esc(t('held.shag_n', {n: job.step_index + 1}))}</b>${job.step_label
+            ? ` · <span>${esc(window.jobLabelWords ? jobLabelWords(job.step_label) : job.step_label)}</span>` : ''}` : '';
+    const what = lost ? t('held.chto_lost') : blind ? t('held.chto_blind') : t('held.chto_miss');
+    const ждёт = job.held_at ? Math.max(1, Math.round((Date.now() / 1000 - job.held_at) / 60)) : 0;
     return `<div class="held-choice">
-      <button class="sm accent held-main" onclick="${главное.onclick}">
-        <svg class="ic" aria-hidden="true"><use href="#i-${главное.icon}"/></svg>${esc(главное.label)}</button>
-      <p class="held-hint">${esc(главное.hint)}</p>
-      <div class="held-acts"><span class="held-or">или:</span>${мелкие.join('')}
-        ${уронить ? `<button class="sm ghost held-drop" title="${esc(уронить[2])}"
-          onclick="${decide('drop')}">${esc(уронить[1])}</button>` : ''}</div>
+      ${step || ждёт ? `<div class="held-step">${step}${ждёт ? `<span class="held-age">${esc(t('held.zhdet_min', {n: ждёт}))}</span>` : ''}</div>` : ''}
+      <p class="held-what" title="${esc(job.held_reason || '')}">${esc(what)}</p>
+      <div class="held-acts">
+        <button class="sm primary held-main" onclick="${главное.onclick}">${recIcon(главное.icon)}${esc(главное.label)}</button>
+        ${простые.join('')}
+        ${меню.length ? `<details class="held-more"><summary class="sm ghost" aria-label="${esc(t('held.eshe'))}" title="${esc(t('held.eshe'))}">${recIcon('more')}</summary>
+          <div class="held-pop" role="menu">${меню.join('')}</div></details>` : ''}
+      </div>
     </div>`;
 }
 
@@ -439,8 +441,6 @@ function decisionBar(job, opts) {
     <div class="held-body">
       ${jobHeldShotHtml(job, repair)}
       <div class="held-text">
-        <div class="held-why"><svg class="ic"><use href="#i-alert"/></svg>
-          <span>${esc(job.held_reason || 'запуск ждёт решения')}</span></div>
         ${heldChoiceHtml(job, {repair, open: onDevice ? '' : `openDevice('${esc(job.serial)}')`})}
       </div>
     </div>

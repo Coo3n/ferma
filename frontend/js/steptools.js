@@ -162,10 +162,31 @@ document.addEventListener('pointerdown', ev => {
    висели открытыми, пока не нажмёшь на заголовок ещё раз. Фаза перехвата:
    экран телефона и холст схемы гасят всплытие своих нажатий. */
 document.addEventListener('pointerdown', ev => {
-    document.querySelectorAll('details.recmore[open], details.selbar-menu[open], details.dl-menu[open]').forEach(menu => {
+    document.querySelectorAll('details.recmore[open], details.selbar-menu[open], details.dl-menu[open], details.held-more[open]').forEach(menu => {
         if (!menu.contains(ev.target)) menu.open = false;
     });
     if (REC.menuFor != null && !ev.target.closest('.rs-menu, .rs-more-btn')) recRowMenuClose();
+}, true);
+
+/* Меню «⋯» карточки решения — поверх всего (fixed), а не внутри списка с
+   прокруткой: там оно обрезалось краем, появлялась полоса прокрутки, и
+   карточка съезжала вбок. Снизу мало места — открываем вверх. */
+document.addEventListener('toggle', ev => {
+    const menu = ev.target;
+    if (!(menu instanceof HTMLDetailsElement) || !menu.classList.contains('held-more') || !menu.open) return;
+    const pop = menu.querySelector('.held-pop');
+    const r = menu.querySelector('summary').getBoundingClientRect();
+    pop.style.position = 'fixed';
+    pop.style.left = Math.min(r.left, window.innerWidth - pop.offsetWidth - 8) + 'px';
+    const below = window.innerHeight - r.bottom - 8;
+    if (below < pop.offsetHeight && r.top > pop.offsetHeight + 8) {
+        pop.style.top = (r.top - pop.offsetHeight - 4) + 'px';
+    } else {
+        pop.style.top = (r.bottom + 4) + 'px';
+    }
+}, true);
+window.addEventListener('scroll', () => {
+    document.querySelectorAll('details.held-more[open]').forEach(menu => { menu.open = false; });
 }, true);
 
 /* ⌘/Ctrl+C при выделенных шагах — их подписи текстом, по строке на шаг:
@@ -1203,6 +1224,10 @@ const ST_SHOTS_KEY = 'farm.rec.shots';
 /* «Запуск приложения: com.vkontakte.android» → «… «VK»»: пакет знакомого
    приложения человеку ничего не говорит. */
 function jobLabelWords(label) {
+    /* Старая серверная подпись «Тап по элементу: pkg:id/iv_likes — «iv_likes»»
+       → «Нажать «iv_likes»»: человеку не нужен ни пакет, ни слово «элемент». */
+    const tap = /^Тап по элементу(?::\s*(?:[\w.]+:id\/)?([^\s—]+))?(?:\s+—\s+«?([^»]+)»?)?$/.exec(String(label || ''));
+    if (tap) return tap[2] || tap[1] ? t('job.nazhat_x', {x: tap[2] || tap[1]}) : t('job.nazhat');
     return String(label || '').replace(/\b[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+\b/gi,
         m => (window.REC_APPS && REC_APPS[m]) ? recApp(m) : m);
 }

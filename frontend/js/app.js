@@ -133,11 +133,11 @@ async function pollStatus() {
         /* «Ждёт вас» — кнопка: ждущие решения и свежие сбои одним окном
            (inbox.js), а не надпись, которую нельзя нажать. */
         const waiting = window.inboxCount ? Math.max(held, inboxCount()) : held;
-        setHTML($('stJobs'), (active
-            ? `работает <b>${jobs.running || 0}</b>`
-              + (jobs.queued ? ` · в очереди <b>${jobs.queued}</b>` : '')
-            : '')
-            + (waiting ? ` <button class="sm inbox-btn" onclick="inboxOpen()">${esc(t('inbox.zhdet_vas', {n: waiting}))}</button>` : ''));
+        /* «работает 0» рядом с «ждёт вас» ничего не говорило: показываем
+           только ненулевое, каждое — отдельным элементом с ровным зазором. */
+        setHTML($('stJobs'), (jobs.running ? `<span>работает <b>${jobs.running}</b></span>` : '')
+            + (jobs.queued ? `<span>в очереди <b>${jobs.queued}</b></span>` : '')
+            + (waiting ? `<button class="sm inbox-btn" onclick="inboxOpen()">${esc(t('inbox.zhdet_vas', {n: waiting}))}</button>` : ''));
 
         // Значок на «Задачах»: сколько работ в полёте прямо сейчас.
         const badge = $('navJobs');

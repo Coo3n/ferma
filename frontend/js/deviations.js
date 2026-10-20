@@ -154,11 +154,15 @@ function holdActions(item) {
     const задача = (S.jobs || []).find(j => j.id === item.job_id);
     /* Та же разметка, что у полосы в журнале задач (jobs.js: heldChoiceHtml):
        одна главная кнопка, остальное мелким «или:». */
-    return heldChoiceHtml(задача || {id: item.job_id}, {
+    const extra = [];
+    if (item.job_id) extra.push([t('held.k_zapusku'), `deviationToJob('${item.id}')`, 'activity']);
+    if (item.scenario_key) extra.push([t('held.k_stsenariyu'), `deviationToScenario('${item.id}')`, 'scroll']);
+    return heldChoiceHtml(задача || {id: item.job_id, step_index: item.step_index}, {
         /* repairable — вердикт сервера по рецепту (runner.hold_repairable). */
         repair: deviationRepairMode(item) === 'hold' && задача && задача.repairable
             ? `deviationRepairHold('${esc(item.id)}')` : '',
         open: `deviationToDevice('${esc(item.id)}')`,
+        extra,
     });
 }
 
@@ -332,25 +336,37 @@ function deviationCard(item) {
         ? `${devices.length} ${declOfNum(devices.length, ['телефон', 'телефона', 'телефонов'])}` : '';
     const thumb = deviationThumb(item);
     const step = Number.isInteger(item.step_index) && item.step_index >= 0 ? `, шаг ${item.step_index + 1}` : '';
+    /* Ждёт решения прямо сейчас: шаг, что случилось и кнопки — в карточке
+       решения; длинный технический заголовок и ссылки рядом были бы вторым
+       экземпляром того же. */
+    const waiting = item.kind === 'hold' && stillHeld(item);
     return `<article class="dvn dvn--${esc(item.kind)} ${item.seen ? 'seen' : ''} ${thumb ? 'has-shot' : ''}">
     ${thumb}
     <div class="dvn-main">
       <div class="dvn-kind" title="${esc(kind.hint)}"><i aria-hidden="true"></i>${esc(kind.label)}${item.seen ? '' : ' <span class="dvn-new">новое</span>'}</div>
-      <h3 class="dvn-title">${esc(item.title)}</h3>
-      ${item.detail ? `<p class="dvn-detail">${esc(item.detail)}</p>` : ''}
+      ${waiting ? `<h3 class="dvn-title">${esc(item.scenario_name || '')}</h3>` : `<h3 class="dvn-title">${esc(item.title)}</h3>`}
+      ${dvnMeta(item, waiting, phones, step)}
+      ${!waiting && item.detail ? `<p class="dvn-detail">${esc(item.detail)}</p>` : ''}
       ${deviationRepairButton(item)}
       ${holdActions(item)}
-      <div class="dvn-acts">${deviationActions(item)}</div>
+      ${waiting ? '' : `<div class="dvn-acts">${deviationActions(item)}</div>`}
     </div>
-    <dl class="dvn-facts">
-      ${item.scenario_name ? `<div><dt>Сценарий</dt><dd>${esc(item.scenario_name)}${step}</dd></div>` : ''}
-      ${phones ? `<div><dt>Где</dt><dd title="${esc(devices.join(', '))}">${phones}</dd></div>` : ''}
-      ${item.hits > 1 ? `<div><dt>Повторов</dt><dd>${item.hits}</dd></div>` : ''}
-      <div><dt>Когда</dt><dd class="dvn-age" data-at="${esc(item.last_at)}"></dd></div>
-    </dl>
     <button class="xdel" title="Убрать из списка" aria-label="Убрать проблему из списка"
             onclick="deviationDelete('${item.id}')">✕</button>
   </article>`;
+}
+
+/* Где и когда — одной тихой строкой под заголовком, а не колонкой справа:
+   «VK like · шаг 10 · Poco X3 · 3 мин назад». У ждущей решения сценарий уже
+   в заголовке, а время — «ждёт N мин» в карточке решения. */
+function dvnMeta(item, waiting, phones, step) {
+    const devices = item.devices || [];
+    const bits = [];
+    if (item.scenario_name && !waiting) bits.push(esc(item.scenario_name + step));
+    if (devices.length) bits.push(`<span title="${esc(devices.join(', '))}">${esc(devices.length <= 2 ? devices.join(', ') : phones)}</span>`);
+    if (item.hits > 1) bits.push(esc(`повторов: ${item.hits}`));
+    if (!waiting) bits.push(`<span class="dvn-age" data-at="${esc(item.last_at)}"></span>`);
+    return bits.length ? `<div class="dvn-meta">${bits.join('<i aria-hidden="true">·</i>')}</div>` : '';
 }
 
 /* Возраст меняется каждый опрос, и будь он в строке HTML, список
