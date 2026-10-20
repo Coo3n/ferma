@@ -477,6 +477,12 @@
                                     <use href="#i-fit"/>
                                 </svg>
                             </button>
+                            <button class="sm ghost" onclick="grAutoLayout()" title="Разложить по порядку — карточки встанут столбиком"
+                                    aria-label="Разложить по порядку" data-t-title="device.razlozhit_title" data-t-aria-label="device.razlozhit">
+                                <svg class="ic" aria-hidden="true">
+                                    <use href="#i-list-checks"/>
+                                </svg>
+                            </button>
                         </div>
                     <div class="sch-view" id="recCanvas">
                         <div class="sch-spine"></div>
@@ -746,13 +752,12 @@
         <div class="bar">
             <div class="seg runs-seg" role="tablist" aria-label="Сценарии и приложения" data-t-aria-label="apk.stsenarii_tabs">
                 <button class="sm on" role="tab" aria-selected="true"
-                        onclick="showView('scen')" data-t="apk.tab_stsenarii">Сценарии</button>
+                        onclick="showView('scen')"><span data-t="apk.tab_stsenarii">Сценарии</span><b class="tab-n" data-count="scen"></b></button>
                 <button class="sm" role="tab" aria-selected="false"
-                        onclick="showView('apps')" data-t="apk.tab_prilozheniya">Приложения</button>
+                        onclick="showView('apps')"><span data-t="apk.tab_prilozheniya">Приложения</span><b class="tab-n" data-count="apps"></b></button>
             </div>
-            <span class="stat" id="scenCount"></span>
-            <button class="sm ghost" onclick="recTipsOpen()" data-t="tips.link"><svg class="ic" aria-hidden="true"><use href="#i-lightbulb"/></svg>Как записывать точно</button>
             <span class="sp"></span>
+            <button class="sm ghost" onclick="recTipsOpen()" data-t="tips.link"><svg class="ic" aria-hidden="true"><use href="#i-lightbulb"/></svg>Советы</button>
             <button class="sm accent" id="btnScenRecord" onclick="recNew(false)" data-t="scen.sozdat_zapisyu">
                 <svg class="ic" aria-hidden="true">
                     <use href="#i-record"/>
@@ -776,13 +781,12 @@
         <div class="bar">
             <div class="seg runs-seg" role="tablist" aria-label="Сценарии и приложения" data-t-aria-label="apk.stsenarii_tabs">
                 <button class="sm" role="tab" aria-selected="false"
-                        onclick="showView('scen')" data-t="apk.tab_stsenarii">Сценарии</button>
+                        onclick="showView('scen')"><span data-t="apk.tab_stsenarii">Сценарии</span><b class="tab-n" data-count="scen"></b></button>
                 <button class="sm on" role="tab" aria-selected="true"
-                        onclick="showView('apps')" data-t="apk.tab_prilozheniya">Приложения</button>
+                        onclick="showView('apps')"><span data-t="apk.tab_prilozheniya">Приложения</span><b class="tab-n" data-count="apps"></b></button>
             </div>
-            <span class="stat" id="apkCount"></span>
             <span class="sp"></span>
-            <button class="sm primary" id="btnApkAdd" onclick="apkPick()" data-t="apk.dobavit">
+            <button class="sm" id="btnApkAdd" onclick="apkPick()" data-t="apk.dobavit">
                 <svg class="ic" aria-hidden="true">
                     <use href="#i-upload"/>
                 </svg>

@@ -784,8 +784,16 @@ function grBlockFrames(layout) {
         if (!boxes.length) return;
         const pad = GR_BLOCK_PAD - depth * 4;   // вложенная рамка заметно внутри внешней, края не сливаются
         const x1 = Math.min(...boxes.map(b => b.x)) - pad;
-        const y1 = Math.min(...boxes.map(b => b.y)) - pad;
+        let y1 = Math.min(...boxes.map(b => b.y)) - pad;
         const x2 = Math.max(...boxes.map(b => b.x)) + layout.nodeW + pad;
+        /* Карточку перед блоком могли поставить вплотную (перетаскиванием):
+           рамка тогда наезжала на неё сверху. Верх рамки не выше её низа. */
+        const before = REC.steps[REC.steps.indexOf(head) - 1];
+        const prev = before && layout.pos.get(before.id);
+        if (prev && prev.x < x2 && prev.x + layout.nodeW > x1) {
+            const floor = prev.y + GR_NODE_H + 3;
+            if (y1 < floor) y1 = Math.min(floor, Math.min(...boxes.map(b => b.y)) - 3);
+        }
         const y2 = Math.max(...boxes.map(b => b.y)) + GR_NODE_H + pad;
         parts.push(`<rect class="gr-block-box gr-block-${head.kind}" x="${x1}" y="${y1}"
             width="${x2 - x1}" height="${y2 - y1}" rx="12"/>`);

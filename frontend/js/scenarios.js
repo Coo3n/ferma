@@ -23,7 +23,7 @@ async function loadScenarios(reload) {
 
     scRenderList();
 
-    setText($('scenCount'), S.scenarios.length ? `всего: ${S.scenarios.length}` : '');
+    document.querySelectorAll('[data-count="scen"]').forEach(el => setText(el, S.scenarios.length ? String(S.scenarios.length) : ''));
 
     if (S.scenario && !S.scenarios.some(s => s.key === S.scenario)) S.scenario = null;
     if (!S.scenario && S.scenarios.length) pickScenario(scOrdered(S.scenarios)[0].key);

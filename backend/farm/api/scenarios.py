@@ -115,7 +115,8 @@ def run_scenario(payload: dict = Body(...)):
                              stop_step=(int(payload["stop_step"])
                                         if payload.get("stop_step") is not None else None),
                              speed=float(payload.get("speed") or 1.0),
-                             batch=batch)
+                             batch=batch,
+                             step_shots=bool(payload.get("step_shots")))
     except (ValueError, TypeError) as e:
         raise HTTPException(400, str(e))
     return {"ok": True, "jobs": [j.to_dict() for j in jobs],

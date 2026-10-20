@@ -1300,9 +1300,18 @@ function grLayout() {
     let y = 16;
     let maxX = GR_COL_X + nodeW;
 
+    /* Шаг без своей позиции встаёт под предыдущим (со сдвигом по
+       вложенности), а не в левую колонку: если предыдущие карточки
+       перетащили вправо, новый шаг оказывался в стороне, и рамка блока
+       растягивалась через весь холст. */
+    let prevHere = null, prevDepth = 0;
     REC.steps.forEach(step => {
+        const depth = blockDepth(step);
         const here = step.pos ? {x: step.pos[0], y: step.pos[1]}
-            : {x: GR_COL_X + blockDepth(step) * GR_BLOCK_INDENT, y};
+            : prevHere ? {x: Math.max(GR_COL_X, prevHere.x + (depth - prevDepth) * GR_BLOCK_INDENT), y}
+                : {x: GR_COL_X + depth * GR_BLOCK_INDENT, y};
+        prevHere = here;
+        prevDepth = depth;
         pos.set(step.id, here);
 
         let blockHeight = GR_ROW_H;
@@ -1863,6 +1872,7 @@ function recSetView(name) {
     if (name === 'scheme') {
         recSchemeSpine();
         recSchemeRefresh();
+        requestAnimationFrame(grRevealContent);
     }
 }
 
@@ -1915,16 +1925,48 @@ function grZoomBy(direction) {
 
 /* «Вписать» никогда не увеличивает: сюжет из трёх шагов, растянутый на
    двести процентов, читается как ошибка вёрстки, а не как помощь. */
+/* Где на полотне стоят карточки: после перетаскивания они бывают далеко
+   от левого верхнего угла, и «вписать» по всему полотну давало мелкую
+   схему в углу пустого поля. */
+function grContentBox(layout) {
+    const pts = [...layout.pos.values()];
+    if (!pts.length) return {x: 0, y: 0, w: layout.width, h: layout.height};
+    const x = Math.min(...pts.map(p => p.x)), y = Math.min(...pts.map(p => p.y));
+    const r = Math.max(...pts.map(p => p.x)) + layout.nodeW + 40;
+    const b = Math.max(...pts.map(p => p.y)) + GR_NODE_H + 24;
+    return {x, y, w: r - x, h: b - y};
+}
+
 function grZoomFit() {
     const view = $('recCanvas');
     if (!view || !REC.steps.length) return;
-    const layout = grLayout();
+    const box = grContentBox(grLayout());
     const scale = Math.min(
-        (view.clientWidth - GR_FIT_PAD) / layout.width,
-        (view.clientHeight - GR_FIT_PAD) / layout.height,
+        (view.clientWidth - GR_FIT_PAD) / box.w,
+        (view.clientHeight - GR_FIT_PAD) / box.h,
         1);
     grZoomSet(scale);
-    view.scrollTo({left: 0, top: 0});
+    view.scrollTo({left: Math.max(0, box.x * scale - GR_FIT_PAD / 2), top: Math.max(0, box.y * scale - GR_FIT_PAD / 2)});
+}
+
+/* «Разложить по порядку»: забыть ручные позиции — карточки встают столбиком
+   по порядку шагов, рамки блоков снова ровные. Отменяется ⌘Z. */
+function grAutoLayout() {
+    REC.steps.forEach(s => { delete s.pos; });
+    recRender();
+    recSave();
+    requestAnimationFrame(grZoomFit);
+}
+
+/* Открыли схему, а в окне пусто (карточки дальше видимой части) — едем к ним. */
+function grRevealContent() {
+    const view = $('recCanvas');
+    if (!view || !REC.steps.length) return;
+    const zoom = grZoom();
+    const box = grContentBox(grLayout());
+    const seen = box.x * zoom < view.scrollLeft + view.clientWidth && (box.x + box.w) * zoom > view.scrollLeft
+        && box.y * zoom < view.scrollTop + view.clientHeight && (box.y + box.h) * zoom > view.scrollTop;
+    if (!seen) view.scrollTo({left: Math.max(0, box.x * zoom - 24), top: Math.max(0, box.y * zoom - 24)});
 }
 
 function grZoomSync() {
@@ -3174,7 +3216,12 @@ function recRowMenuShow(focus) {
         menu.appendChild(box);
     });
     acts.appendChild(menu);
-    if (focus) menu.querySelector('button').focus();
+    /* У нижних шагов меню уходило за край списка: «Удалить» не было видно.
+       Не помещается вниз — раскрываем вверх. */
+    const list = $('recSteps');
+    const room = list ? list.getBoundingClientRect().bottom : window.innerHeight;
+    if (menu.getBoundingClientRect().bottom > room - 8) menu.classList.add('up');
+    if (focus) menu.querySelector('button').focus({preventScroll: true});
 }
 
 function recRender() {

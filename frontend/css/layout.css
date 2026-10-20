@@ -704,3 +704,7 @@ body:has(#view-device.on) #stJobs {
 .ctx-go:hover { background: var(--accent-dim); }
 .ctx-x:hover { color: var(--bad); background: var(--panel2); }
 .ctx-go:focus-visible, .ctx-x:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Число во вкладке («Сценарии 12») вместо отдельного «всего: 12» в полосе. */
+.tab-n { margin-left: 6px; color: var(--dim); font-weight: 500; font-variant-numeric: tabular-nums; }
+.tab-n:empty { display: none; }

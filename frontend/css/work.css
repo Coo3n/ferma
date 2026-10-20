@@ -1037,16 +1037,48 @@ button.held-shot:hover {
 #scTools .seg { flex-wrap: wrap; }
 
 /* Советы: четыре карточки 2×2, в каждой правило и пример «так / не так». */
-.tips { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s3); list-style: none; margin: 0; padding: 0; }
-.tip { display: grid; gap: var(--s2); padding: var(--s4); border-radius: var(--r3); background: var(--bg); align-content: start; }
-.tip h4 { margin: 0; font-size: var(--fs-3); }
-.tip-ic { display: grid; place-items: center; width: 36px; height: 36px; margin-bottom: var(--s1); border-radius: 50%;
-    background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
-.tip-ic .ic { width: 18px; height: 18px; }
-.tip p { margin: 0; display: flex; gap: var(--s2); align-items: flex-start; font-size: var(--fs-2); line-height: 1.4; }
-.tip p .ic { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+/* Советы — листалка: картинка «так / не так» слева, две строки справа. */
+.tipc { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--s5, 24px); align-items: center;
+    min-height: 220px; }
+.tipc-art { display: grid; place-items: center; padding: var(--s4); border-radius: var(--r3); background: var(--bg); }
+.tipc-art svg { width: 100%; max-width: 300px; height: auto; }
+.tipc-tx { display: grid; gap: var(--s2); }
+.tipc-n { color: var(--dim); font-size: var(--fs-1); font-variant-numeric: tabular-nums; }
+.tipc-tx h3 { margin: 0 0 var(--s2); font-size: var(--fs-5); line-height: 1.25; }
+.tipc .tip-ok, .tipc .tip-bad { margin: 0; display: flex; gap: var(--s2); align-items: flex-start;
+    font-size: var(--fs-3); line-height: 1.4; }
+.tipc p .ic { width: 18px; height: 18px; flex: none; margin-top: 1px; }
 .tip-ok { color: var(--text); }
 .tip-ok .ic { color: var(--ok); }
 .tip-bad { color: var(--dim); }
 .tip-bad .ic { color: var(--bad); }
+.tipc-dots { display: flex; justify-content: center; gap: 8px; margin-top: var(--s4); }
+.tipc-dots button { width: 8px; height: 8px; min-height: 0; padding: 0; border: 0; border-radius: var(--pill);
+    background: var(--line-hover); transition: width var(--fast) var(--ease), background-color var(--fast); }
+.tipc-dots button::before { content: none; }
+.tipc-dots button[aria-selected="true"] { width: 22px; background: var(--accent); }
+@media (max-width: 640px) { .tipc { grid-template-columns: 1fr; } }
+
+/* Рисунки советов: всё на токенах темы. */
+.ta-body { fill: var(--panel2); stroke: var(--line-hover); stroke-width: 2; }
+.ta-body-on { stroke: var(--accent); }
+.ta-btn { fill: var(--accent); }
+.ta-on { fill: var(--bg); font-weight: 700; }
+.ta-t { fill: var(--text2); font: 500 var(--fs-1) var(--sans); }
+.ta-acc { fill: var(--accent); }
+.ta-dimt { fill: var(--dim); }
+.ta-dim { fill: var(--line); }
+.ta-ok-ring { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 3; }
+.ta-ok-fill { fill: var(--accent); }
+.ta-ok-soft { fill: color-mix(in srgb, var(--accent) 14%, transparent); }
+.ta-ok-stroke { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; }
+.ta-bad-dot { fill: var(--bad); }
+.ta-bad-ring { fill: none; stroke: var(--bad); stroke-width: 2; stroke-dasharray: 4 3; }
+.ta-bad-fill { fill: var(--bad); }
+.ta-mark { fill: none; stroke: var(--bg); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.ta-line { stroke: var(--line-hover); stroke-width: 2; stroke-dasharray: 3 4; }
+.ta-node, .ta-pill { fill: var(--panel2); stroke: var(--line-hover); stroke-width: 1.5; }
+.ta-pill { stroke: var(--accent-line); }
+.ta-pill-bad { fill: var(--panel2); stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.ta-arrow { fill: none; stroke: var(--dim); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 560px) { .tips { grid-template-columns: 1fr; } }

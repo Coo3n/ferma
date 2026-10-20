@@ -763,13 +763,16 @@ function stRunBuild() {
         <select id="runFrom" aria-label="Начать с шага" onchange="stRunNote()"></select></span>
       <label class="run-opt inline-check" title="Только этот шаг — с текущего экрана">
         <input type="checkbox" id="runOnly" onchange="stRunNote()"> только этот шаг</label>
+      <label class="run-opt inline-check" title="${esc(t('rec.snimki_shagov_title'))}">
+        <input type="checkbox" id="runShots" ${store.get(ST_SHOTS_KEY, true) ? 'checked' : ''}
+               onchange="store.set(ST_SHOTS_KEY, this.checked)"> ${recIcon('camera')}${esc(t('rec.snimki_shagov'))}</label>
       <span class="run-opt"><span class="run-lbl">скорость</span>
         <span class="seg" role="group" aria-label="Скорость">${ST_SPEEDS.map(([v, t]) =>
         `<button type="button" class="${REC.runSpeed === v ? 'on' : ''}" aria-pressed="${REC.runSpeed === v}"
           data-speed="${v}" onclick="stSetSpeed('${v}')" title="${esc(t)}">${v}×</button>`).join('')}</span></span>
       <span class="sp"></span>
-      <button class="sm ghost" onclick="recValidate()" title="Проверить шаги без запуска">
-        ${recIcon('check')} Найти ошибки</button>
+      <button class="sm ghost icon-only" onclick="recValidate()" title="Найти ошибки — проверить шаги без запуска"
+              aria-label="Найти ошибки">${recIcon('check')}</button>
       <button class="sm ghost" onclick="recRunClose()" aria-label="Закрыть панель">${recIcon('x')}</button>
     </div>
     <div class="run-note" id="runNote" hidden></div>
@@ -986,7 +989,8 @@ async function recRunStart() {
     let result;
     try {
         result = await post('/api/run', {scenario: REC.edit.key, serials: [S.active],
-            start_step: from, stop_step: only ? from + 1 : null, speed: speed});
+            start_step: from, stop_step: only ? from + 1 : null, speed: speed,
+            step_shots: !!($('runShots') || {}).checked});
     } catch (e) {
         toast(e.message, 'bad');
         return;
@@ -1192,6 +1196,17 @@ function jobStepsHtml(job) {
     return `<div class="jsteps">${strip}${err}${list}</div>`;
 }
 
+/* Снимок экрана после каждого шага при проверке — по умолчанию да: на
+   одном телефоне это ~0.3 с на шаг, зато в «Запусках» видно, что вышло. */
+const ST_SHOTS_KEY = 'farm.rec.shots';
+
+/* «Запуск приложения: com.vkontakte.android» → «… «VK»»: пакет знакомого
+   приложения человеку ничего не говорит. */
+function jobLabelWords(label) {
+    return String(label || '').replace(/\b[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+\b/gi,
+        m => (window.REC_APPS && REC_APPS[m]) ? recApp(m) : m);
+}
+
 const JSTEP_WORDS = {ok: 'ок', retried: 'с повтором', blind: 'вслепую', skipped: 'пропущен', failed: 'упал'};
 
 /* Шаги списком с временем; у упавшего — снимок экрана и красная точка, куда
@@ -1204,14 +1219,18 @@ function jobStepListHtml(job) {
         const img = name => `/api/jobs/${esc(job.id)}/artifacts/${encodeURIComponent(name)}`;
         const expected = st.expected ? `<figure class="jshot exp"><figcaption>${esc(t('job.shot_expected'))}</figcaption>
             <div class="jimg"><img src="${img(st.expected)}" alt="" loading="lazy"></div></figure>` : '';
-        const failed = st.shot ? `<figure class="jshot fail"><figcaption>${esc(t('job.shot_fail'))}</figcaption>
+        const failedStep = st.status === 'failed';
+        const failed = st.shot && failedStep ? `<figure class="jshot fail"><figcaption>${esc(t('job.shot_fail'))}</figcaption>
             <div class="jimg"><img src="${img(st.shot)}" alt="" loading="lazy">
             ${st.tap ? `<i class="jtap" style="left:${st.tap[0] * 100}%;top:${st.tap[1] * 100}%"></i>` : ''}</div>
             ${st.tap ? `<span class="jlegend"><i></i>${esc(t('job.kuda_nazhali'))}</span>` : ''}</figure>` : '';
         const shot = expected + failed;
+        /* Снимок после обычного шага — миниатюрой справа, по щелчку крупно. */
+        const thumb = st.shot && !failedStep ? `<a class="jthumb" href="${img(st.shot)}" target="_blank"
+            title="${esc(t('job.shot_after'))}"><img src="${img(st.shot)}" alt="" loading="lazy"></a>` : '';
         return `<li class="jstep ${esc(st.status)}"><div class="jhead"><span class="jn">${st.i + 1}</span>
-            <span class="jl">${esc(st.label || '')}</span>
-            <small>${esc(JSTEP_WORDS[st.status] || st.status)} · ${st.secs != null ? st.secs + ' с' : ''}${st.n > 1 ? ' · ×' + st.n : ''}</small></div>${shot ? `<div class="jshots">${shot}</div>` : ''}</li>`;
+            <span class="jl">${esc(jobLabelWords(st.label))}</span>
+            <small>${esc(JSTEP_WORDS[st.status] || st.status)} · ${st.secs != null ? st.secs + ' с' : ''}${st.n > 1 ? ' · ×' + st.n : ''}</small>${thumb}</div>${shot ? `<div class="jshots">${shot}</div>` : ''}</li>`;
     }).join('');
     return `<details class="jlist"${job.status === 'failed' ? ' open' : ''}>
         <summary>${esc(t('job.shagi_spiskom'))}</summary><ol>${rows}</ol></details>`;

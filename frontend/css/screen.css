@@ -784,7 +784,7 @@ button.pult-tag-add {
 .pult-seg button[aria-selected="true"] { background: var(--panel3); color: var(--text); }
 
 /* Буква-аватар приложения: цвет из токена (--av), заливка приглушена. */
-.chip .av {
+.av {
     display: inline-grid; place-items: center; flex: none;
     width: 20px; height: 20px; margin-left: -6px; border-radius: 50%;
     background: color-mix(in srgb, var(--av) 20%, transparent); color: var(--av);

@@ -403,3 +403,11 @@ button.jchip:hover { filter: brightness(1.25); }
 .run-fail-box .runprog-acts a:hover { color: var(--text); }
 .run-fail-box .runprog-acts .sp-end { margin-left: auto; }
 
+
+/* Миниатюра «экран после шага» в строке ленты: справа, кликабельна. */
+.jthumb { margin-left: auto; flex: none; display: block; line-height: 0; border-radius: var(--r1); overflow: hidden;
+    outline: 1px solid var(--line-soft); transition: outline-color var(--fast) var(--ease); }
+.jthumb img { width: 36px; height: 64px; object-fit: cover; object-position: top; }
+.jthumb:hover { outline-color: var(--accent-line); }
+.jhead { align-items: center; }
+#recRun .run-opt .ic { width: 14px; height: 14px; color: var(--dim); margin-right: 2px; }

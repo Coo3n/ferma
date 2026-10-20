@@ -77,6 +77,9 @@ class Job:
     start_step: int = 0
     stop_step: int | None = None  # не включая; start+1 — прогон одного шага
     speed: float = 1.0
+    # Снимок экрана после каждого шага (по желанию: +~0.3 с на шаг). Мелкий
+    # JPEG ~15 КБ в папке запуска — чистится вместе с ней (sweep_artifacts).
+    step_shots: bool = False
     # Ход по шагам записанного сценария: текущий, всего и хронология
     # [{i, label, status, secs}] — из неё же собирается отчёт.
     step_index: int = -1
@@ -128,6 +131,7 @@ class Job:
             "start_step": self.start_step,
             "stop_step": self.stop_step,
             "speed": self.speed,
+            "step_shots": self.step_shots,
             "step_index": self.step_index,
             "step_total": self.step_total,
             "step_label": self.step_label,
@@ -165,12 +169,32 @@ def hold_repairable(scenario_key: str, step_index: int) -> bool:
                 or step.get("point_rel"))
 
 
+STEP_SHOT_WIDTH = 270
+STEP_SHOT_QUALITY = 55
+
+
+def _step_shot(job: Job, entry: dict) -> None:
+    """Снимок экрана после шага — чтобы в отчёте было видно, что вышло.
+    В повторе по кругу файл один на шаг: остаётся последний проход."""
+    if not job.step_shots or entry.get("status") == "failed":
+        return
+    name = f"step_{entry['i'] + 1:02d}.jpg"
+    try:
+        data = control.screenshot(job.serial, max_width=STEP_SHOT_WIDTH, quality=STEP_SHOT_QUALITY)
+        (Path(config.ARTIFACTS_DIR) / job.id / name).write_bytes(data)
+        entry["shot"] = name
+    except Exception as e:  # noqa: BLE001 — снимок не должен ронять запуск
+        job.add_line(f"снимок шага {entry['i'] + 1} не снят: {e}")
+
+
 def _open_step(job: Job, index: int, labels: list) -> None:
     """Шаг `index` начался: закрыть предыдущий как выполненный, открыть новый."""
     now = time.time()
     if job.timeline and job.timeline[-1].get("t0") and "open" in job.timeline[-1]:
         last = job.timeline[-1]
         last["secs"] = round(last.get("secs", 0) + now - last.pop("open"), 2)
+        _step_shot(job, last)
+        now = time.time()   # время снимка — не в счёт следующего шага
     job.step_index = index
     job.step_label = labels[index] if 0 <= index < len(labels) else ""
     # Повтор по кругу проходит одни и те же шаги сотни раз: запись шага одна,
@@ -204,6 +228,8 @@ def _finish_timeline(job: Job, art_dir: Path) -> None:
     last = job.timeline[-1]
     if "open" in last:
         last["secs"] = round(last.get("secs", 0) + time.time() - last.pop("open"), 2)
+        if job.status == PASSED:
+            _step_shot(job, last)
     job.timeline.sort(key=lambda t: t["i"])   # после повторов — снова по порядку шагов
     try:
         report = {"job": job.id, "scenario": job.scenario_name,
@@ -719,7 +745,8 @@ class Runner:
 
     def submit(self, scenario_key: str, serials: list[str], params: dict | None = None,
                repeat: int = 1, start_step: int = 0, speed: float = 1.0,
-               stop_step: int | None = None, batch: str | None = None) -> list[Job]:
+               stop_step: int | None = None, batch: str | None = None,
+               step_shots: bool = False) -> list[Job]:
         sc = scenarios.get(scenario_key)
         if sc is None:
             raise ValueError(f"сценарий «{scenario_key}» не найден")
@@ -764,6 +791,7 @@ class Runner:
                     stop_step=stop_step,
                     batch=batch,
                     speed=speed,
+                    step_shots=bool(step_shots),
                 )
                 with self._lock:
                     self.jobs[job.id] = job

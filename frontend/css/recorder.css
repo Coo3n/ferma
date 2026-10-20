@@ -1208,3 +1208,49 @@ body.rec-picking .stage, body.rec-picking #recLayer { cursor: crosshair; }
     background: transparent; cursor: pointer;
 }
 .rs-sel:not(:checked):hover { border-color: var(--accent-line); }
+
+/* Меню «⋯»: шире, чтобы «Пока не найдёт» и «Если на экране» не резались;
+   один размер шрифта на всё меню; значки блоков — в цвет своих блоков. */
+.rs-menu { width: 296px; min-width: 0; }
+.rs-menu-i { font-size: var(--fs-2); min-height: 34px; }
+.rs-menu-t { font-size: var(--fs-2); min-width: 0; white-space: normal; line-height: 1.25; }
+.rs-menu-tiles.wide .rs-menu-t { padding: var(--s2) var(--s3); }
+.rs-menu-tiles.wide .rs-menu-t:nth-child(1) .ic { color: var(--accent); }
+.rs-menu-tiles.wide .rs-menu-t:nth-child(2) .ic { color: var(--busy); }
+.rs-menu-tiles.wide .rs-menu-t:nth-child(4) .ic { color: var(--warn); }
+
+/* Подписи шагов в одну вертикаль: простой значок занимает столько же места,
+   сколько картинка шага (28px), — иначе строки со свайпом съезжали вправо. */
+.rs-head > svg.ic { flex: 0 0 16px; margin: 0 6px; }
+
+/* «Добавить шаг» с разделами: слева список, справа карточки раздела.
+   Высота постоянная — окно не прыгает при смене раздела. */
+.addpick {
+    display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: var(--s4);
+    height: min(520px, 64vh);
+}
+.addpick-nav { display: flex; flex-direction: column; gap: 2px; padding-right: var(--s3);
+    border-right: 1px solid var(--line-soft); overflow: auto; }
+.addpick-nav button {
+    justify-content: flex-start; gap: var(--s2); min-height: 38px; padding: 0 var(--s3);
+    border: 0; border-radius: var(--r1); background: transparent; color: var(--text2);
+    font-size: var(--fs-2); text-align: left;
+}
+.addpick-nav button::before { content: none; }
+.addpick-nav button .ic { width: 16px; height: 16px; color: var(--dim); flex: none; }
+.addpick-nav button:hover { background: var(--panel2); color: var(--text); }
+.addpick-nav button[aria-selected="true"] { background: var(--accent-dim); color: var(--text); font-weight: 600; }
+.addpick-nav button[aria-selected="true"] .ic { color: var(--accent); }
+.addpick-pane { overflow: auto; padding-right: var(--s1); }
+.addpick-g, .addpick-g:last-child { margin: 0; }
+.addpick-g h4 { font-size: var(--fs-3); margin-bottom: var(--s3); }
+.addpick-sub { margin: var(--s3) 0 var(--s2); color: var(--dim); font-size: var(--fs-1); font-weight: 600; }
+.addpick-sub:first-of-type { margin-top: 0; }
+.addpick-empty { margin: 0; color: var(--dim); font-size: var(--fs-2); line-height: var(--lh); max-width: 40ch; }
+.addpick-card { background: var(--panel2); }
+.addpick-card:hover:not(:disabled) { background: var(--panel3); border-color: transparent; }
+@media (max-width: 640px) {
+    .addpick { grid-template-columns: 1fr; height: auto; }
+    .addpick-nav { flex-direction: row; flex-wrap: wrap; border-right: 0; padding: 0; }
+}
+.rs-menu.up { top: auto; bottom: calc(100% + 4px); }

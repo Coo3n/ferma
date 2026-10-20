@@ -57,3 +57,36 @@
 .apk-row:focus-within .apk-acts {
     opacity: 1;
 }
+
+/* Список — колонкой разумной ширины, а не на весь экран; зона «перетащите
+   APK» — под списком. Пустой раздел объясняет себя тремя шагами. */
+.apk-wrap { max-width: 760px; padding: var(--s4); display: grid; gap: var(--s3); }
+#apkList .apk-wrap .apk-list { padding: 0; gap: 2px; }
+.apk-row { border-bottom: 0; }
+.apk-av .av { width: 32px; height: 32px; margin: 0; font-size: var(--fs-3); }
+.apk-acts { opacity: 0; }
+
+.apk-empty { max-width: 720px; margin: 0 auto; padding: var(--s6, 40px) var(--s4); text-align: center; }
+.apk-empty h3 { margin: 0 0 var(--s2); font-size: var(--fs-5); }
+.apk-empty > p { margin: 0 auto var(--s5); max-width: 52ch; color: var(--text2); font-size: var(--fs-3); line-height: var(--lh); }
+.apk-how { list-style: none; margin: 0 0 var(--s4); padding: 0; display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: var(--s3); text-align: left; }
+.apk-how li { position: relative; display: grid; gap: var(--s1); align-content: start; padding: var(--s4);
+    border-radius: var(--r3); background: var(--panel2); }
+.apk-how li .ic { width: 22px; height: 22px; color: var(--accent); margin-bottom: var(--s1); }
+.apk-how b { font-size: var(--fs-3); }
+.apk-how span:not(.apk-how-n) { color: var(--dim); font-size: var(--fs-2); line-height: 1.45; }
+.apk-how-n { position: absolute; top: var(--s3); right: var(--s3); color: var(--dim); font-size: var(--fs-1);
+    font-variant-numeric: tabular-nums; }
+.apk-drop {
+    width: 100%; justify-content: center; gap: var(--s2); min-height: 56px; padding: var(--s3) var(--s4);
+    border: 1.5px dashed var(--line-hover); border-radius: var(--r3); background: transparent;
+    color: var(--dim); font-size: var(--fs-2); white-space: normal;
+}
+.apk-drop::before { content: none; }
+.apk-drop b { color: var(--text); font-weight: 600; }
+.apk-drop.big { min-height: 96px; }
+.apk-drop:hover, #view-apps.drag .apk-drop { border-color: var(--accent-line); background: var(--accent-dim); color: var(--text); }
+@media (max-width: 720px) { .apk-how { grid-template-columns: 1fr; } }
+
+#apkList:has(> .apk-empty) { display: grid; place-items: center; }
