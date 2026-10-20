@@ -24,7 +24,7 @@ const COACH_TOURS = {
     ],
     pult: () => [
         {sel: '#mirror .stage', title: t('coach.pult_screen_t'), text: t('coach.pult_screen')},
-        {sel: '.pult-keys', title: t('coach.pult_keys_t'), text: t('coach.pult_keys')},
+        {sel: '#pultDock', title: t('coach.pult_keys_t'), text: t('coach.pult_keys')},
         {sel: '#pultApps', title: t('coach.pult_apps_t'), text: t('coach.pult_apps')},
         {sel: '#pult #padText', title: t('coach.pult_text_t'), text: t('coach.pult_text')},
         {sel: '.pult-files', title: t('coach.pult_files_t'), text: t('coach.pult_files')},

@@ -374,30 +374,6 @@
     font-weight: 400;
 }
 
-/* Клавиши телефона — компактные плитки: значок слева от подписи. Плитки
-   «значок над подписью» по 58 px занимали полпанели, и команды с
-   приложениями уходили за прокрутку. */
-.pult-keys {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-}
-
-.pult-keys .key {
-    justify-content: flex-start;
-    gap: var(--s2);
-    min-height: 38px;
-    padding: 0 var(--s3);
-    font-size: var(--fs-2);
-}
-
-.pult-keys .key .ic {
-    flex: none;
-    width: 16px;
-    height: 16px;
-    color: var(--text2);
-}
-
 .pult-apps {
     display: flex;
     flex-wrap: wrap;
@@ -481,20 +457,43 @@
     outline-offset: -10px;
 }
 
-.pult-row {
+/* Док кнопок телефона под экраном (пульт). Значки без подписей — подпись
+   в подсказке; группы: навигация · громкость и поворот · экран · снимки. */
+.pult-dock { display: none; }
+.work.pult-on .pult-dock {
     display: flex;
-    gap: 6px;
-    margin-top: var(--s2);
+    align-items: center;
+    gap: 2px;
+    align-self: center;
+    margin: 0 auto var(--s3);
+    padding: 4px;
+    border-radius: var(--pill);
+    background: var(--panel2);
 }
-
-.pult-row > button {
-    flex: 1;
+.pult-dock .dk {
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
+    gap: var(--s2);
+    min-width: 40px;
+    height: 40px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--pill);
+    background: transparent;
+    color: var(--text2);
 }
-
+.pult-dock .dk::before { content: none; }
+.pult-dock .dk:hover:not(:disabled) { background: var(--panel3); color: var(--text); }
+.pult-dock .dk:active:not(:disabled) { transform: scale(.94); }
+.pult-dock .dk .ic { width: 18px; height: 18px; }
+.pult-dock .dk span:empty { display: none; }
+.dk-sep { width: 1px; height: 20px; margin: 0 4px; background: var(--line); }
 #btnPultRec.on {
     color: var(--bad);
     background: var(--bad-dim);
+    font-size: var(--fs-2);
+    font-variant-numeric: tabular-nums;
 }
 
 .pult-jobs {
@@ -760,16 +759,6 @@ button.pult-tag-add {
 /* Команды: «+ Новая» уходит вправо, как «из буфера» у текста. */
 #pultCmdSect h4 .sm { margin-left: auto; }
 
-/* «Открытые приложения» свёрнуты: нужны редко, список грузится по раскрытию. */
-.pult-fold > summary { cursor: pointer; list-style: none; display: flex; align-items: center; }
-.pult-fold > summary::-webkit-details-marker { display: none; }
-.pult-fold > summary h4 { margin: 0; }
-.pult-fold > summary { gap: var(--s2); }
-.pult-fold .fold-chev { width: 14px; height: 14px; color: var(--dim); transition: transform var(--dur, .2s) var(--ease); }
-.pult-fold[open] .fold-chev { transform: rotate(180deg); }
-.pult-fold > summary:hover h4, .pult-fold > summary:hover .fold-chev { color: var(--text); }
-.pult-fold[open] > summary { margin-bottom: var(--s2); }
-
 /* Команды и открытые приложения: компактные чипы в строку, а не плашки на всю ширину. */
 .pult-chips { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .pult-chips .chip {
@@ -784,3 +773,39 @@ button.pult-tag-add {
 .pult-chips .closable:hover .ic { color: var(--bad); }
 .pult-chips .ghost-chip { background: transparent; color: var(--dim); }
 .pult-hint { color: var(--dim); font-size: var(--fs-2); }
+
+/* «Все / Открытые» у заголовка «Приложения» — маленький переключатель. */
+.pult-seg { display: inline-flex; margin-left: auto; padding: 2px; border-radius: var(--pill); background: var(--panel2); }
+.pult-seg button {
+    min-height: 26px; padding: 0 var(--s3); border: 0; border-radius: var(--pill);
+    background: transparent; color: var(--dim); font-size: var(--fs-1); font-weight: 500;
+}
+.pult-seg button::before { content: none; }
+.pult-seg button[aria-selected="true"] { background: var(--panel3); color: var(--text); }
+
+/* Буква-аватар приложения: цвет из токена (--av), заливка приглушена. */
+.chip .av {
+    display: inline-grid; place-items: center; flex: none;
+    width: 20px; height: 20px; margin-left: -6px; border-radius: 50%;
+    background: color-mix(in srgb, var(--av) 20%, transparent); color: var(--av);
+    font-size: var(--fs-1); font-style: normal; font-weight: 700;
+}
+.pult-apps .chip, .pult-chips .chip { display: inline-flex; align-items: center; gap: var(--s2); border-radius: var(--pill); }
+.pult-apps { max-height: 172px; }
+
+/* В пульте полоса над экраном пустеет (кнопки трансляции — в доке). */
+.work.pult-on .mirror-head { display: none; }
+.dk-slot { display: contents; }
+.pult-dock .dk-slot > button {
+    min-width: 40px; height: 40px; min-height: 40px; padding: 0 10px; justify-content: center;
+    border: 0; border-radius: var(--pill); background: transparent; color: var(--text2); font-size: 0; gap: 0;
+}
+.pult-dock .dk-slot > button::before { content: none; }
+.pult-dock .dk-slot > button:hover { background: var(--panel3); color: var(--text); }
+.pult-dock .dk-slot > button .ic { width: 18px; height: 18px; margin: 0; }
+
+/* Первый кадр не пришёл за 8 с: под крутилкой — почему и «Подключить заново». */
+.scr-load .scr-slow { display: none; }
+.scr-load.slow .scr-slow { display: inline-flex; }
+.scr-load.slow > span.scr-slow { color: var(--warn); }
+.scr-load button { pointer-events: auto; }

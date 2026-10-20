@@ -136,7 +136,7 @@ def power_ack(serial: str):
 
 @router.get("/{serial}/packages")
 def packages(serial: str, all: bool = Query(False)):
-    return adb.list_packages(serial, third_party_only=not all)
+    return adb.list_packages(serial, third_party_only=False) if all else adb.visible_packages(serial)
 
 
 _APP_LABELS: dict[tuple[str, str], str] = {}
@@ -167,7 +167,7 @@ def apps(serial: str, all: bool = Query(False)):
     """
     from concurrent.futures import ThreadPoolExecutor, wait
 
-    pkgs = adb.list_packages(serial, third_party_only=not all)
+    pkgs = adb.list_packages(serial, third_party_only=False) if all else adb.visible_packages(serial)
     pool = ThreadPoolExecutor(max_workers=APP_LABEL_WORKERS)
     try:
         futures = {pkg: pool.submit(_app_label, serial, pkg) for pkg in pkgs}

@@ -62,6 +62,8 @@
     function show(el) {
         const text = textOf(el);
         if (!text || !el.isConnected) return;
+        /* data-tip-trunc: подсказка нужна, только если текст не влез. */
+        if (el.dataset.tipTrunc && el.scrollWidth <= el.clientWidth) return;
         /* «Крупно — видно экран»: до тире — заголовок, после — пояснение.
            Короткое начало, иначе тире внутри фразы рвало бы её пополам. */
         const cut = text.indexOf(' — ');

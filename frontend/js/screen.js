@@ -168,20 +168,31 @@ function startStream() {
 
     empty.style.display = 'none';
     img.style.display = 'block';
-    /* Пока не пришёл первый кадр — крутилка, а не чёрное поле. */
-    $('scrLoad').hidden = false;
-    const loaded = () => { $('scrLoad').hidden = true; };
+    /* Пока не пришёл первый кадр — крутилка, а сама картинка невидима:
+       пустой <img> рисовался серым квадратиком посреди крутилки. */
+    img.style.visibility = 'hidden';
+    const load = $('scrLoad');
+    load.hidden = false;
+    load.classList.remove('slow');
+    const loaded = () => {
+        img.style.visibility = '';
+        load.hidden = true;
+    };
     img.onload = loaded;
     /* MJPEG в Chrome не всегда шлёт load после первого кадра, а крутилка
-       оставалась поверх живого экрана: смотрим, появилась ли картинка. */
+       оставалась поверх живого экрана: смотрим, появилась ли картинка.
+       Не пришла за 8 с — говорим «отвечает медленно» и даём переподключить;
+       раньше через 6 с крутилка просто исчезала и оставалось пустое поле. */
+    const born = Date.now();
     const watch = setInterval(() => {
-        if (!img.isConnected) return clearInterval(watch);
+        if (!img.isConnected || img.classList.contains('dead')) return clearInterval(watch);
         if (img.naturalWidth > 0) {
             clearInterval(watch);
             loaded();
+        } else if (Date.now() - born > 8000) {
+            load.classList.add('slow');
         }
     }, 150);
-    setTimeout(() => { clearInterval(watch); if (img.isConnected && !img.classList.contains('dead')) loaded(); }, 6000);
     /* Поток не пришёл у телефона «в сети» — раньше оставалось пустое
        чёрное поле. Говорим, что случилось, и даём повторить. */
     img.onerror = () => {

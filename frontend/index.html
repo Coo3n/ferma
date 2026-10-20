@@ -552,6 +552,8 @@
                     <div class="scr-load" id="scrLoad" hidden role="status" aria-live="polite">
                         <span class="spinner" aria-hidden="true"></span>
                         <span data-t="screen.loading">Подключаемся к экрану…</span>
+                        <span class="scr-slow" data-t="screen.slow">Телефон отвечает медленно</span>
+                        <button class="sm scr-slow" onclick="startStream()" data-t="screen.retry">Подключить заново</button>
                     </div>
                     <div class="emptybig" id="scrEmpty">
                         <svg class="art" viewBox="0 0 150 120" fill="none" aria-hidden="true">
@@ -576,6 +578,26 @@
                             Выбрать на ферме
                         </button>
                     </div>
+                </div>
+                <!-- Пульт: кнопки телефона — доком под экраном, как в эмуляторе и
+                     Vysor: рука тянется к экрану, а не в панель справа. -->
+                <div class="pult-dock" id="pultDock" role="toolbar" aria-label="Кнопки" data-t-aria-label="pult.knopki">
+                    <button class="dk" data-live onclick="sendKey('back')" title="Назад" aria-label="Назад" data-t-title="pult.nazad" data-t-aria-label="pult.nazad"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg></button>
+                    <button class="dk" data-live onclick="sendKey('home')" title="Домой" aria-label="Домой" data-t-title="pult.domoy" data-t-aria-label="pult.domoy"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg></button>
+                    <button class="dk" data-live onclick="sendKey('recents')" title="Недавние" aria-label="Недавние" data-t-title="pult.nedavnie" data-t-aria-label="pult.nedavnie"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg></button>
+                    <span class="dk-sep" aria-hidden="true"></span>
+                    <button class="dk" data-live onclick="sendKey('volume_down')" title="Тише" aria-label="Тише" data-t-title="pult.tishe" data-t-aria-label="pult.tishe"><svg class="ic" aria-hidden="true"><use href="#i-volume-low"/></svg></button>
+                    <button class="dk" data-live onclick="sendKey('volume_up')" title="Громче" aria-label="Громче" data-t-title="pult.gromche" data-t-aria-label="pult.gromche"><svg class="ic" aria-hidden="true"><use href="#i-volume-high"/></svg></button>
+                    <button class="dk" data-live onclick="pultRotate()" title="Повернуть" aria-label="Повернуть" data-t-title="pult.povernut" data-t-aria-label="pult.povernut"><svg class="ic" aria-hidden="true"><use href="#i-rotate"/></svg></button>
+                    <span class="dk-sep" aria-hidden="true"></span>
+                    <button class="dk" data-live onclick="doUnlock()" title="Разбудить" aria-label="Разбудить" data-t-title="pult.razbudit" data-t-aria-label="pult.razbudit"><svg class="ic" aria-hidden="true"><use href="#i-unlock"/></svg></button>
+                    <button class="dk" data-live onclick="act({type:'screen_off'})" title="Погасить" aria-label="Погасить" data-t-title="pult.pogasit" data-t-aria-label="pult.pogasit"><svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg></button>
+                    <button class="dk" data-live onclick="sendKey('power')" title="Питание" aria-label="Питание" data-t-title="pult.pitanie" data-t-aria-label="pult.pitanie"><svg class="ic" aria-hidden="true"><use href="#i-power"/></svg></button>
+                    <span class="dk-sep" aria-hidden="true"></span>
+                    <button class="dk" data-live onclick="pultShot()" title="Скриншот" aria-label="Скриншот" data-t-title="pult.skrinshot" data-t-aria-label="pult.skrinshot"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></button>
+                    <button class="dk" id="btnPultRec" data-live onclick="pultRecord()" title="Видео экрана" aria-label="Видео экрана" data-t-title="pult.video_ekrana" data-t-aria-label="pult.video_ekrana"><svg class="ic" aria-hidden="true"><use href="#i-video"/></svg><span></span></button>
+                    <span class="dk-sep" aria-hidden="true"></span>
+                    <span class="pult-slot dk-slot" data-slot="stream"></span>
                 </div>
                 <div class="pad" id="padKeys">
                     <button class="key" data-live onclick="sendKey('back')" data-t="device.nazad">
@@ -663,32 +685,19 @@
                 </div>
                 <div class="pult-slot" data-slot="held"></div>
                 <div class="pult-body">
-                    <section class="pult-sect">
-                        <h4 data-t="pult.knopki">Кнопки</h4>
-                        <div class="pult-keys">
-                            <button class="key" data-live onclick="sendKey('back')" data-t="pult.nazad"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg>Назад</button>
-                            <button class="key" data-live onclick="sendKey('home')" data-t="pult.domoy"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg>Домой</button>
-                            <button class="key" data-live onclick="sendKey('recents')" data-t="pult.nedavnie"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg>Недавние</button>
-                            <button class="key" data-live onclick="sendKey('volume_down')" data-t="pult.tishe"><svg class="ic" aria-hidden="true"><use href="#i-volume-low"/></svg>Тише</button>
-                            <button class="key" data-live onclick="sendKey('volume_up')" data-t="pult.gromche"><svg class="ic" aria-hidden="true"><use href="#i-volume-high"/></svg>Громче</button>
-                            <button class="key" data-live onclick="pultRotate()" data-t="pult.povernut"><svg class="ic" aria-hidden="true"><use href="#i-rotate"/></svg>Повернуть</button>
-                            <button class="key" data-live onclick="doUnlock()" data-t="pult.razbudit"><svg class="ic" aria-hidden="true"><use href="#i-unlock"/></svg>Разбудить</button>
-                            <button class="key" data-live onclick="act({type:'screen_off'})" data-t="pult.pogasit"><svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg>Погасить</button>
-                            <button class="key" data-live onclick="sendKey('power')" data-t="pult.pitanie"><svg class="ic" aria-hidden="true"><use href="#i-power"/></svg>Питание</button>
-                        </div>
-                    </section>
                     <section class="pult-sect" id="pultCmdSect">
                         <h4><span data-t="cmd.komandy">Команды</span>
                             <button class="sm ghost" onclick="recBegin(true)" title="Короткое действие до 8 шагов: закрыть всё, очистить кэш, открыть чат" data-t="cmd.novaya" data-t-title="cmd.hint"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Новая</button></h4>
                         <div class="pult-chips" id="pultCmds"></div>
                     </section>
-                    <details class="pult-sect pult-fold" id="pultRecentsSect" ontoggle="if(this.open)pultRecents()">
-                        <summary><h4 data-t="pult.otkrytye">Открытые приложения</h4><svg class="ic fold-chev" aria-hidden="true"><use href="#i-down"/></svg></summary>
-                        <div class="pult-chips" id="pultRecents"></div>
-                    </details>
                     <section class="pult-sect">
-                        <h4 data-t="pult.prilozheniya">Приложения</h4>
+                        <h4><span data-t="pult.prilozheniya">Приложения</span>
+                            <span class="pult-seg" role="tablist" id="pultAppsSeg">
+                                <button role="tab" aria-selected="true" data-k="all" onclick="pultAppsTab('all')" data-t="pult.vse">Все</button>
+                                <button role="tab" aria-selected="false" data-k="open" onclick="pultAppsTab('open')" data-t="pult.otkrytye_tab">Открытые</button>
+                            </span></h4>
                         <div class="pult-apps" id="pultApps"></div>
+                        <div class="pult-chips" id="pultRecents" hidden></div>
                     </section>
                     <section class="pult-sect">
                         <h4 data-t="pult.tekst">Текст
@@ -700,7 +709,7 @@
                         <div class="pult-slot" data-slot="kb"></div>
                     </section>
                     <section class="pult-sect">
-                        <h4 data-t="pult.fayly_i_zapis">Файлы и запись</h4>
+                        <h4 data-t="pult.fayly">Файлы</h4>
                         <label class="pult-drop" id="pultDrop" tabindex="0"
                                onkeydown="if(event.key==='Enter')$('pultFile').click()">
                             <input type="file" id="pultFile" hidden onchange="pultFiles(this.files);this.value=''">
@@ -709,12 +718,6 @@
                         </label>
                         <button class="sm pult-files" onclick="filesOpen()" title="Выгрузить фото, видео и другие файлы с телефона" data-t-title="files.podskazka">
                             <svg class="ic" aria-hidden="true"><use href="#i-download"/></svg><span data-t="files.otkryt">Файлы на телефоне</span></button>
-                        <div class="pult-row">
-                            <button class="sm" data-live onclick="pultShot()" data-t="pult.skrinshot">
-                                <svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg>Скриншот</button>
-                            <button class="sm" id="btnPultRec" data-live onclick="pultRecord()">
-                                <svg class="ic" aria-hidden="true"><use href="#i-video"/></svg><span data-t="pult.video_ekrana">Видео экрана</span></button>
-                        </div>
                     </section>
                     <section class="pult-sect">
                         <h4 data-t="pult.poslednie_zapuski">Последние запуски</h4>

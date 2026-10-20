@@ -265,7 +265,7 @@ def _packages(serial: str) -> list[str]:
     hit = _packages_cache.get(serial)
     if hit and time.monotonic() - hit[0] < PACKAGES_TTL:
         return hit[1]
-    pkgs = adb.list_packages(serial, third_party_only=True)
+    pkgs = adb.visible_packages(serial)
     _packages_cache[serial] = (time.monotonic(), pkgs)
     return pkgs
 

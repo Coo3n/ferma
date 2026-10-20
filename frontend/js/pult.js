@@ -10,7 +10,10 @@
 const PULT = {apps: {}, jobsSig: null, appsFor: '', rec: null, recTimer: null};
 
 /* Какие узлы переезжают в пульт: id → слот в пульте. */
-const PULT_MOVES = [['deviceHeldBar', 'held'], ['padText', 'text'], ['kbLabel', 'kb']];
+/* «Стоп-кадр» и «В окне» в пульте уезжают в док под экраном: полоса над
+   экраном ради двух кнопок съедала высоту телефона. */
+const PULT_MOVES = [['deviceHeldBar', 'held'], ['padText', 'text'], ['kbLabel', 'kb'],
+    ['btnStream', 'stream'], ['btnScrcpy', 'stream']];
 
 function pultOn() {
     const work = $('work');
@@ -138,6 +141,7 @@ const PULT_BRAND_PKG = /^(com|org)\.(samsung|sec|google|miui|xiaomi|huawei|oppo|
 
 async function pultLoadApps(serial) {
     PULT.appsFor = serial;
+    pultAppsTab('all');
     const box = $('pultApps');
     if (!PULT.apps[serial]) {
         box.innerHTML = `<span class="dim">${t('pult.zagruzhayu')}</span>`;
@@ -214,7 +218,7 @@ function pultAppsRender(serial) {
     const hidden = rows.filter(r => r.sys).length;
     const folded = !needle && !PULT.showSys;
     const shown = rows.filter(r => match(r) && !(folded && r.sys));
-    const chip = r => `<button class="chip" data-live data-pkg="${esc(r.pkg)}" title="${esc(r.pkg)}">${esc(r.name)}${
+    const chip = r => `<button class="chip" data-live data-pkg="${esc(r.pkg)}" title="${esc(r.pkg)}">${pultAvatar(r.name, r.pkg)}${esc(r.name)}${
         r.dup ? ` <small class="dim">${esc(r.pkg.split('.').slice(-2).join('.'))}</small>` : ''}</button>`;
     let html = shown.map(chip).join('');
     if (!shown.length) html = `<span class="dim">${t('pult.nichego_ne_nashlos')}</span>`;
@@ -237,6 +241,29 @@ function pultAppsRender(serial) {
     if (window.syncInteractive) syncInteractive();
 }
 
+/* Кружок с буквой вместо иконки приложения: иконок сервер не отдаёт, а
+   ряд одинаковых серых слов не различался глазом. Цвет — из токенов
+   состояний по хешу пакета, у одного приложения всегда один. */
+const PULT_AV_TONES = ['accent', 'busy', 'warn', 'bad', 'text2'];
+
+function pultAvatar(name, pkg) {
+    let h = 0;
+    for (const ch of pkg) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const letter = (String(name).trim()[0] || '?').toUpperCase();
+    return `<i class="av" style="--av:var(--${PULT_AV_TONES[h % PULT_AV_TONES.length]})" aria-hidden="true">${esc(letter)}</i>`;
+}
+
+/* «Все» / «Открытые» — один раздел вместо двух: открытые — те же
+   приложения, только те, что висят в недавних, и их можно закрыть. */
+function pultAppsTab(kind) {
+    const open = kind === 'open';
+    document.querySelectorAll('#pultAppsSeg button').forEach(b =>
+        b.setAttribute('aria-selected', String(b.dataset.k === kind)));
+    $('pultApps').hidden = open;
+    $('pultRecents').hidden = !open;
+    if (open) pultRecents();
+}
+
 /* Открытые приложения (бэкстек), в том числе системные: закрыть можно
    каждое отдельно или все сразу. Список читается по кнопке, не опросом. */
 async function pultRecents() {
@@ -255,7 +282,7 @@ async function pultRecents() {
         return;
     }
     const chip = p => `<button class="chip closable" data-live data-close="${esc(p)}"
-        title="${esc(t('pult.zakryt'))}">${esc(pultAppName(serial, p))}<svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>`;
+        title="${esc(t('pult.zakryt'))}">${pultAvatar(pultAppName(serial, p), p)}${esc(pultAppName(serial, p))}<svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>`;
     box.innerHTML = pkgs.map(chip).join('')
         + `<button class="chip ghost-chip" data-live data-close-all>${esc(t('pult.zakryt_vse'))}</button>`;
     box.onclick = async ev => {
@@ -420,7 +447,7 @@ function pultRecReset() {
     const btn = $('btnPultRec');
     btn.disabled = false;
     btn.classList.remove('on');
-    setText(btn.querySelector('span'), t('pult.video_ekrana'));
+    setText(btn.querySelector('span'), '');   // в доке — значок; подпись только пока пишем
 }
 
 /* Файл можно бросить и на зону в пульте, и прямо на экран телефона. */

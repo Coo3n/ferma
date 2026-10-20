@@ -443,5 +443,27 @@ def list_packages(serial: str, third_party_only: bool = True) -> list[str]:
     return sorted(l.strip().replace("package:", "") for l in out.splitlines() if l.strip().startswith("package:"))
 
 
+_LAUNCHER_ACT = re.compile(r"^\s+([A-Za-z][\w.]*)/[\w.$]+\s*$")
+
+
+def launchable_packages(serial: str) -> list[str]:
+    """Приложения со значком на рабочем столе, включая системные (Настройки,
+    Галерея, Камера). Служебные пакеты без значка сюда не попадают."""
+    args = ["cmd", "package", "query-activities", "--brief",
+            "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"]
+    try:
+        out = shell(serial, args, timeout=20)
+    except AdbError:
+        return []
+    return sorted({m.group(1) for m in map(_LAUNCHER_ACT.match, out.splitlines()) if m})
+
+
+def visible_packages(serial: str) -> list[str]:
+    """Что человек видит как «приложения»: установленные им плюс системные со
+    значком. Раньше было только -3, и Настройки с Галереей нельзя было открыть
+    ни из пульта, ни шагом сценария."""
+    return sorted(set(list_packages(serial, third_party_only=True)) | set(launchable_packages(serial)))
+
+
 def screencap_png(serial: str, timeout: float = 15) -> bytes | str:
     return exec_out(serial, ["screencap", "-p"], timeout=timeout)

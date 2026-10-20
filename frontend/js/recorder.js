@@ -2032,7 +2032,15 @@ function recMarquee(ev, box, rows) {
     function onUp(e) {
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
-        if (!moved) return;
+        if (!moved) {
+            /* Щелчок по пустому месту без Shift/Cmd снимает выделение — как в
+               Finder. Раньше галочки оставались, и непонятно было, как их снять. */
+            if (!add && REC.sel.size && !ev.target.closest('[data-id]')) {
+                REC.sel = new Set();
+                recRender();
+            }
+            return;
+        }
         mq.remove();
         document.body.classList.remove('marqueeing');
         /* Отпустили над строкой — её click (раскрыть шаг) не нужен. */
@@ -2061,7 +2069,7 @@ function recListMarquee(ev) {
        перетаскиваемой, дальше работает обычный recDragStart/recDrop. */
     const selRow = ev.target.closest('.rs.sel[data-id]');
     if (selRow && !ev.target.closest('input, select, textarea, button, a, label, .rs-body, details')) {
-        selRow.draggable = true;
+        recDragArm(selRow);
         return;
     }
     if (ev.target.closest('input, select, textarea, button, a, label, .rs-grip, .rs-body, .selbar, .rs-empty, details')) return;
@@ -3007,6 +3015,21 @@ function recThumb(step) {
     return `<div class="rs-thumb"><img src="${step.shot}" alt="">${frame}</div>`;
 }
 
+/* Что сделано в шаге — картинкой, как в «Сценариях»: вырезка кнопки, по
+   которой жали, или схема телефона с точкой/стрелкой. Без неё строка была
+   просто подписью, и «Нажать «…»» среди десяти таких же не узнавалось. */
+function recRowVis(step) {
+    if (step.crop) {
+        return `<span class="rs-vis"><img class="sc-crop" alt="" src="data:image/png;base64,${step.crop}"></span>`;
+    }
+    const a = step.args || {};
+    const frac = (...v) => v.every(n => typeof n === 'number' && n >= 0 && n <= 1);
+    const coords = (step.kind === 'tap' || step.kind === 'long_tap') ? frac(a.x, a.y)
+        : step.kind === 'swipe' && frac(a.x1, a.y1, a.x2, a.y2);
+    if (coords && window.scStepVisual) return `<span class="rs-vis">${scStepVisual(step, {})}</span>`;
+    return grIcon(schIcon(step)[1]);
+}
+
 /* Главное в строке — проверить шаг; остальное (записать после, дублировать,
    двигать, удалить) живёт в «⋯»: семь иконок без подписей подряд читались
    как шум, а корзина рядом со стрелкой «вниз» ловила промахи. */
@@ -3025,7 +3048,7 @@ function recRow(step, index) {
              ${sel ? 'checked' : ''}
              onclick="event.stopPropagation();recSelToggle(${step.id}, event)">
       <span class="rs-n">${index + 1}</span>
-      ${grIcon(schIcon(step)[1])}
+      ${recRowVis(step)}
       <span class="rs-label">${esc(recLabel(step))}</span>
       ${recBadges(step)}
       <span class="rs-acts">
@@ -3230,7 +3253,17 @@ function recMove(id, delta) {
    руками иначе было бы по одному шагу на бросок. */
 function recDragOn(ev) {
     const row = ev.target.closest('.rs');
-    if (row) row.draggable = true;
+    if (row) recDragArm(row);
+}
+
+/* Строка перетаскиваемая только на время жеста: отпустили, не потащив, —
+   draggable снимаем. Иначе строка так и оставалась «хваталкой»: текст в ней
+   не выделялся, а ручка ⠿ висела, пока не уйдёт курсор. */
+function recDragArm(row) {
+    row.draggable = true;
+    window.addEventListener('pointerup', () => {
+        if (REC.drag == null) row.draggable = false;
+    }, {once: true});
 }
 
 /* Что едет при перетаскивании id: вся отметка галочками, если id в ней

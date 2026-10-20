@@ -146,6 +146,42 @@ document.addEventListener('keydown', ev => {
     recRender();
 });
 
+/* Клик мимо выделенных шагов снимает выделение: по экрану телефона, по
+   панели справа, по шапке. Не снимает — строки, панель выбранных, меню,
+   окна (с ними и работают над выделенным). Пустое место самого списка
+   решает рамка выделения (recMarquee). */
+document.addEventListener('pointerdown', ev => {
+    if (S.view !== 'device' || !REC.sel.size || ev.button !== 0) return;
+    if (ev.shiftKey || ev.ctrlKey || ev.metaKey) return;
+    if (ev.target.closest('#recSteps, #recScheme, .selbar, .selbar-pop, .rs-menu, #modal, #tip, #toast')) return;
+    recSelClear();
+});
+
+/* Выпадающие меню конструктора («Ещё», «В блок», «⋯» у шага) закрываются
+   щелчком мимо — как любое меню. <details> сам по себе так не умеет, и меню
+   висели открытыми, пока не нажмёшь на заголовок ещё раз. Фаза перехвата:
+   экран телефона и холст схемы гасят всплытие своих нажатий. */
+document.addEventListener('pointerdown', ev => {
+    document.querySelectorAll('details.recmore[open], details.selbar-menu[open]').forEach(menu => {
+        if (!menu.contains(ev.target)) menu.open = false;
+    });
+    if (REC.menuFor != null && !ev.target.closest('.rs-menu, .rs-more-btn')) recRowMenuClose();
+}, true);
+
+/* ⌘/Ctrl+C при выделенных шагах — их подписи текстом, по строке на шаг:
+   вставить в чат, в заметку, в задачу. Если выделен текст — обычное
+   копирование браузера. */
+document.addEventListener('copy', ev => {
+    if (S.view !== 'device' || !REC.sel.size) return;
+    if (String(window.getSelection() || '').trim()) return;
+    const el = ev.target;
+    if (el && /^(INPUT|TEXTAREA)$/.test(el.tagName)) return;
+    const lines = REC.steps.map((st, i) => REC.sel.has(st.id) ? `${i + 1}. ${recLabel(st)}` : null).filter(Boolean);
+    ev.clipboardData.setData('text/plain', lines.join('\n'));
+    ev.preventDefault();
+    toast(t('rec.skopirovano_shagov', {n: lines.length}));
+});
+
 /* ----------------------------------------------------- обёртки recorder.js */
 
 const stOrigSave = window.recSave;

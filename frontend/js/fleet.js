@@ -290,9 +290,14 @@ function tileUpdate(el, device, ghost) {
     el.querySelector('.dot').className = 'dot ' + status;
     el.dataset.st = status;   // рамка и полоса состояния: норма тихая, исключения громкие
     setText(el.querySelector('.nm'), device.name);
-    el.querySelector('.nm').title = device.name;
-    /* На мелких плитках имя обрезается — полное имя и состояние в подсказке. */
-    el.title = `${device.name} — ${statusWord(device)}`;
+    /* Подсказка с именем — только когда имя обрезано (мелкие плитки). Серая
+       подсказка «Poco X3 — в сети» над целой плиткой повторяла написанное и
+       закрывала фильтры над сеткой. */
+    const nm = el.querySelector('.nm');
+    nm.title = device.name;
+    nm.dataset.tipTrunc = '1';
+    el.removeAttribute('title');
+    delete el.dataset.tip;
     tileAccountFlag(el.querySelector('.accflag'), device.accounts || []);
 
     const os = el.querySelector('.os');

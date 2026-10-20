@@ -280,7 +280,6 @@
   "pult.dobavit": "Добавить",
   "pult.domoy": "Домой",
   "pult.esche_ne_zapuskali": "на этом телефоне ещё не запускали",
-  "pult.fayly_i_zapis": "Файлы и запись",
   "pult.ferma": "Ферма",
   "pult.gromche": "Громче",
   "pult.idet_zapusk": "идёт запуск",
@@ -346,7 +345,6 @@
   "job.shot_fail": "Было на экране",
   "jobs.tablitsa_shagov": "Таблица по шагам",
   "jobs.tablitsa_shagov_title": "Каждый шаг каждого запуска для Excel, у упавшего — ссылка на снимок",
-  "pult.otkrytye": "Открытые приложения",
   "pult.nichego_ne_otkryto": "ничего не открыто",
   "pult.zakryt": "Закрыть приложение",
   "pult.zakryt_vse": "Закрыть все",
@@ -870,5 +868,11 @@
   "rec.gotov_v_bib": "в библиотеке {v}",
   "rec.gotov_net_v_bib": "нет в библиотеке — шаг только проверит, пока не добавите APK в Сценарии → Приложения",
   "rec.blok_dobavlen_telefon": "блок «если на телефоне» добавлен — выберите проверку в заголовке, шаги внутри выполнятся только если она сработает",
-  "job.kuda_nazhali": "сюда нажали"
+  "job.kuda_nazhali": "сюда нажали",
+  "pult.fayly": "Файлы",
+  "pult.vse": "Все",
+  "pult.otkrytye_tab": "Открытые",
+  "rec.skopirovano_shagov": "скопировано шагов: {n}",
+  "screen.slow": "Телефон отвечает медленно",
+  "screen.retry": "Подключить заново"
 }

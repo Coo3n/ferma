@@ -81,8 +81,10 @@
     transition: opacity var(--fast) var(--ease);
 }
 
+/* :has(:focus-visible), а не :focus-within: после щелчка мышью фокус
+   остаётся на кнопке, и кнопки строки «зависали» видимыми. */
 .rs:hover .rs-acts,
-.rs:focus-within .rs-acts,
+.rs:has(:focus-visible) .rs-acts,
 .rs.open .rs-acts { opacity: 1; }
 /* overflow-wrap обязателен: resourceId вида com.android.systemui:id/… это одно
    «слово» без пробелов, и без переноса оно уезжает за правый край панели. */
@@ -1182,3 +1184,27 @@ body.rec-picking .stage, body.rec-picking #recLayer { cursor: crosshair; }
 .rs-menu-t::before { content: none; }
 .rs-menu-tiles.wide .rs-menu-t { flex-direction: row; justify-content: flex-start; min-height: 40px; gap: var(--s2); text-align: left; }
 .rs-menu-t .ic { width: 18px; height: 18px; color: var(--dim); }
+
+/* Картинка шага в строке: вырезка кнопки или схема телефона (recRowVis). */
+.rs-vis {
+    display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px;
+    border-radius: var(--r1); background: var(--well, var(--panel));
+}
+.rs-vis .sc-crop { max-width: 26px; max-height: 26px; outline-width: 1.5px; outline-offset: 0; }
+.rs-vis .sc-phone { width: 14px; height: 24px; }
+.rs:has(.rs-vis) { padding-top: 6px; padding-bottom: 6px; }
+
+/* Режим выделения: работают с группой — кнопки и ручка отдельной строки
+   молчат, иначе при наведении на каждую выделенную строку вспыхивали
+   серые ▶ ⋯ ⠿. Тащить выделенное можно за любое место строки. */
+#recSteps.has-sel .rs-acts,
+#recSteps.has-sel .rs-grip { opacity: 0; pointer-events: none; }
+
+/* Галочка без серого квадрата браузера: пустая — тонкая рамка, отмеченная —
+   родная галочка в цвет акцента. */
+.rs-sel:not(:checked) {
+    appearance: none; -webkit-appearance: none;
+    width: 15px; height: 15px; border: 1.5px solid var(--line-hover); border-radius: 4px;
+    background: transparent; cursor: pointer;
+}
+.rs-sel:not(:checked):hover { border-color: var(--accent-line); }
