@@ -292,7 +292,15 @@ function sendKey(name) {
     return act({type: 'key', name});
 }
 
+/* Нажали «Разбудить» — плашку прячем сразу, не дожидаясь опроса: телефон
+   просыпается за полсекунды, а сведения об экране приходят с задержкой, и
+   плашка висела поверх уже проснувшегося экрана. Не проснулся — опрос
+   вернёт её через несколько секунд. */
+const SLEEP_HUSH_MS = 6000;
+
 function doUnlock() {
+    S.sleepHushUntil = Date.now() + SLEEP_HUSH_MS;
+    syncScreenSleep();
     return act({type: 'unlock'});
 }
 
@@ -579,7 +587,14 @@ function syncScreenSleep() {
     if (!box) return;
     const device = (S.devices || []).find(d => d.serial === S.active);
     const screen = device && device.online ? device.screen : null;
-    const mode = !screen ? '' : !screen.on ? 'off' : screen.locked ? 'locked' : '';
+    const hushed = Date.now() < (S.sleepHushUntil || 0);
+    const mode = !screen || hushed ? '' : !screen.on ? 'off' : screen.locked ? 'locked' : '';
+    if (hushed && !S.sleepHushTimer) {
+        S.sleepHushTimer = setTimeout(() => {
+            S.sleepHushTimer = 0;
+            syncScreenSleep();
+        }, S.sleepHushUntil - Date.now() + 50);
+    }
     if (box.dataset.mode === mode) return;
     box.dataset.mode = mode;
     box.hidden = !mode;

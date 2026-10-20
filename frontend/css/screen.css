@@ -832,3 +832,23 @@ button.pult-tag-add {
     #pult.loading #pultName, #pult.loading #pultMeta { animation: none; }
 }
 .scr-load.slow > [data-t="screen.loading"] { display: none; }
+
+/* Тег под именем телефона: заметная пилюля со значком, а не серое «+ тег».
+   Что такое тег — в подсказке (держим мышь на кнопке). */
+button.pult-tag-add {
+    display: inline-flex; align-items: center; gap: 5px; min-height: 24px; padding: 0 10px;
+    border: 1px dashed var(--line-hover); border-radius: var(--pill); background: transparent;
+    color: var(--text2); font-size: var(--fs-1);
+}
+button.pult-tag-add::before { content: none; }
+button.pult-tag-add .ic { width: 12px; height: 12px; }
+button.pult-tag-add:hover { border-color: var(--accent-line); color: var(--text); background: var(--accent-dim); }
+.pult-tag { gap: 4px; }
+.pult-tag .ic { width: 11px; height: 11px; color: var(--accent); }
+.pult-tags { margin-top: 6px; }
+
+/* «Свои · Системные · Открытые» — своей строкой во всю ширину: рядом с
+   заголовком в панели ~380px последняя вкладка обрезалась. */
+.pult-sect h4:has(.pult-seg) { flex-wrap: wrap; }
+.pult-seg { flex: 1 0 100%; margin-left: 0; }
+.pult-seg button { flex: 1; justify-content: center; }

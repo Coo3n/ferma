@@ -195,18 +195,29 @@ def mjpeg(serial: str, live: bool = False):
 SCREEN_TTL = 4.0
 _screen: dict[str, tuple[float, dict]] = {}
 _screen_busy: set[str] = set()
+# Просили перепроверить после «разбудить/погасить», пока шла обычная
+# проверка: её ответ мог быть снят ДО нажатия («выключен»), и плашка висела
+# до следующего круга. Такой запрос не выбрасываем — повторяем после текущей.
+_screen_again: set[str] = set()
 _screen_guard = threading.Lock()
 
 
 def _screen_check(serial: str, delay: float) -> None:
-    try:
-        time.sleep(delay)   # экрану нужно мгновение, чтобы погаснуть/загореться
-        state = adb.screen_state(serial)
-        if state is not None:
-            _screen[serial] = (time.time(), state)
-    finally:
-        with _screen_guard:
-            _screen_busy.discard(serial)
+    while True:
+        try:
+            time.sleep(delay)   # экрану нужно мгновение, чтобы погаснуть/загореться
+            state = adb.screen_state(serial)
+            if state is not None:
+                _screen[serial] = (time.time(), state)
+        finally:
+            with _screen_guard:
+                again = serial in _screen_again
+                _screen_again.discard(serial)
+                if not again:
+                    _screen_busy.discard(serial)
+        if not again:
+            return
+        delay = 0.7
 
 
 def screen_refresh(serial: str, force: bool = False) -> None:
@@ -217,6 +228,8 @@ def screen_refresh(serial: str, force: bool = False) -> None:
         return
     with _screen_guard:
         if serial in _screen_busy:
+            if force:
+                _screen_again.add(serial)
             return
         _screen_busy.add(serial)
     threading.Thread(target=_screen_check, args=(serial, 0.7 if force else 0.0), daemon=True,

@@ -800,8 +800,18 @@
 /* До первого ответа фермы раздел пуст: нули в обзоре и заглушка «ферма
    пуста» на долю секунды выглядели как реальное состояние. */
 #view-fleet.loading #fleetScroll {
-    visibility: hidden;
+    display: none;
 }
+
+/* Вместо пустоты — заготовки обзора и плиток с бликом, той же сеткой. */
+.fleet-skel { display: none; }
+#view-fleet.loading .fleet-skel { display: block; flex: 1; overflow: hidden; }
+.fleet-skel .kpi-sk { height: 54px; border-radius: var(--r3); }
+.fleet-skel .tiles { padding-top: calc(var(--s4) + 36px); }
+.tile-sk { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line-soft); border-radius: var(--r3);
+    background: var(--panel); }
+.tile-sk-shot { aspect-ratio: 9 / 14; border-radius: var(--r2); }
+.tile-sk .sk-line { margin: 0; }
 
 /* ------------------------------------------------------------ пустая ферма */
 
@@ -836,27 +846,6 @@
 }
 
 /* --------------------------------------------------------------- скелет */
-
-/* Плитка-заглушка на первую загрузку: пустой экран читается как поломка. */
-.tile.skel {
-    pointer-events: none;
-    border-style: dashed
-}
-
-.tile.skel .glass {
-    background: linear-gradient(100deg, var(--well) 30%, var(--panel) 50%, var(--well) 70%);
-    background-size: 220% 100%;
-    animation: shimmer 1.4s linear infinite;
-}
-
-@keyframes shimmer {
-    from {
-        background-position: 120% 0
-    }
-    to {
-        background-position: -120% 0
-    }
-}
 
 @media (max-width: 640px) {
     .tiles {

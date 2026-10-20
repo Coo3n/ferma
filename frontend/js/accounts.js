@@ -36,6 +36,7 @@ const ACC_FILTERS = [
 async function loadAccounts() {
     try {
         ACC.items = await api('/api/accounts');
+        ACC.loaded = true;
     } catch (e) {
         return toast(e.message, 'bad');
     }
@@ -99,6 +100,7 @@ function renderAccounts() {
         ? t('accounts.pokazano', {n: rows.length, all: ACC.items.length}) : '');
 
     const box = $('accList');
+    if (!ACC.loaded) return;   // заготовки из разметки — до первого ответа
     if (!ACC.items.length) {
         setHTML(box, emptyBig({
             art: 'scenario',

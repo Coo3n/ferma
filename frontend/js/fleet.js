@@ -800,6 +800,22 @@ function selectRange(from, to) {
     renderFleet();
 }
 
+/* Снять выбор и фокус с плитки: щелчок мимо — значит «хватит». */
+function fleetDeselect() {
+    const focused = document.activeElement;
+    if (focused && focused.closest && focused.closest('#fleet .tile')) focused.blur();
+    if (S.selected.size) selectAll(false);
+}
+
+/* Мимо сетки, но в разделе фермы (пустая часть шапки раздела) — тоже
+   снимает. Кнопки, поля, панель запуска и окна — нет: ими работают с выбором. */
+document.addEventListener('pointerdown', ev => {
+    if (ev.button !== 0 || ev.shiftKey || ev.metaKey || ev.ctrlKey) return;
+    if (!ev.target.closest('#view-fleet') || ev.target.closest('#fleetScroll')) return;
+    if (ev.target.closest('button, input, select, a, label, .runbar, #modal, .menu')) return;
+    fleetDeselect();
+});
+
 function marqueeRect(a, b) {
     return {
         left: Math.min(a.x, b.x), top: Math.min(a.y, b.y),
@@ -818,6 +834,7 @@ function marqueeRect(a, b) {
         if (ev.button !== 0 || ev.target.closest('button, input, select, a')) return;
         MARQUEE.start = {x: ev.clientX, y: ev.clientY};
         MARQUEE.additive = ev.shiftKey || ev.metaKey || ev.ctrlKey;
+        MARQUEE.target = ev.target;
     });
 
     /* Рамку до края — список едет сам, иначе 40 телефонов не обвести.
@@ -871,7 +888,12 @@ function marqueeRect(a, b) {
     window.addEventListener('pointerup', () => {
         if (!MARQUEE.start) return;
         MARQUEE.start = null;
-        if (!MARQUEE.box) return;
+        if (!MARQUEE.box) {
+            /* Щелчок по пустому месту (не по плитке) без Shift/Cmd снимает
+               выбор — как в Finder. Раньше выбранные так и висели. */
+            if (!MARQUEE.additive && !MARQUEE.target.closest('.tile, .kpis')) fleetDeselect();
+            return;
+        }
         MARQUEE.box.remove();
         MARQUEE.box = null;
         document.body.classList.remove('marqueeing');

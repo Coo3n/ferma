@@ -112,10 +112,11 @@ function pultTagsRender(device) {
     const key = device.serial + '|' + tags.join('|');
     if (box.dataset.key === key) return;
     box.dataset.key = key;
-    box.innerHTML = tags.map(tg => `<span class="tagchip pult-tag">${esc(tg)}<button class="pult-tag-x"
+    box.innerHTML = tags.map(tg => `<span class="tagchip pult-tag"><svg class="ic" aria-hidden="true"><use href="#i-tag"/></svg>${esc(tg)}<button class="pult-tag-x"
             aria-label="${esc(t('pult.snyat_teg', {teg: tg}))}" title="${esc(t('pult.snyat_teg', {teg: tg}))}"
             onclick="pultTagRemove(this.dataset.t)" data-t="${esc(tg)}">×</button></span>`).join('')
-        + `<button class="sm ghost pult-tag-add" onclick="pultTagAdd()">${esc(t('pult.plus_teg'))}</button>`;
+        + `<button class="sm pult-tag-add" onclick="pultTagAdd()" title="${esc(t('pult.teg_title'))}">
+            <svg class="ic" aria-hidden="true"><use href="#i-tag"/></svg>${esc(tags.length ? t('pult.esche_teg') : t('pult.plus_teg'))}</button>`;
 }
 
 async function pultTagsSave(tags) {
@@ -148,13 +149,16 @@ const PULT_BRAND_PKG = /^(com|org)\.(samsung|sec|google|miui|xiaomi|huawei|oppo|
 
 async function pultLoadApps(serial) {
     PULT.appsFor = serial;
-    pultAppsTab('all');
+    pultAppsTab('own');
     const box = $('pultApps');
     if (!PULT.apps[serial]) {
         box.innerHTML = `<div class="pult-app-skel" aria-label="${esc(t('pult.zagruzhayu'))}">${
             pultSkelChips([64, 96, 80, 72, 104, 60, 88])}</div>`;
         try {
-            PULT.apps[serial] = await api(`/api/devices/${serial}/packages`);
+            const [all, own] = await Promise.all([api(`/api/devices/${serial}/packages`),
+                api(`/api/devices/${serial}/packages?own=1`).catch(() => [])]);
+            PULT.apps[serial] = all;
+            PULT.own = Object.assign(PULT.own || {}, {[serial]: new Set(own)});
         } catch (e) {
             PULT.appsFor = '';
             box.innerHTML = `<span class="dim">${esc(t('pult.ne_zagruzilis', {error: e.message}))}</span>`;
@@ -163,7 +167,6 @@ async function pultLoadApps(serial) {
     }
     if (S.active !== serial) return;
     PULT.query = '';
-    PULT.showSys = false;
     pultAppsRender(serial);
     pultAppLabels(serial);
 }
@@ -175,6 +178,16 @@ async function pultAppLabels(serial) {
         const rows = await api(`/api/devices/${serial}/apps`);
         PULT.labels = PULT.labels || {};
         PULT.labels[serial] = Object.fromEntries(rows.filter(r => r.label).map(r => [r.package, r.label]));
+        /* Сервер отдаёт, что успел за 6 с, остальное доберёт в кэш: один
+           повтор — и «Camera»/«Gallery» становятся «Камера»/«Галерея». */
+        PULT.labelRetry = PULT.labelRetry || {};
+        if (rows.some(r => !r.label) && !PULT.labelRetry[serial]) {
+            PULT.labelRetry[serial] = true;
+            setTimeout(() => {
+                PULT.labelsFor[serial] = false;
+                if (S.active === serial) pultAppLabels(serial);
+            }, 2500);
+        }
     } catch (e) {
         PULT.labelsFor[serial] = false;   // не вышло — в следующий раз попробуем снова
         return;
@@ -198,11 +211,17 @@ function pultAppsRender(serial) {
     /* Одинаковые названия различаем хвостом пакета: «Заметки · samsung.notes». */
     const count = {};
     rows.forEach(r => { count[r.name.toLowerCase()] = (count[r.name.toLowerCase()] || 0) + 1; });
+    /* «Свои» — поставленные человеком (pm list -3), «Системные» — остальные
+       со значком: Настройки, Камера, Галерея. Раньше системные прятались за
+       строкой «ещё системных: 31» в самом низу прокрутки — её не находили. */
+    const own = (PULT.own || {})[serial];
     rows.forEach(r => {
         r.dup = count[r.name.toLowerCase()] > 1;
-        r.sys = !REC_APPS[r.pkg] && PULT_BRAND_PKG.test(r.pkg)
-            && !((PULT.labels || {})[serial] || {})[r.pkg];
+        r.sys = own ? !own.has(r.pkg) : PULT_BRAND_PKG.test(r.pkg);
     });
+    const nOwn = rows.filter(r => !r.sys).length;
+    setText(document.querySelector('#pultAppsSeg [data-n="own"]'), String(nOwn));
+    setText(document.querySelector('#pultAppsSeg [data-n="sys"]'), String(rows.length - nOwn));
     rows.sort((a, b) => (REC_APPS[a.pkg] ? 0 : 1) - (REC_APPS[b.pkg] ? 0 : 1)
         || a.name.localeCompare(b.name, 'ru'));
 
@@ -215,34 +234,25 @@ function pultAppsRender(serial) {
         });
     }
     const q = box.querySelector('.pult-app-q');
-    q.hidden = rows.length <= PULT_APP_SEARCH_FROM;
+    const tabRows = rows.filter(r => (PULT.tab === 'sys') === r.sys);
+    q.hidden = tabRows.length <= PULT_APP_SEARCH_FROM;
     q.placeholder = t('pult.poisk_prilozheniya');
     q.setAttribute('aria-label', t('pult.poisk_prilozheniya'));
     if (q.value !== (PULT.query || '')) q.value = PULT.query || '';
 
     const needle = (PULT.query || '').trim().toLowerCase();
     const match = r => !needle || r.name.toLowerCase().includes(needle) || r.pkg.toLowerCase().includes(needle);
-    /* Системные обёртки производителей свёрнуты, пока человек не ищет. */
-    const hidden = rows.filter(r => r.sys).length;
-    const folded = !needle && !PULT.showSys;
-    const shown = rows.filter(r => match(r) && !(folded && r.sys));
+    const shown = tabRows.filter(match);
     const chip = r => `<button class="chip" data-live data-pkg="${esc(r.pkg)}" title="${esc(r.pkg)}">${pultAvatar(r.name, r.pkg)}${esc(r.name)}${
         r.dup ? ` <small class="dim">${esc(r.pkg.split('.').slice(-2).join('.'))}</small>` : ''}</button>`;
     let html = shown.map(chip).join('');
     if (!shown.length) html = `<span class="dim">${t('pult.nichego_ne_nashlos')}</span>`;
-    if (!needle && hidden) {
-        html += `<button class="sm ghost pult-sys-toggle" data-sys-toggle>${esc(PULT.showSys
-            ? t('pult.sistemnye_skryt') : t('pult.sistemnye_n', {n: hidden}))}</button>`;
-    }
     const list = box.querySelector('.pult-app-list');
     list.innerHTML = html;
     list.onclick = ev => {
         const btn = ev.target.closest('button');
         if (!btn) return;
-        if (btn.hasAttribute('data-sys-toggle')) {
-            PULT.showSys = !PULT.showSys;
-            pultAppsRender(S.active);
-        } else if (btn.dataset.pkg) {
+        if (btn.dataset.pkg) {
             act({type: 'launch', package: btn.dataset.pkg});
         }
     };
@@ -261,10 +271,15 @@ function pultAvatar(name, pkg) {
     return `<i class="av" style="--av:var(--${PULT_AV_TONES[h % PULT_AV_TONES.length]})" aria-hidden="true">${esc(letter)}</i>`;
 }
 
-/* «Все» / «Открытые» — один раздел вместо двух: открытые — те же
-   приложения, только те, что висят в недавних, и их можно закрыть. */
+/* «Свои» / «Системные» / «Открытые» — один раздел. Открытые — то, что
+   висит в недавних, их можно закрыть. */
 function pultAppsTab(kind) {
     const open = kind === 'open';
+    if (!open) {
+        PULT.tab = kind;
+        PULT.query = '';
+        if (S.active && PULT.apps[S.active]) pultAppsRender(S.active);
+    }
     document.querySelectorAll('#pultAppsSeg button').forEach(b =>
         b.setAttribute('aria-selected', String(b.dataset.k === kind)));
     $('pultApps').hidden = open;

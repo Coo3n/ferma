@@ -50,6 +50,7 @@ function scVisible(list) {
 
 function scRenderList() {
     const box = $('scList');
+    if (!S.scenariosLoaded) return;   // заготовки из разметки стоят до первого ответа
     if (!S.scenarios.length) {
         setHTML(box, emptyBig({
             art: 'scenario',
@@ -336,6 +337,13 @@ async function renderScenarioSteps(scenario) {
         return;
     }
     let recipe = scRecipeCache.get(scenario.key);
+    if (!recipe) {
+        box.hidden = false;
+        setHTML(box, `<div class="sc-steps-head"><span class="sk sk-line" style="--w:90px"></span></div>
+            <div class="skel-list" aria-busy="true">${[62, 48, 70, 54, 66].map(w => `<div class="skel-row">
+            <span class="sk skel-av sq"></span><span class="skel-tx"><span class="sk sk-line" style="--w:${w}%"></span></span>
+            </div>`).join('')}</div>`);
+    }
     try {
         if (!recipe) {
             recipe = await api('/api/recorder/recipe/' + encodeURIComponent(scenario.key));

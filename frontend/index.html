@@ -197,6 +197,8 @@
             </button>
         </div>
 
+        <!-- До первого ответа фермы: заготовки обзора и плиток с бликом. -->
+        <div class="fleet-skel" aria-busy="true" aria-hidden="true"><div class="kpis"><span class="sk kpi-sk"></span><span class="sk kpi-sk"></span><span class="sk kpi-sk"></span><span class="sk kpi-sk"></span></div><div class="tiles"><div class="tile-sk"><span class="sk tile-sk-shot"></span><span class="sk sk-line" style="--w:70%"></span><span class="sk sk-line sm" style="--w:45%"></span></div><div class="tile-sk"><span class="sk tile-sk-shot"></span><span class="sk sk-line" style="--w:70%"></span><span class="sk sk-line sm" style="--w:45%"></span></div><div class="tile-sk"><span class="sk tile-sk-shot"></span><span class="sk sk-line" style="--w:70%"></span><span class="sk sk-line sm" style="--w:45%"></span></div><div class="tile-sk"><span class="sk tile-sk-shot"></span><span class="sk sk-line" style="--w:70%"></span><span class="sk sk-line sm" style="--w:45%"></span></div><div class="tile-sk"><span class="sk tile-sk-shot"></span><span class="sk sk-line" style="--w:70%"></span><span class="sk sk-line sm" style="--w:45%"></span></div><div class="tile-sk"><span class="sk tile-sk-shot"></span><span class="sk sk-line" style="--w:70%"></span><span class="sk sk-line sm" style="--w:45%"></span></div></div></div>
         <div class="scroll grow" id="fleetScroll">
             <!-- Обзор: четыре числа, которые спрашивают первыми. Каждая
                  карточка — это же и фильтр, поэтому она кнопка. -->
@@ -705,8 +707,12 @@
                     <section class="pult-sect">
                         <h4><span data-t="pult.prilozheniya">Приложения</span>
                             <span class="pult-seg" role="tablist" id="pultAppsSeg">
-                                <button role="tab" aria-selected="true" data-k="all" onclick="pultAppsTab('all')" data-t="pult.vse">Все</button>
-                                <button role="tab" aria-selected="false" data-k="open" onclick="pultAppsTab('open')" data-t="pult.otkrytye_tab">Открытые</button>
+                                <button role="tab" aria-selected="true" data-k="own" onclick="pultAppsTab('own')"
+                                        title="Поставленные вами: VK, Telegram, Chrome…" data-t-title="pult.svoi_title"><span data-t="pult.svoi">Свои</span><b class="tab-n" data-n="own"></b></button>
+                                <button role="tab" aria-selected="false" data-k="sys" onclick="pultAppsTab('sys')"
+                                        title="Встроенные в телефон: Настройки, Камера, Галерея…" data-t-title="pult.sistemnye_title"><span data-t="pult.sistemnye">Системные</span><b class="tab-n" data-n="sys"></b></button>
+                                <button role="tab" aria-selected="false" data-k="open" onclick="pultAppsTab('open')"
+                                        title="Что сейчас открыто в «Недавних» — можно закрыть" data-t-title="pult.otkrytye_title" data-t="pult.otkrytye_tab">Открытые</button>
                             </span></h4>
                         <div class="pult-apps" id="pultApps"><div class="pult-app-skel"><span class="sk sk-chip" style="--w:64px"></span><span class="sk sk-chip" style="--w:96px"></span><span class="sk sk-chip" style="--w:80px"></span><span class="sk sk-chip" style="--w:72px"></span><span class="sk sk-chip" style="--w:104px"></span><span class="sk sk-chip" style="--w:60px"></span><span class="sk sk-chip" style="--w:88px"></span></div></div>
                         <div class="pult-chips" id="pultRecents" hidden></div>
@@ -772,7 +778,7 @@
             </button>
         </div>
         <div class="split">
-            <div class="scroll" id="scList"></div>
+            <div class="scroll" id="scList"><div class="skel-list" aria-busy="true"><div class="skel-row"><span class="skel-tx"><span class="sk sk-line" style="--w:72%"></span><span class="sk sk-line sm" style="--w:26%"></span></span></div><div class="skel-row"><span class="skel-tx"><span class="sk sk-line" style="--w:54%"></span><span class="sk sk-line sm" style="--w:38%"></span></span></div><div class="skel-row"><span class="skel-tx"><span class="sk sk-line" style="--w:66%"></span><span class="sk sk-line sm" style="--w:48%"></span></span></div><div class="skel-row"><span class="skel-tx"><span class="sk sk-line" style="--w:48%"></span><span class="sk sk-line sm" style="--w:50%"></span></span></div></div></div>
             <div class="scroll pad-box">
                 <div class="box" id="scParams"></div>
                 <div class="box" id="scSteps" hidden></div>
@@ -801,7 +807,7 @@
             <input type="file" id="apkFile" accept=".apk" hidden
                    onchange="apkUpload(this.files[0]); this.value=''">
         </div>
-        <div class="scroll" id="apkList"></div>
+        <div class="scroll" id="apkList"><div class="skel-list" aria-busy="true"><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:72%"></span><span class="sk sk-line sm" style="--w:26%"></span></span></div><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:54%"></span><span class="sk sk-line sm" style="--w:38%"></span></span></div><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:66%"></span><span class="sk sk-line sm" style="--w:48%"></span></span></div></div></div>
     </section>
 
     <!-- ========================================================== ЗАДАЧИ -->
@@ -849,7 +855,7 @@
         </div>
         <div class="batchbar" id="jobBatch" hidden></div>
         <div class="split">
-            <div class="scroll" id="jobList"></div>
+            <div class="scroll" id="jobList"><div class="skel-list" aria-busy="true"><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:72%"></span><span class="sk sk-line sm" style="--w:26%"></span></span></div><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:54%"></span><span class="sk sk-line sm" style="--w:38%"></span></span></div><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:66%"></span><span class="sk sk-line sm" style="--w:48%"></span></span></div><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:48%"></span><span class="sk sk-line sm" style="--w:50%"></span></span></div><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:60%"></span><span class="sk sk-line sm" style="--w:32%"></span></span></div><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:70%"></span><span class="sk sk-line sm" style="--w:44%"></span></span></div></div></div>
             <div class="logwrap">
                 <!-- Живой экран задачи: пока прогон идёт (queued/running/held),
                      видно, что сейчас на устройстве, без похода на «Ферма» или
@@ -930,7 +936,7 @@
                 Новая смена
             </button>
         </div>
-        <div class="scroll" id="schList"></div>
+        <div class="scroll" id="schList"><div class="skel-list" aria-busy="true"><div class="skel-row"><span class="skel-tx"><span class="sk sk-line" style="--w:72%"></span><span class="sk sk-line sm" style="--w:26%"></span></span></div><div class="skel-row"><span class="skel-tx"><span class="sk sk-line" style="--w:54%"></span><span class="sk sk-line sm" style="--w:38%"></span></span></div><div class="skel-row"><span class="skel-tx"><span class="sk sk-line" style="--w:66%"></span><span class="sk sk-line sm" style="--w:48%"></span></span></div></div></div>
     </section>
 
     <!-- ========================================================= АККАУНТЫ -->
@@ -969,7 +975,7 @@
         <!-- чипы статуса и панель выбора рисует accounts.js -->
         <div class="acc-filters" id="accFilters" hidden></div>
         <div class="acc-selbar" id="accSelBar" hidden></div>
-        <div class="scroll grow" id="accList"></div>
+        <div class="scroll grow" id="accList"><div class="skel-list" aria-busy="true"><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:72%"></span><span class="sk sk-line sm" style="--w:26%"></span></span></div><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:54%"></span><span class="sk sk-line sm" style="--w:38%"></span></span></div><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:66%"></span><span class="sk sk-line sm" style="--w:48%"></span></span></div><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:48%"></span><span class="sk sk-line sm" style="--w:50%"></span></span></div><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:60%"></span><span class="sk sk-line sm" style="--w:32%"></span></span></div><div class="skel-row"><span class="sk skel-av"></span><span class="skel-tx"><span class="sk sk-line" style="--w:70%"></span><span class="sk sk-line sm" style="--w:44%"></span></span></div></div></div>
     </section>
 <script>
     /* Раздел из адреса выбираем сразу, до первой отрисовки: app.js потом

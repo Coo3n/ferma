@@ -135,7 +135,11 @@ def power_ack(serial: str):
 
 
 @router.get("/{serial}/packages")
-def packages(serial: str, all: bool = Query(False)):
+def packages(serial: str, all: bool = Query(False), own: bool = Query(False)):
+    """Приложения со значком (свои + системные). own — только поставленные
+    человеком: пульт делит список на «Свои» и «Системные»."""
+    if own:
+        return adb.list_packages(serial, third_party_only=True)
     return adb.list_packages(serial, third_party_only=False) if all else adb.visible_packages(serial)
 
 

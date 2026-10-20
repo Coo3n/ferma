@@ -125,7 +125,7 @@ function schCardHtml(s) {
         <button class="sm danger" onclick="schDelete('${esc(s.id)}', this)">
           <svg class="ic" aria-hidden="true"><use href="#i-trash"/></svg><span>Удалить</span></button>
       </div>
-      ${open ? `<div class="sch-plan" id="schPlan-${esc(s.id)}">${SCH.plans[s.id] ? schPlanHtml(SCH.plans[s.id]) : '<p class="dim">Загружаем план…</p>'}</div>` : ''}
+      ${open ? `<div class="sch-plan" id="schPlan-${esc(s.id)}">${SCH.plans[s.id] ? schPlanHtml(SCH.plans[s.id]) : '<div class="skel-list" aria-busy="true"><span class="sk sk-line" style="--w:70%"></span><span class="sk sk-line" style="--w:55%"></span><span class="sk sk-line" style="--w:62%"></span></div>'}</div>` : ''}
     </article>`;
 }
 
