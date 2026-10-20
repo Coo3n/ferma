@@ -10,7 +10,7 @@
    Имена с префиксом st — внутренние, rec* — вызываются из разметки. */
 
 const ST_FLEX = new Set(['click', 'tap', 'long_tap', 'swipe', 'type', 'key',
-    'launch_app', 'open_url', 'stop_app', 'shell', 'screenshot', 'unlock']);
+    'launch_app', 'open_url', 'stop_app', 'shell', 'screenshot', 'unlock', 'ensure_app']);
 const ST_HIST_MAX = 60;
 const ST_HIST_MERGE_MS = 700;   // правки внутри окна — одна запись отмены (набор текста)
 const ST_POLL_MS = 700;

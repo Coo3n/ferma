@@ -6,7 +6,7 @@ from farm.api import recorder as api_recorder
 def test_схема_отдаёт_все_виды_шагов_и_блоки():
     data = api_recorder.recipe_schema()
     assert set(data["kinds"]) == set(steps.ARGS)
-    assert data["blocks"] == ["chance", "if_seen", "loop", "until"]
+    assert data["blocks"] == ["chance", "if_phone", "if_seen", "loop", "until"]
     assert data["kinds"]["until"]["required"] == ["span"]
     assert data["limits"]["block_depth"] == steps.BLOCK_DEPTH_MAX
 

@@ -11,7 +11,7 @@ const POLL_SCENARIOS_MS = 15000;
    разделе. */
 const POLL_DEVIATIONS_MS = 6000;
 
-const VIEWS = ['fleet', 'device', 'scen', 'jobs', 'deviations', 'schedule', 'accounts'];
+const VIEWS = ['fleet', 'device', 'scen', 'apps', 'jobs', 'deviations', 'schedule', 'accounts'];
 
 /* ------------------------------------------------------------- навигация */
 
@@ -30,8 +30,9 @@ function showView(name) {
     S.view = name;
     document.querySelectorAll('.view').forEach(view =>
         view.classList.toggle('on', view.id === 'view-' + name));
-    /* «Проблемы» живут внутри «Запусков» — подсвечиваем их пункт. */
-    const navName = (name === 'deviations' || name === 'schedule') ? 'jobs' : name;
+    /* «Проблемы» живут внутри «Запусков», «Приложения» — внутри «Сценариев». */
+    const navName = (name === 'deviations' || name === 'schedule') ? 'jobs'
+        : name === 'apps' ? 'scen' : name;
     document.querySelectorAll('.navbtn').forEach(button => {
         const on = button.dataset.view === navName;
         button.classList.toggle('on', on);
@@ -54,6 +55,7 @@ function showView(name) {
 
     if (name === 'fleet') renderFleet();
     if (name === 'accounts') loadAccounts();
+    if (name === 'apps') apkShow();
     /* Фильтр «этот запуск» подменяет S.jobs; вне «Запусков» он только
        прятал бы чужие задачи от экрана телефона и «Проблем». */
     if (name !== 'jobs' && S.runBatch) S.runBatch = '';

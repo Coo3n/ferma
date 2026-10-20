@@ -337,6 +337,11 @@ body.marqueeing {
     color: var(--dim);
 }
 
+.inline-check .ens-note {
+    display: block;
+    font-size: var(--fs-1);
+}
+
 .inline-check input {
     accent-color: var(--accent);
     width: auto;

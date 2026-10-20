@@ -1,0 +1,59 @@
+/* Библиотека APK (apklib.js). Действия строки тихие, пока строку не навели:
+   в списке из десяти приложений тридцать кнопок разом — шум. */
+#apkList .apk-list {
+    display: grid;
+    gap: var(--s1);
+    padding: var(--s3) var(--s4);
+}
+
+.apk-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    padding: var(--s2) var(--s3);
+    border-radius: var(--r2);
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.apk-row:hover,
+.apk-row:focus-within {
+    background: var(--panel2);
+}
+
+.apk-ic {
+    flex: none;
+    color: var(--dim);
+}
+
+.apk-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    line-height: var(--lh);
+}
+
+.apk-main b {
+    font-size: var(--fs-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.apk-main span {
+    font-size: var(--fs-2);
+    color: var(--dim);
+}
+
+.apk-acts {
+    display: flex;
+    gap: var(--s1);
+    flex: none;
+    opacity: .45;
+    transition: opacity var(--fast) var(--ease);
+}
+
+.apk-row:hover .apk-acts,
+.apk-row:focus-within .apk-acts {
+    opacity: 1;
+}

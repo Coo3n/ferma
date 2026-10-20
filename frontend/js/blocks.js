@@ -22,9 +22,42 @@ const BLOCK_KINDS = {
     chance: {icon: 'dice', defaults: () => ({percent: 15})},
     until: {icon: 'search', defaults: () => ({tries: 20, on_fail: 'skip'})},
     if_seen: {icon: 'eye', defaults: () => ({negate: false, timeout: 3})},
+    if_phone: {icon: 'phone', defaults: () => ({check: 'app_installed', negate: false})},
 };
 const UNTIL_ON_FAIL = ['skip', 'fail', 'ask'];
 const UNTIL_FEATS = ['textContains', 'text', 'resourceId', 'descriptionContains'];
+
+/* Поля каждой проверки «если на телефоне» — как steps.PHONE_CHECKS. */
+const PHONE_CHECK_FIELDS = {
+    app_installed: ['package'], app_older: ['package', 'version'], battery_below: ['percent'],
+    offline: [], space_below: ['gb'], no_account: ['platform'],
+};
+
+function phoneCheckName(c) {
+    return c === 'app_installed' ? t('rec.tel_c_app') : c === 'app_older' ? t('rec.tel_c_older')
+        : c === 'battery_below' ? t('rec.tel_c_battery') : c === 'offline' ? t('rec.tel_c_offline')
+        : c === 'space_below' ? t('rec.tel_c_space') : t('rec.tel_c_account');
+}
+
+function phoneCheckText(a) {
+    const app = a.package ? recApp(a.package) : t('rec.tel_prilozhenie');
+    const p = PLATFORM_NAMES[a.platform] || a.platform || '';
+    switch (a.check) {
+        case 'app_installed':
+            return a.negate ? t('rec.tel_net_prilozheniya', {app}) : t('rec.tel_est_prilozhenie', {app});
+        case 'app_older':
+            return a.negate ? t('rec.tel_versiya_ne_nizhe', {app, v: a.version || '?'})
+                : t('rec.tel_versiya_nizhe', {app, v: a.version || '?'});
+        case 'battery_below':
+            return a.negate ? t('rec.tel_zaryad_ne_menshe', {n: a.percent}) : t('rec.tel_zaryad_menshe', {n: a.percent});
+        case 'offline':
+            return a.negate ? t('rec.tel_est_internet') : t('rec.tel_net_interneta');
+        case 'space_below':
+            return a.negate ? t('rec.tel_mesta_hvataet', {n: recNum(a.gb)}) : t('rec.tel_malo_mesta', {n: recNum(a.gb)});
+        default:
+            return a.negate ? t('rec.tel_akkaunt_est', {p}) : t('rec.tel_net_akkaunta', {p});
+    }
+}
 
 /* Ключи строк — буквально: test_strings ищет t('…') в коде. */
 function untilFeatName(k) {
@@ -38,6 +71,7 @@ function untilOnFailName(v) {
 
 function blockAddedHint(kind) {
     if (kind === 'if_seen') return t('rec.blok_dobavlen_esli');
+    if (kind === 'if_phone') return t('rec.blok_dobavlen_telefon');
     return kind === 'chance' ? t('rec.blok_dobavlen_shans')
         : kind === 'until' ? t('rec.blok_dobavlen_poka') : t('rec.blok_dobavlen_povtor');
 }
@@ -204,6 +238,12 @@ function blockPayloadArgs(step) {
     } else if (step.kind === 'if_seen') {
         out.negate = !!a.negate;
         out.timeout = Math.min(60, Math.max(0, Number(a.timeout ?? 3)));
+    } else if (step.kind === 'if_phone') {
+        out.check = a.check;
+        out.negate = !!a.negate;
+        for (const f of PHONE_CHECK_FIELDS[a.check] || []) {
+            out[f] = f === 'percent' || f === 'gb' ? Number(a[f]) : String(a[f] ?? '');
+        }
     }
     return out;
 }
@@ -230,6 +270,7 @@ function blockTarget(step) {
 }
 
 function blockLabel(step) {
+    if (step.kind === 'if_phone') return phoneCheckText(step.args);
     if (step.kind === 'loop') return t('rec.povtoryat', {mera: blockLoopMeasure(step.args)});
     if (step.kind === 'chance') return t('rec.s_shansom', {p: recNum(step.args.percent)});
     if (step.kind === 'if_seen') {
@@ -243,6 +284,12 @@ function blockLabel(step) {
 function blockCode(step) {
     const a = blockPayloadArgs(step);
     if (step.kind === 'chance') return `if ctx.chance(${recNum(a.percent)}):`;
+    if (step.kind === 'if_phone') {
+        const parts = [JSON.stringify(a.check)];
+        for (const f of ['package', 'version', 'platform']) if (a[f] != null) parts.push(`${f}=${JSON.stringify(a[f])}`);
+        for (const f of ['percent', 'gb']) if (a[f] != null) parts.push(`${f}=${recNum(a[f])}`);
+        return `if ${a.negate ? 'not ' : ''}ctx.phone_is(${parts.join(', ')}):`;
+    }
     if (step.kind === 'if_seen') {
         const цель = (step.any || []).map(x => `dict(${x})`).join(', ');
         return `if ${a.negate ? 'not ' : ''}ctx.seen([${цель}], timeout=${recNum(a.timeout)}):`;
@@ -282,7 +329,8 @@ function recBlockEditor(step) {
     if (!blockIsHead(step)) return '';   // «в блок» — в меню «⋯» строки (REC_ROW_MENU)
     const body = step.kind === 'loop' ? blockLoopEditor(step)
         : step.kind === 'chance' ? blockChanceEditor(step)
-        : step.kind === 'if_seen' ? blockIfSeenEditor(step) : blockUntilEditor(step);
+        : step.kind === 'if_seen' ? blockIfSeenEditor(step)
+        : step.kind === 'if_phone' ? blockIfPhoneEditor(step) : blockUntilEditor(step);
     return `<div class="blk-ed">${body}
       <div class="blk-ed-row">
         <span class="sp"></span>
@@ -464,6 +512,51 @@ function blockIfSeenEditor(step) {
       <p class="blk-ed-hint">${esc(t('rec.esli_podskazka'))}</p>`;
 }
 
+function blockIfPhoneEditor(step) {
+    const a = step.args;
+    const fields = PHONE_CHECK_FIELDS[a.check] || [];
+    const row = (label, html) => `<div class="blk-ed-row"><span class="blk-ed-k">${esc(label)}</span>${html}</div>`;
+    const chip = neg => `<button class="chip ${!!a.negate === neg ? 'on' : ''}" aria-pressed="${!!a.negate === neg}"
+        onclick="recBlockSet(${step.id}, 'negate', ${neg})">${esc(phoneCheckText(Object.assign({}, a, {negate: neg})))}</button>`;
+    const pid = 'phoneApp' + step.id;
+    if (fields.includes('package')) setTimeout(() => appPickFill(pid), 0);
+    const checks = Object.keys(PHONE_CHECK_FIELDS).map(c =>
+        `<option value="${c}" ${a.check === c ? 'selected' : ''}>${esc(phoneCheckName(c))}</option>`).join('');
+    const platforms = Object.keys(PLATFORM_NAMES).map(p =>
+        `<option value="${p}" ${a.platform === p ? 'selected' : ''}>${esc(PLATFORM_NAMES[p])}</option>`).join('');
+    return row(t('rec.uslovie'), `<select aria-label="${esc(t('rec.uslovie'))}"
+            onchange="recPhoneCheck(${step.id}, this.value)">${checks}</select>`)
+        + `<div class="blk-ed-row"><div class="chips" role="group">${chip(false)}${chip(true)}</div></div>`
+        + (fields.includes('package') ? row(t('rec.tel_kakoe'),
+            appPickHtml(pid, a.package, (v, typing) => recBlockSet(step.id, 'package', v, typing))) : '')
+        + (fields.includes('version') ? row(t('rec.tel_versiya'), `<input type="text" class="blk-ed-n" placeholder="8.40"
+            aria-label="${esc(t('rec.tel_versiya'))}" value="${esc(a.version || '')}"
+            onchange="recBlockSet(${step.id}, 'version', this.value.trim())">`) : '')
+        + (fields.includes('percent') ? row(t('rec.tel_zaryad'), `<input type="number" class="blk-ed-n" min="1" max="99"
+            aria-label="${esc(t('rec.tel_zaryad'))}" value="${a.percent ?? 20}"
+            onchange="recBlockSet(${step.id}, 'percent', this.value)"><span>%</span>`) : '')
+        + (fields.includes('gb') ? row(t('rec.tel_mesto'), `<input type="number" class="blk-ed-n" min="0.1" max="256" step="0.5"
+            aria-label="${esc(t('rec.tel_mesto'))}" value="${a.gb ?? 1}"
+            onchange="recBlockSet(${step.id}, 'gb', this.value)"><span>${esc(t('rec.tel_gb'))}</span>`) : '')
+        + (fields.includes('platform') ? row(t('rec.tel_akkaunt'), `<select aria-label="${esc(t('rec.tel_akkaunt'))}"
+            onchange="recBlockSet(${step.id}, 'platform', this.value)">${platforms}</select>`) : '')
+        + `<div class="blk-ed-row"><span class="sp"></span>
+            <button class="sm ghost" onclick="recIfSeenElse(${step.id})"
+                    title="${esc(t('rec.inache_podskazka'))}">${esc(t('rec.dobavit_inache'))}</button></div>`;
+}
+
+/* Сменили проверку — поля прежней убираем, новой ставим значения по умолчанию. */
+function recPhoneCheck(id, check) {
+    const step = recFind(id);
+    if (!step || !PHONE_CHECK_FIELDS[check]) return;
+    const keep = {package: step.args.package || '', version: step.args.version || '',
+        percent: step.args.percent ?? 20, gb: step.args.gb ?? 1, platform: step.args.platform || 'vk'};
+    step.args = {check, negate: !!step.args.negate};
+    for (const f of PHONE_CHECK_FIELDS[check]) step.args[f] = keep[f];
+    recRender();
+    recSave();
+}
+
 /* Первый клик внутри блока — обычно цель: «если есть „Закрыть“ — нажать». */
 function blockFirstClick(head) {
     return blockInside(head).find(s => s.kind === 'click' && s.selector) || null;
@@ -472,11 +565,15 @@ function blockFirstClick(head) {
 /* «Иначе»: такой же блок с обратным условием сразу за этим. */
 function recIfSeenElse(id) {
     const head = recFind(id);
-    if (!head || head.kind !== 'if_seen') return;
+    if (!head || (head.kind !== 'if_seen' && head.kind !== 'if_phone')) return;
     const at = REC.steps.indexOf(head) + blockOf(head).length;
-    const other = {id: REC.nextId++, kind: 'if_seen', parent: head.parent ?? null,
-        args: {negate: !head.args.negate, timeout: head.args.timeout ?? 3},
-        any: [...(head.any || [])], param: null, note: '', warn: ''};
+    const other = head.kind === 'if_seen'
+        ? {id: REC.nextId++, kind: 'if_seen', parent: head.parent ?? null,
+            args: {negate: !head.args.negate, timeout: head.args.timeout ?? 3},
+            any: [...(head.any || [])], param: null, note: '', warn: ''}
+        : {id: REC.nextId++, kind: 'if_phone', parent: head.parent ?? null,
+            args: Object.assign({}, head.args, {negate: !head.args.negate}),
+            param: null, note: '', warn: ''};
     const pause = {id: REC.nextId++, kind: 'sleep', args: {seconds: 1}, parent: other.id,
         param: null, note: '', warn: ''};
     REC.steps.splice(at, 0, other, pause);
@@ -526,7 +623,7 @@ function recUntilDrop(id, index) {
     recSave();
 }
 
-function recBlockSet(id, field, value) {
+function recBlockSet(id, field, value, typing) {
     const step = recFind(id);
     if (!blockIsHead(step)) return;
     const a = step.args;
@@ -550,6 +647,12 @@ function recBlockSet(id, field, value) {
         a.timeout = Math.min(60, Math.max(0, Number(value) || 0));
     } else if (field === 'on_fail') {
         a.on_fail = UNTIL_ON_FAIL.includes(value) ? value : 'skip';
+    } else if (['package', 'version', 'platform'].includes(field)) {
+        a[field] = String(value || '');
+    } else if (field === 'percent' && step.kind === 'if_phone') {
+        a.percent = Math.min(99, Math.max(1, Math.round(Number(value) || 1)));
+    } else if (field === 'gb') {
+        a.gb = Math.min(256, Math.max(0.1, Number(value) || 1));
     } else if (field === 'percent') {
         a.percent = Math.min(100, Math.max(1, Number(value) || 1));
     } else if (field === 'tries') {
@@ -558,7 +661,8 @@ function recBlockSet(id, field, value) {
         a[field] = Math.max(0, Number(value) || 0);
         if (a.pause_min > (a.pause_max ?? 0)) a.pause_max = a.pause_min;
     }
-    recRender();
+    /* Набор текста: перерисовка убрала бы поле из-под курсора. */
+    if (!typing) recRender();
     recSave();
 }
 
@@ -685,7 +789,7 @@ function grBlockFrames(layout) {
         const y2 = Math.max(...boxes.map(b => b.y)) + GR_NODE_H + pad;
         parts.push(`<rect class="gr-block-box gr-block-${head.kind}" x="${x1}" y="${y1}"
             width="${x2 - x1}" height="${y2 - y1}" rx="12"/>`);
-        if (head.kind === 'chance' || head.kind === 'if_seen' || block.length < 2) return;   // пустому — без петли
+        if (head.kind === 'chance' || head.kind === 'if_seen' || head.kind === 'if_phone' || block.length < 2) return;   // пустому — без петли
         /* Петля «назад, к началу круга» — снаружи рамки, прямыми отрезками со
            скруглёнными углами: от последнего шага вправо, вверх по краю и к
            заголовку блока. Дуга по рамкам пересекала края вложенных блоков, и

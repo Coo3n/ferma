@@ -131,7 +131,21 @@ def _if_seen(step: dict) -> str:
     return f'if {"not " if args.get("negate") else ""}{вызов}:'
 
 
-BLOCK_HEADERS = {"loop": _loop, "chance": _chance, "until": _until, "if_seen": _if_seen}
+def _if_phone(step: dict) -> str:
+    """«Если на телефоне»: факт о телефоне, тело — следующие span шагов."""
+    args = step["args"]
+    parts = [literal(args["check"])]
+    for field in ("package", "version", "platform"):
+        if field in args:
+            parts.append(f"{field}={literal(args[field])}")
+    for field in ("percent", "gb"):
+        if field in args:
+            parts.append(f"{field}={_num(args[field])}")
+    return f'if {"not " if args.get("negate") else ""}ctx.phone_is({", ".join(parts)}):'
+
+
+BLOCK_HEADERS = {"loop": _loop, "chance": _chance, "until": _until, "if_seen": _if_seen,
+                 "if_phone": _if_phone}
 
 
 def _call(step: dict):
@@ -151,6 +165,13 @@ def _call(step: dict):
         return f'ctx.finish({literal(args.get("reason") or "")})'
     if kind == "call":
         return f'ctx.run({literal(args["scenario"])})'
+    if kind == "ensure_app":
+        parts = [_value(step, literal(args["package"]))]
+        if args.get("min_version"):
+            parts.append(f'min_version={literal(args["min_version"])}')
+        if not args.get("install", True):
+            parts.append("install=False")
+        return f"ctx.ensure_app({', '.join(parts)})"
     if kind == "click":
         selector = step["selector"]
         chain = [selector["args"], *(selector.get("fallbacks") or [])]

@@ -7,28 +7,43 @@
 const APP_PICK = {byDevice: {}, cb: {}};
 const APP_OTHER = '__other__';
 
-/* [{package, label}] по телефону: названия с телефона, а где их нет — по
-   имени пакета. Кэш на телефон: форма открывается часто. */
+/* [{package, label}] по телефону + приложения из библиотеки APK: шагу
+   «Приложение готово» нужно выбрать и то, чего на телефоне ещё нет.
+   Кэш на телефон: форма открывается часто. */
 async function appChoices(serial) {
-    if (!serial) return [];
-    if (APP_PICK.byDevice[serial]) return APP_PICK.byDevice[serial];
-    let rows = [];
+    let lib = [];
     try {
-        rows = await api(`/api/devices/${serial}/apps`);
+        lib = (await apkList()).map(a => ({package: a.package, label: a.name}));
     } catch (e) {
-        try {
-            rows = (await api(`/api/devices/${serial}/packages`)).map(pkg => ({package: pkg}));
-        } catch (e2) {
-            return [];
-        }
+        lib = [];
     }
-    const list = rows.map(r => ({
-        package: r.package,
-        label: r.label || recApp(r.package).replace(/[«»]/g, ''),
-    })).sort((a, b) => (REC_APPS[a.package] ? 0 : 1) - (REC_APPS[b.package] ? 0 : 1)
+    if (!serial) return lib;
+    if (!APP_PICK.byDevice[serial]) {
+        let rows = [];
+        try {
+            rows = await api(`/api/devices/${serial}/apps`);
+        } catch (e) {
+            try {
+                rows = (await api(`/api/devices/${serial}/packages`)).map(pkg => ({package: pkg}));
+            } catch (e2) {
+                rows = [];
+            }
+        }
+        const mapped = rows.map(r => ({
+            package: r.package,
+            label: r.label || recApp(r.package).replace(/[«»]/g, ''),
+        }));
+        if (!rows.length) return mergeApps(mapped, lib);   // сбой не запоминаем
+        APP_PICK.byDevice[serial] = mapped;
+    }
+    return mergeApps(APP_PICK.byDevice[serial], lib);
+}
+
+function mergeApps(base, lib) {
+    const list = base.slice();
+    for (const a of lib) if (!list.some(x => x.package === a.package)) list.push(a);
+    return list.sort((a, b) => (REC_APPS[a.package] ? 0 : 1) - (REC_APPS[b.package] ? 0 : 1)
         || a.label.localeCompare(b.label, 'ru'));
-    APP_PICK.byDevice[serial] = list;
-    return list;
 }
 
 function appLabelOf(serial, pkg) {
@@ -80,5 +95,5 @@ function appPickChanged(id, typing) {
     input.hidden = select.value !== APP_OTHER;
     if (!typing && !input.hidden) input.focus();
     const handler = APP_PICK.cb[id];
-    if (handler && (select.value !== APP_OTHER || typing)) handler(appPickValue(id));
+    if (handler && (select.value !== APP_OTHER || typing)) handler(appPickValue(id), !!typing);
 }

@@ -66,6 +66,7 @@ Simultaneous identical actions on many phones = ban. Default ON: jitter modes of
 - Every step must be testable alone: ▶ on scheme card / list row → `recRunStep(i)` → `/api/run` with `stop_step`.
 - Toolbar row 1 = flow (Запись → Проверить → Сохранить). Row 2 = editing tools. Canvas controls (zoom) live on the canvas. Each row must fit 1280px without wrapping.
 - Accounts in scenarios: never store credentials in a scenario. Recording into a focused password/login/phone field of vk/inst/tiktok/tg (dump `password`/`focused`/`hint`/`package`) becomes `type` with `args.account`+`args.field` (`recNoteType`, `recFieldKind`); the type step editor offers «Свой текст / Из аккаунта телефона» chips; preset «Войти в аккаунт телефона» uses account fields.
+- `if_phone` 📱 — a fact about the phone, colored like `if_seen`; fields per `PHONE_CHECK_FIELDS`; «+ иначе» adds the twin with negated `negate`.
 - Builder needs a phone: use `pickPhone(title, then)` (devices.js), never a disabled button.
 - Re-render the scheme when it becomes visible (`recSetView`) — widths computed while hidden are wrong.
 
@@ -101,7 +102,7 @@ Four sections: Ферма · Сценарии · Запуски (tabs «Все �
 
 ## LaiXi parity checklist
 
-Done: preflight before run (accounts/busy/offline), runs filtered by launch batch, mirroring, sync control (+jitter), bulk APK/file/reboot/text/open/clear data, groups + scenario per group, quick phrases, density S/M/L, accounts manager. Schedules «смены» (per-phone random slots in a window, Запуски → Расписание), device tags (filter, bulk, run by tag), bulk screenshots, screen off, jobs CSV export. Phone pult (volume, rotate, full-size screenshot, screen video, clipboard paste), drag-and-drop APK/file onto screen or tiles, «farm waits» notifications, stuck-run watchdog with teach-and-continue.
+Done: preflight before run (accounts/busy/offline), runs filtered by launch batch, mirroring, sync control (+jitter), bulk APK/file/reboot/text/open/clear data, groups + scenario per group, quick phrases, density S/M/L, accounts manager, phone checks in scenarios (`if_phone`), «Приложение готово» step (`ensure_app`), APK library (Сценарии → Приложения). Schedules «смены» (per-phone random slots in a window, Запуски → Расписание), device tags (filter, bulk, run by tag), bulk screenshots, screen off, jobs CSV export. Phone pult (volume, rotate, full-size screenshot, screen video, clipboard paste), drag-and-drop APK/file onto screen or tiles, «farm waits» notifications, stuck-run watchdog with teach-and-continue.
 Removed 2026-10-17: ready-made warm-up templates (blind taps, untested on real phones — owner records own scenarios).
 Not planned: multi-computer remote control, chat/inbox management.
 When adding a competitor feature, write it into this list.
