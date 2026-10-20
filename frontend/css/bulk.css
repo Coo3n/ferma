@@ -399,8 +399,16 @@ body.marqueeing {
 
 /* ------------------------------------------- шаги сценария на «Сценариях» */
 
+/* Лента шагов — спокойный список, не стопка карточек: на всю ширину
+   экрана подпись уезжала от картинки, а паузы весили столько же, сколько
+   нажатия. Ширина — как у текста, паузы тише, блоки с отступом. */
 #scSteps {
     margin-top: var(--s3);
+}
+
+.sc-steps-head,
+.sc-steps {
+    max-width: 720px;
 }
 
 .sc-steps-head {
@@ -410,54 +418,80 @@ body.marqueeing {
 }
 
 .sc-steps {
-    margin: var(--s3) 0 0;
+    margin: var(--s2) 0 0;
     padding: 0;
     list-style: none;
     counter-reset: scs;
     display: grid;
-    gap: var(--s1);
     font-size: var(--fs-2);
     color: var(--text);
 }
 
 /* Строка шага: картинка слева (что сделано), номер и подпись справа. */
 .sc-steps li {
+    --d: 0;
     counter-increment: scs;
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--s3);
-    min-height: 48px;
-    padding: var(--s1) var(--s3);
-    border-radius: var(--r2);
-    background: var(--panel2);
+    min-height: 40px;
+    padding: 2px var(--s2) 2px calc(var(--s2) + var(--d) * 24px);
+    border-radius: var(--r1);
 }
 
+.sc-steps li:hover { background: var(--panel2); }
 .sc-steps li::after { content: none; }
+
+/* Шаг внутри блока: тонкая линия слева — «это крутится вместе». */
+.sc-steps li.in::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--s2) + var(--d) * 24px - 9px);
+    width: 2px;
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
 .sc-lbl::before {
     content: counter(scs);
     display: inline-block;
     min-width: 2ch;
     margin-right: var(--s2);
     color: var(--dim);
+    font-size: var(--fs-1);
     font-variant-numeric: tabular-nums;
 }
 
 .sc-vis {
     flex: none;
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     display: grid;
     place-items: center;
     border-radius: var(--r1);
-    background: var(--well, var(--panel));
 }
-.sc-vis .ic { width: 20px; height: 20px; color: var(--dim); }
-.sc-crop { max-width: 36px; max-height: 36px; border-radius: 4px; outline: 2px solid var(--accent); outline-offset: 1px; }
-.sc-phone { width: 20px; height: 36px; }
+
+/* Подложка только у настоящих картинок; значку она не нужна. */
+.sc-vis:has(.sc-crop, .sc-phone) { background: var(--well, var(--panel)); }
+.sc-vis .ic { width: 16px; height: 16px; color: var(--dim); }
+.sc-crop { max-width: 30px; max-height: 30px; border-radius: 4px; outline: 2px solid var(--accent); outline-offset: 1px; }
+.sc-phone { width: 16px; height: 28px; }
+
+/* Паузы — служебные, тише и ниже. */
+.sc-steps li.wait { min-height: 28px; color: var(--dim); font-size: var(--fs-1); }
+.sc-steps li.wait .sc-vis { height: 24px; }
+
+/* Заголовок блока — жирнее, значок в цвете блока. */
+.sc-steps li.blk .sc-lbl { font-weight: 600; }
+.sc-steps li.k-loop .ic { color: var(--accent); }
+.sc-steps li.k-chance .ic { color: var(--warn); }
+.sc-steps li.k-until .ic { color: var(--busy); }
 .sv-body { fill: none; stroke: var(--line-hover); stroke-width: 1.5; }
 .sv-dot { fill: var(--accent); }
 .sv-ring { fill: none; stroke: var(--accent); stroke-width: 1.5; opacity: .6; }
-.sv-arrow { stroke: var(--accent); stroke-width: 2; stroke-linecap: round; }
+.sv-arrow { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 
 /* --------------------------------------------- выбор телефона для записи */
 

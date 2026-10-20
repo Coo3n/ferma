@@ -346,14 +346,32 @@ async function renderScenarioSteps(scenario) {
     }
     if (S.scenario !== scenario.key) return;   // пока грузили, выбрали другой
     const steps = (recipe.steps || []).map(st => Object.assign({args: {}}, st));
+    const depth = scStepDepths(steps);
     box.hidden = false;
     setHTML(box, `<div class="sc-steps-head"><h3>Шаги · ${steps.length}</h3>
         <button class="sm" onclick="editScenario('${esc(scenario.key)}')"
                 title="Открыть в конструкторе">
           <svg class="ic"><use href="#i-pencil"/></svg>Изменить</button></div>
-      <ol class="sc-steps">${steps.map(st =>
-        `<li><span class="sc-vis">${scStepVisual(st, recipe.assets || {})}</span>
-          <span class="sc-lbl">${esc(recLabel(st))}</span></li>`).join('')}</ol>`);
+      <ol class="sc-steps">${steps.map((st, i) => {
+          const head = !!BLOCK_KINDS[st.kind];
+          const cls = (head ? `blk k-${st.kind}` : st.kind === 'sleep' ? 'wait' : '')
+              + (depth[i] ? ' in' : '');
+          return `<li class="${cls}" style="--d:${depth[i]}">
+            <span class="sc-vis">${scStepVisual(st, recipe.assets || {})}</span>
+            <span class="sc-lbl">${esc(recLabel(st))}</span></li>`;
+      }).join('')}</ol>`);
+}
+
+/* Глубина вложенности по span заголовков блоков — шаги внутри «Повторять»
+   сдвинуты вправо, чтобы было видно, что крутится. */
+function scStepDepths(steps) {
+    const open = [];   // индекс последнего шага каждого открытого блока
+    return steps.map((st, i) => {
+        while (open.length && i > open[open.length - 1]) open.pop();
+        const d = open.length;
+        if (BLOCK_KINDS[st.kind]) open.push(i + (Number(st.args.span) || 0));
+        return d;
+    });
 }
 
 /* Картинка шага: что именно сделано. Нажатие по кнопке — её вырезка в
@@ -371,8 +389,10 @@ function scStepVisual(st, assets) {
     if ((st.kind === 'tap' || st.kind === 'long_tap') && num(a.x) && num(a.y)) return phone(dot(a.x, a.y));
     if (st.kind === 'swipe' && [a.x1, a.y1, a.x2, a.y2].every(num)) {
         const [x1, y1, x2, y2] = [a.x1 * 24, a.y1 * 44, a.x2 * 24, a.y2 * 44];
+        const ang = Math.atan2(y2 - y1, x2 - x1);
+        const tip = s => `${(x2 - 7 * Math.cos(ang + s)).toFixed(1)},${(y2 - 7 * Math.sin(ang + s)).toFixed(1)}`;
         return phone(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="sv-arrow"/>
-            <circle cx="${x1}" cy="${y1}" r="2.5" class="sv-dot"/>`);
+            <polyline points="${tip(.6)} ${x2.toFixed(1)},${y2.toFixed(1)} ${tip(-.6)}" class="sv-arrow"/>`);
     }
     return `<svg class="ic" aria-hidden="true"><use href="#i-${esc(schIcon(st)[1])}"/></svg>`;
 }
