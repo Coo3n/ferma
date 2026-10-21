@@ -268,3 +268,12 @@ def test_выключенные_правила_не_пробуются_в_зап
     guards.set_scenario_off("s1", True)
     assert DeviceContext._rescue(fake) is False
     assert Engine.calls == 1
+
+
+def test_не_помеха_убирается_из_списка(песочница, monkeypatch):
+    monkeypatch.setattr(api, "scan_obstacles", lambda package="": [
+        {"job": "j1", "file": "obstacle.json", "texts": ["Главная"], "package": "com.app", "candidates": []}])
+    monkeypatch.setattr(api.obstacle, "uncovered", lambda found, rules: found)
+    assert len(api.detour_map("com.app")["obstacles"]) == 1
+    api.ignore_obstacle({"job": "j1", "file": "obstacle.json"})
+    assert api.detour_map("com.app")["obstacles"] == []

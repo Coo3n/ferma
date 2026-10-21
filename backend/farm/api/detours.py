@@ -261,6 +261,31 @@ def _rule_img(g) -> str:
     return ""
 
 
+IGNORED_FILE = "obstacles_ignored.json"
+
+
+def _ignored() -> set:
+    try:
+        data = json.loads((Path(config.GUARDS_DIR) / IGNORED_FILE).read_text("utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    return {x for x in data if isinstance(x, str)} if isinstance(data, list) else set()
+
+
+@router.post("/obstacles/ignore")
+def ignore_obstacle(payload: dict = Body(...)):
+    """«Это не помеха»: обычный экран приложения попал в список встреченных
+    окон — убрать его, чтобы не мозолил глаза."""
+    job, file = str(payload.get("job") or ""), str(payload.get("file") or "")
+    if not job or not file:
+        raise HTTPException(400, "не указано, какой экран убрать")
+    keys = _ignored() | {f"{job}/{file}"}
+    path = Path(config.GUARDS_DIR) / IGNORED_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(sorted(keys), ensure_ascii=False), "utf-8")
+    return {"ok": True}
+
+
 @router.get("")
 def detour_map(package: str = ""):
     """Карта отводов: что уже умеем обходить и обо что ещё спотыкаемся.
@@ -276,4 +301,6 @@ def detour_map(package: str = ""):
          "action": g.action, "source": g.source, "img": _rule_img(g)}
         for g in guards.load(package)
     ]
-    return {"rules": rules, "obstacles": obstacle.uncovered(scan_obstacles(package), rules)}
+    ignored = _ignored()
+    found = [o for o in scan_obstacles(package) if f"{o.get('job')}/{o.get('file')}" not in ignored]
+    return {"rules": rules, "obstacles": obstacle.uncovered(found, rules)}

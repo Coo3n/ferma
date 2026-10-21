@@ -1394,6 +1394,13 @@ class DeviceContext:
             слепок = dict(слепок, escaped=True)
             (base / имя).write_text(
                 json.dumps(слепок, ensure_ascii=False, indent=1), "utf-8")
+            # Снимок этого экрана рядом — чтобы в «Окнах-помехах» было видно,
+            # что встретилось, а не только список надписей.
+            try:
+                (base / имя.replace(".json", ".jpg")).write_bytes(
+                    control.screenshot(self.serial, max_width=360, quality=60))
+            except Exception as e:  # noqa: BLE001 — без снимка слепок всё равно полезен
+                self.log(f"снимок незнакомого экрана не снят: {e}")
             return имя
         except OSError as e:
             self.log(f"слепок обойдённой преграды не сохранился: {e}")

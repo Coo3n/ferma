@@ -58,8 +58,11 @@ function popRunnable() {
 function popRuleRow(r) {
     const id = `${r.source}\u0000${r.name}`;
     const editing = POP.edit === id;
+    /* Нет снимка (правило из коробки или старое) — макет кнопки с её
+       надписью: узнаётся глазом так же, как вырезка, а не одинаковый значок. */
+    const word = popWhenText(r).replace(/[«»]/g, '');
     const thumb = r.img ? `<img class="pop-thumb" src="${esc(r.img)}" alt="">`
-        : `<span class="pop-thumb ic-only">${recIcon('layers')}</span>`;
+        : `<span class="pop-thumb mock" aria-hidden="true"><span>${esc(word)}</span></span>`;
     return `<li class="pop-rule ${editing ? 'editing' : ''}">
       <div class="pop-line">
         ${thumb}
@@ -184,15 +187,18 @@ function popSideHtml(карта, package_) {
     POP.rules = карта.rules || [];
     POP.lastPkg = package_ || '';
     const gaps = карта.obstacles || [];
+    POP.gaps = gaps;
+    POP.gapIcon = `<span class="pop-thumb ic-only warn">${recIcon('alert')}</span>`;
     const gapRow = o => {
         const {title} = schObstacleLabel(o);
         const word = popSuggest(o);
         return `<li class="pop-rule pop-gap"><div class="pop-line">
-          <span class="pop-thumb ic-only warn">${recIcon('alert')}</span>
+          ${o.job ? `<img class="pop-thumb shot" alt="" loading="lazy" src="/api/jobs/${esc(o.job)}/artifacts/${encodeURIComponent(popGapShot(o))}"
+              onerror="this.outerHTML=POP.gapIcon">` : POP.gapIcon}
           <span class="pop-tx"><span class="pop-when">${esc(title)}</span>
             <span class="pop-act dim">${esc(word ? t('pop.pohozhe', {word}) : t('pop.vstrech', {n: o.hits}))}</span></span>
           ${word ? `<button class="sm primary" onclick="popQuickRule('${esc(o.package || package_ || '')}', ${esc(JSON.stringify(word))})">${esc(t('pop.nazhimat_word', {word}))}</button>` : ''}
-          <button class="sm" onclick="teachDetour('${esc(o.job || '')}', '${esc(o.file || '')}')" ${o.job ? '' : 'disabled'}>${esc(t('pop.nauchit'))}</button>
+          <button class="sm" onclick="popTeachGap(${esc(JSON.stringify(gaps.indexOf(o)))})" ${o.job ? '' : 'disabled'}>${esc(t('pop.nauchit'))}</button>
         </div></li>`;
     };
     return `<div class="pop">
@@ -232,6 +238,7 @@ async function popScenarioLoad(key) {
       </div>
       ${!info.off && POP.rules.length ? `<ol class="pop-rules">${POP.rules.map(popRuleRow).join('')}</ol>` : ''}
     </div>`);
+    if (window.coachOnce) coachOnce('scenpop', 'scen');
 }
 
 async function popScenarioToggle(key, off) {
@@ -272,6 +279,61 @@ async function popSave() {
             when: [when], action, img});
         closeModal();
         toast(t('pop.sohraneno', {name: r.name}), 'ok');
+        popRerender();
+    } catch (e) {
+        toast(e.message, 'bad');
+    }
+}
+
+/* ------------------------------------- «Научить» по встреченному окну */
+
+/* Снимок того экрана из запуска, где он встретился: obstacle.json — кадр
+   падения, obstacle_escaped_NN.json — кадр обхода вслепую с тем же номером. */
+function popGapShot(o) {
+    return /^obstacle_escaped_\d+\.json$/.test(o.file || '') ? o.file.replace('.json', '.jpg') : '99_failure.jpg';
+}
+
+async function popTeachGap(i) {
+    const o = (POP.gaps || [])[i];
+    if (!o || !o.job) return;
+    let job = null;
+    try {
+        job = await api('/api/jobs/' + encodeURIComponent(o.job));
+    } catch (e) { /* запуск могли удалить — снимка не будет, учить всё равно можно */ }
+    const shot = popGapShot(o);   // файл берём прямо по имени: запуска в журнале может уже не быть
+    const {title} = schObstacleLabel(o);
+    const texts = (o.texts || []).slice(0, 8);
+    POP.noShot = `${recIcon('image')}<p>${esc(t('pop.snimka_net'))}</p>`;
+    $('mTitle').textContent = t('pop.okno_meshalo');
+    $('mBody').innerHTML = `<div class="vp">
+        <div class="vp-shot"><img class="pop-gap-shot" src="/api/jobs/${esc(o.job)}/artifacts/${encodeURIComponent(shot)}" alt=""
+              onerror="this.replaceWith(Object.assign(document.createElement('div'), {className: 'vp-empty', innerHTML: POP.noShot}))"></div>
+        <div class="vp-side">
+          <div><b class="pop-gap-title">${esc(title)}</b>
+            <p class="how-note">${esc(t('pop.vstrech', {n: o.hits}))}${job ? ' · ' + esc(job.device_name || '') : ''}</p></div>
+          ${texts.length ? `<p class="vp-h">${esc(t('pop.na_ekrane_bylo'))}</p>
+            <div class="pop-words">${texts.map(x => `<span>${esc(x)}</span>`).join('')}</div>` : ''}
+          <p class="vp-h">${esc(t('pop.kak_nauchit'))}</p>
+          <button type="button" class="pop-way" onclick="closeModal();popNew('${esc(o.package || '')}', ${job ? `'${esc(job.serial)}'` : 'undefined'})">
+            ${recIcon('crosshair')}<span><b>${esc(t('pop.way_knopka_t'))}</b><small>${esc(t('pop.way_knopka'))}</small></span></button>
+          <button type="button" class="pop-way" onclick="closeModal();teachDetour('${esc(o.job)}', '${esc(o.file || '')}')">
+            ${recIcon('record')}<span><b>${esc(t('pop.way_kliki_t'))}</b><small>${esc(t('pop.way_kliki'))}</small></span></button>
+          <button type="button" class="pop-way quiet" onclick="popIgnoreGap(${i})">
+            ${recIcon('check')}<span><b>${esc(t('pop.way_ne_pomeha_t'))}</b><small>${esc(t('pop.way_ne_pomeha'))}</small></span></button>
+        </div>
+      </div>`;
+    $('mActs').innerHTML = `<span class="sp"></span><button class="sm" onclick="closeModal()">${esc(t('rec.otmena'))}</button>`;
+    modalSheet('wide');
+    openModal();
+}
+
+async function popIgnoreGap(i) {
+    const o = (POP.gaps || [])[i];
+    if (!o) return;
+    try {
+        await post('/api/detours/obstacles/ignore', {job: o.job, file: o.file});
+        closeModal();
+        toast(t('pop.ubrano'), 'ok');
         popRerender();
     } catch (e) {
         toast(e.message, 'bad');

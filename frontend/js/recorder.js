@@ -2077,6 +2077,11 @@ function recSideOpen() {
 async function recSchemeSideLoad() {
     const side = document.querySelector('#recSide .sch-side-wrap');
     if (!side) return;
+    /* Раскрыли впервые — сразу заготовка, а не пустой подвал на время запроса. */
+    if (!side.firstElementChild) {
+        side.innerHTML = '<div class="pop"><span class="sk sk-line" style="--w:40%"></span>'
+            + '<span class="sk sk-line" style="--w:90%;height:52px"></span><span class="sk sk-line" style="--w:90%;height:52px"></span></div>';
+    }
     let карта = {rules: [], obstacles: []};
     try {
         const пакет = (REC.teach && REC.teach.package) || recGuessPackage();
@@ -2093,6 +2098,7 @@ async function recSchemeSideLoad() {
     }
     /* Зовётся после каждого шага записи — тот же список не пересобираем. */
     setHTML(side, popSideHtml(карта, (REC.teach && REC.teach.package) || recGuessPackage()));
+    if (window.coachOnce) coachOnce('popups');
 }
 
 /* Пакет берём из шага запуска приложения: отводы хранятся по пакетам, и
@@ -2134,9 +2140,14 @@ async function teachDetour(jobId, file) {
     const начатьОбучение = async () => {
         if (слепок.serial && S.active !== слепок.serial) openDevice(слепок.serial);
 
+        /* Сценарий в конструкторе не стираем: откладываем в сторону и
+           вернём после «Сохранить» или «Не учить» (recUnstash). Раньше
+           обучение молча выбрасывало готовые шаги. */
+        recStash();
         REC.steps = [];              // учим обходить, а не дописываем чужой сценарий
         REC.params = {};
         REC.nextId = 1;
+        REC.edit = null;
         REC.teach = слепок;
         recOpen(true);   // шаги уже обнулены — черновик предлагать незачем
         await recStart();
@@ -2148,16 +2159,33 @@ async function teachDetour(jobId, file) {
         recSync();
     };
 
-    /* Кнопка «научить» теперь всегда на виду в боковой панели схемы — один
-       случайный клик стирает активную запись без предупреждения, если её не
-       остановить здесь. */
-    if (REC.steps.length) {
-        confirmModal('Научить ферму закрывать это окно?',
-            `<p>Шаги в конструкторе (${REC.steps.length}) будут стёрты.</p>`,
-            'Стереть и учить', начатьОбучение, true);
-        return;
-    }
     начатьОбучение();
+}
+
+/* Отложить сценарий конструктора на время обучения и вернуть после. */
+function recStash() {
+    if (REC.on) recPause();
+    REC.stash = {
+        steps: REC.steps, params: REC.params, nextId: REC.nextId, open: REC.open, edit: REC.edit,
+        command: REC.command, baseWidth: REC.baseWidth, base: REC.base, savedSig: REC.savedSig,
+        banner: REC.bannerMsg || '', builder: REC.builder,
+    };
+}
+
+function recUnstash() {
+    const st = REC.stash;
+    REC.stash = null;
+    if (!st) {
+        REC.steps = [];
+        REC.params = {};
+        REC.open = null;
+        return false;
+    }
+    Object.assign(REC, {steps: st.steps, params: st.params, nextId: st.nextId, open: st.open, edit: st.edit,
+        command: st.command, baseWidth: st.baseWidth, base: st.base, savedSig: st.savedSig});
+    recBanner(st.banner);
+    if (window.stHistReset) stHistReset();   // ⌘Z не должен вернуть шаги обучения
+    return true;
 }
 
 /* Якорь вручную. Автоматика ставит якорь только при заметной смене экрана и
@@ -3456,6 +3484,9 @@ function recSave() {
        они не возьмутся — дампа того экрана уже нет, — а без них перезапись
        молча выкинула бы запасные селекторы и слой шаблона. Сами байты кропа
        вернёт /api/recorder/recipe по имени. */
+    /* Шаги обучения — не черновик сценария: он отложен (REC.stash) и не
+       должен затираться шагами обхода окна. */
+    if (REC.teach) return;
     const light = REC.steps.map(step => Object.assign({}, step, {
         shot: null,
         crop: null,
@@ -3854,13 +3885,13 @@ async function recTeachSubmit() {
     closeModal();
     const resume = REC.teach.resume;
     REC.teach = null;
-    REC.steps = [];
-    REC.params = {};
-    REC.open = null;
-    localStorage.removeItem(REC_DRAFT_KEY);
+    recBanner('');
+    /* Вернуть отложенный сценарий; черновик переписываем им же, а не
+       шагами обучения (их recSave успел туда положить). */
+    if (recUnstash() && REC.steps.length) recSave();
+    else localStorage.removeItem(REC_DRAFT_KEY);
     recRender();
     recSync();
-    recBanner('');
     if (resume) {
         /* Человек уже прошёл экран руками, пока показывал, — запуск
            пересверится и пойдёт дальше; в следующий раз отвод сработает сам. */
@@ -3929,6 +3960,15 @@ function recModeOff(confirmed) {
        в конструкторе значило бы предложить сохранить копию под новым именем —
        не то, о чём просили. Черновик правки тоже стираем: он относится к
        сценарию, из которого мы только что вышли. */
+    if (учили) {
+        REC.teach = null;
+        recBanner('');
+        if (recUnstash() && REC.steps.length) recSave();
+        recRender();
+        recSync();
+        toast(t('rec.obuchenie_prervano_vernuli'));
+        return;
+    }
     if (REC.edit) {
         localStorage.removeItem(recDraftKey());
         REC.edit = null;

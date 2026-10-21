@@ -26,6 +26,7 @@ function recHowHtml(step) {
         <button type="button" role="radio" aria-checked="${tap}" onclick="howMode(${step.id}, 'point')">
           ${recIcon('target')}${esc(t('how.v_tochku'))}</button>
       </div>`;
+    if (window.coachOnce) setTimeout(() => document.querySelector('#recSteps .how') && coachOnce('how'), 0);
     return `<section class="how">
       <div class="how-head"><b>${esc(t('how.kak_nazhimat'))}</b>${seg}</div>
       ${tap ? howPointHtml(step) : howListHtml(step)}

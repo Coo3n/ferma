@@ -59,6 +59,21 @@ const COACH_TOURS = {
         {sel: '#btnAccAutobind', title: t('coach.acc_bind_t'), text: t('coach.acc_bind')},
         {sel: '#accList', part: true, title: t('coach.acc_list_t'), text: t('coach.acc_list')},
     ],
+    /* Малые туры по новым местам — сами при первом появлении (coachOnce). */
+    popups: () => [
+        {sel: '#recSide .pop-head', title: t('coach.pop_head_t'), text: t('coach.pop_head')},
+        {sel: '#recSide .pop-rule', title: t('coach.pop_rule_t'), text: t('coach.pop_rule')},
+        {sel: '#recSide .pop-head .primary', title: t('coach.pop_new_t'), text: t('coach.pop_new')},
+    ],
+    how: () => [
+        {sel: '#recSteps .how-mode', title: t('coach.how_mode_t'), text: t('coach.how_mode')},
+        {sel: '#recSteps .how-list', title: t('coach.how_list_t'), text: t('coach.how_list')},
+        {sel: '#recSteps .how-add .sm', title: t('coach.how_add_t'), text: t('coach.how_add')},
+    ],
+    scenpop: () => [
+        {sel: '#scPopups .pop-head', title: t('coach.scenpop_t'), text: t('coach.scenpop')},
+        {sel: '#scPopups .live-switch', title: t('coach.scenpop_sw_t'), text: t('coach.scenpop_sw')},
+    ],
     run: () => [
         {sel: '#rdScen', title: t('coach.run_scen_t'), text: t('coach.run_scen')},
         {sel: '#rdWho', title: t('coach.run_who_t'), text: t('coach.run_who')},
@@ -320,3 +335,15 @@ setInterval(() => {
     if (coachSession().includes(key)) return;
     coachStart(key, false, true);
 }, 250);
+
+/* Новое место на экране показалось впервые — короткий тур по нему, один
+   раз навсегда (как и туры экранов), если подсказки не выключены. */
+function coachOnce(key, view) {
+    /* Проверки — после паузы: зовут из отрисовки, когда раздел ещё
+       переключается, а окна и чужие туры могли успеть открыться. */
+    setTimeout(() => {
+        if (coachOff() || COACH.key || coachSession().includes(key)) return;
+        if (document.querySelector('#modal.on') || (view && S.view !== view)) return;
+        coachStart(key, false, false);
+    }, 600);
+}
