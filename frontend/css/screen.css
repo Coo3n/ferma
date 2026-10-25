@@ -896,3 +896,6 @@ button.pult-job:hover { background: var(--panel3); }
 .pult-dock .dk:has(.dk-l) { padding: 0 var(--s3); }
 .pult-dock { border: 1px solid var(--line-soft); }
 @media (max-width: 1180px) { .pult-dock .dk .dk-l { display: none; } }
+
+/* Док под экраном: одинаковый отступ сверху и снизу, ровно по центру. */
+.work.pult-on .pult-dock { margin: var(--s3) auto; }
