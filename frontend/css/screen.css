@@ -852,3 +852,40 @@ button.pult-tag-add:hover { border-color: var(--accent-line); color: var(--text)
 .pult-sect h4:has(.pult-seg) { flex-wrap: wrap; }
 .pult-seg { flex: 1 0 100%; margin-left: 0; }
 .pult-seg button { flex: 1; justify-content: center; }
+
+/* Пульт, вторая редакция (2026-10-25): панель читается как три слоя —
+   «кто телефон» сверху, карточки задач посередине, «запустить / записать»
+   внизу. Раньше всё лежало плоским списком одного веса. Карточки на --panel2,
+   чипы внутри них на --panel3 (hover — на --line). */
+.pult-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    row-gap: var(--s2);
+    padding: var(--s3) var(--s4) var(--s4);
+}
+.pult-head .crumb { margin-left: calc(var(--s2) * -1); color: var(--dim); }
+.pult-id { flex: 1 1 100%; gap: 2px; }
+.pult-id strong { font-size: var(--fs-5); font-weight: 650; line-height: 1.2; }
+.pult-meta { font-size: var(--fs-2); }
+
+.pult-body { gap: var(--s3); padding: var(--s3) var(--s4) var(--s4); }
+.pult-sect {
+    padding: var(--s2) var(--s3) var(--s3);
+    border-radius: var(--r3);
+    background: var(--panel2);
+}
+.pult-sect h4 { margin-bottom: var(--s1); color: var(--text); }
+.pult-chips .chip,
+.pult-apps .chip { background: var(--panel3); }
+.pult-chips .chip:hover:not(:disabled),
+.pult-apps .chip:hover:not(:disabled) { background: var(--line); }
+.pult-seg { background: var(--well); }
+.pult-seg button[aria-selected="true"] { background: var(--panel3); }
+button.pult-job:hover { background: var(--panel3); }
+
+/* Файлы: зона перетаскивания светлее фона карточки, кнопка под ней тихая. */
+.pult-sect:has(.pult-drop) .pult-drop { border-color: var(--line-hover); background: var(--well); }
+.pult-sect:has(.pult-drop) .pult-files { margin-top: var(--s2); background: var(--panel3); }
+
+/* Низ: «Запустить» — тихая кнопка, «Записать» — единственная зелёная. */
+.pult-foot { padding: var(--s3) var(--s4); background: var(--panel); }
