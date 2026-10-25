@@ -358,6 +358,66 @@ function bulkResReset() {
     bulkAction({type: 'resolution_reset'}, 'Вернуть разрешение');
 }
 
+/* строки: начало */
+/* «Каждому своё»: строка файла — на свой телефон. */
+function bulkLinesRows(text) {
+    return String(text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 5000);
+}
+
+function bulkLinesPlan(names, rows, mode) {
+    return names.map((name, i) => {
+        let text = null;
+        if (rows.length) {
+            if (mode === 'cycle') text = rows[i % rows.length];
+            else if (mode === 'random') text = rows[Math.floor(Math.random() * rows.length)];
+            else text = i < rows.length ? rows[i] : null;
+        }
+        return {name, text};
+    });
+}
+/* строки: конец */
+
+/* Файл в UTF-8, а Excel на русском сохраняет в Windows-1251: пробуем
+   строго UTF-8 и, если не вышло, читаем как 1251. */
+async function bulkLinesLoad(file) {
+    if (!file) return;
+    const buf = await file.arrayBuffer();
+    let text;
+    try {
+        text = new TextDecoder('utf-8', {fatal: true}).decode(buf);
+    } catch (e) {
+        text = new TextDecoder('windows-1251').decode(buf);
+    }
+    $('bulkLines').value = text.replace(/^﻿/, '');
+    bulkLinesPreview();
+}
+
+function bulkLinesPreview() {
+    const rows = bulkLinesRows($('bulkLines').value);
+    const names = bulkTargets().map(serial => {
+        const d = S.devices.find(x => x.serial === serial);
+        return d ? d.name : serial;
+    });
+    const plan = bulkLinesPlan(names, rows, $('bulkLinesMode').value);
+    const missing = plan.filter(p => p.text === null).length;
+    $('bulkLinesInfo').textContent = rows.length
+        ? `Строк: ${rows.length}, телефонов: ${names.length}`
+            + (missing ? ` · без строки останутся ${missing}` : '')
+            + ' · ' + plan.slice(0, 3).map(p => `${p.name} → ${p.text === null ? '—' : p.text}`).join('; ')
+        : 'Вставьте строки или выберите файл .txt / .csv';
+}
+
+function bulkSendLines() {
+    const rows = bulkLinesRows($('bulkLines').value);
+    if (!rows.length) return toast('нет строк', 'bad');
+    const serials = bulkTargets();
+    if (!serials.length) return toast('выберите телефоны в сети', 'bad');
+    return bulkRun('Каждому своё', serials, list => post('/api/bulk/text_lines', {
+        serials: list, lines: rows, mode: $('bulkLinesMode').value,
+        separator: $('bulkLinesSep').value, template: $('bulkLinesTpl').value,
+        clear: $('bulkLinesClear').checked}));
+}
+
 function bulkMenu() {
     const n = bulkTargets().length;
     const busy = bulkBusyCount();
@@ -393,6 +453,7 @@ function bulkMenu() {
     <div class="bulk-sect">Текст, группа и теги</div>
     <div class="bulk-grid">
       ${tile("bulkPanel('text')", 'keyboard', 'Ввести текст', 'в поле, где стоит курсор', 'text')}
+      ${tile("bulkPanel('lines')", 'keyboard', 'Каждому своё', 'строка файла — на свой телефон', 'lines')}
       ${tile("bulkPanel('group')", 'layers', 'Группа', groups.length ? 'назначить или убрать' : 'например, «VK-10»', 'group')}
       ${tile("bulkPanel('tags')", 'layers', 'Теги', 'добавить или снять, например «прогрет»', 'tags')}
     </div>
@@ -479,11 +540,25 @@ function bulkPanel(kind) {
             <button class="sm primary" onclick="bulkResApply()">Применить</button>
             <button class="sm" onclick="bulkResReset()">Вернуть как было</button></div>
           <small class="dim">Проверьте на одном телефоне: на некоторых прошивках после смены обрывается трансляция экрана — «Вернуть как было» всегда доступно.</small>`,
+        lines: `<textarea id="bulkLines" rows="5" placeholder="по строке на телефон: логин, ссылка, текст"
+              aria-label="Строки" oninput="bulkLinesPreview()"></textarea>
+          <div class="bp-row">
+            <input type="file" accept=".txt,.csv" aria-label="Файл" onchange="bulkLinesLoad(this.files[0])">
+            <select id="bulkLinesMode" aria-label="Как раздать" onchange="bulkLinesPreview()">
+              <option value="order">по порядку</option><option value="cycle">по кругу</option>
+              <option value="random">случайно</option></select>
+            <label><input type="checkbox" id="bulkLinesClear"> стереть поле перед вводом</label></div>
+          <div class="bp-row">
+            <input id="bulkLinesSep" placeholder="делить строку по (например ;)" aria-label="Разделитель">
+            <input id="bulkLinesTpl" placeholder="шаблон, например {1}@mail.ru" aria-label="Шаблон">
+            <button class="sm primary" onclick="bulkSendLines()">Ввести</button></div>
+          <small class="dim" id="bulkLinesInfo"></small>`,
     }[kind];
     const first = box.querySelector('input, select');
     if (first) first.focus();
     if (kind === 'app') bulkLoadApps();
     if (kind === 'res') bulkResLoad();
+    if (kind === 'lines') bulkLinesPreview();
     bulkLock();
 }
 

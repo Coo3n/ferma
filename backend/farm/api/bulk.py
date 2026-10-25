@@ -21,6 +21,7 @@ from pathlib import Path
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
 from .. import adb
+from .. import lines as lines_mod
 from ..control import display
 from ..devices import registry
 from .screen import ACTIONS
@@ -272,6 +273,34 @@ def bulk_display(serials: list[str] = Body(..., embed=True)):
     """Размер и плотность выбранных телефонов: окно «Разрешение» показывает,
     есть ли среди них разные, до того как что-то менять."""
     return _each(_online(serials), _display_info, serials)
+
+
+@router.post("/text_lines")
+def text_lines(serials: list[str] = Body(...), lines: list[str] = Body(...),
+               mode: str = Body("order"), separator: str = Body(""),
+               template: str = Body(""), clear: bool = Body(False)):
+    """«Каждому своё»: строка файла — на свой телефон. Телефоны без строки
+    попадают в итог ошибкой «не хватило строк», а не пропадают молча."""
+    rows = lines_mod.clean_rows(lines)
+    if not rows:
+        raise HTTPException(400, "в файле нет ни одной строки")
+    targets = _online(serials)
+    try:
+        plan = lines_mod.assign(targets, rows, mode)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    texts = {s: lines_mod.render(template, lines_mod.split_row(row, separator))
+             for s, row in plan.items() if row is not None}
+
+    def send(serial):
+        ACTIONS["text"](serial, {"type": "text", "value": texts[serial], "clear": clear})
+
+    results = _each(list(texts), send)["results"] if texts else {}
+    results.update(_skipped(serials, targets))
+    for s in plan:
+        if s not in texts:
+            results[s] = failure("не хватило строк в файле")
+    return _summary(results)
 
 
 # Список приложений меняется редко, а pm list на 40 телефонах — 40 вызовов adb.
