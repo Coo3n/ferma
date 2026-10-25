@@ -1553,3 +1553,34 @@ img.pop-thumb.shot { width: 40px; height: 52px; object-fit: cover; object-positi
 
 .addpick-ic { background: var(--panel3); color: var(--text2); }
 .addpick-card:hover:not(:disabled) .addpick-ic { background: var(--accent-dim); color: var(--accent); }
+
+/* Группы «Действия» — вкладки с подчёркиванием в один ряд (было: «таблетки» в
+   два ряда с цифрами). Не влезает — ряд прокручивается, края гаснут. */
+.addpick-chips {
+    display: flex; flex-wrap: nowrap; gap: var(--s1); margin: 0 0 var(--s3);
+    overflow-x: auto; scrollbar-width: none;
+    border-bottom: 1px solid var(--line-soft);
+    -webkit-mask-image: linear-gradient(90deg, currentColor calc(100% - 24px), transparent);
+    mask-image: linear-gradient(90deg, currentColor calc(100% - 24px), transparent);
+}
+.addpick-chips::-webkit-scrollbar { display: none; }
+.addpick-chip {
+    flex: none; min-height: 36px; padding: 0 var(--s3); position: relative;
+    border: 0; border-radius: var(--r1) var(--r1) 0 0; background: transparent;
+    color: var(--text2); font-size: var(--fs-2); font-weight: 500; white-space: nowrap;
+}
+.addpick-chip:hover { background: var(--panel2); color: var(--text); border-color: transparent; }
+.addpick-chip[aria-pressed="true"] {
+    background: transparent; color: var(--text); font-weight: 600; border-color: transparent;
+}
+.addpick-chip[aria-pressed="true"]::after {
+    content: ""; position: absolute; left: var(--s2); right: var(--s2); bottom: -1px; height: 2px;
+    border-radius: var(--pill) var(--pill) 0 0; background: var(--accent);
+}
+.addpick-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Окно «Добавить шаг» шире обычного «широкого»: восемь вкладок групп должны
+   стоять в один ряд без прокрутки, иначе дальние («Сеть», «Телефон») не видны. */
+.sheet.wide.addpick-sheet { width: 840px; }
+.addpick { grid-template-columns: 176px minmax(0, 1fr); }
+.addpick-chip { padding: 0 var(--s2); }

@@ -87,6 +87,23 @@ const ADD_STEP_PRESET_ICON = {
     double_tap: 'pointer', wait: 'eye', wait_gone: 'eye-off', proxy: 'wifi',
 };
 
+/* Значок по самому действию, а не по его первому шагу: «Свайп влево» с
+   вертикальной стрелкой и «Тап по краю» с плюсом (запасной значок) читались
+   как ошибка. Первый шаг остаётся запасным путём для новых действий. */
+const ADD_STEP_PRESET_KEY_ICON = {
+    launch_app: 'app', stop_app: 'app-close', restart_app: 'refresh', clear_app: 'trash',
+    ensure_app: 'check-square', open_url: 'external', unlock: 'unlock', home: 'home',
+    sleep: 'timer', sleep_range: 'timer', screenshot: 'camera',
+    scroll_down: 'down', scroll_up: 'up', next_page: 'right',
+    swipe_up: 'up', swipe_down: 'down', swipe_left: 'left', swipe_right: 'right',
+    pull_refresh: 'refresh', tap_right_edge: 'right', tap_left_edge: 'left', double_like: 'target',
+    scroll_feed_minutes: 'repeat', watch_video: 'video',
+    search_enter: 'search', login_fields: 'shield', type_variants: 'text-input', clear_field: 'x',
+    new_ip: 'refresh', wifi_on: 'wifi', wifi_off: 'wifi', airplane_on: 'moon', airplane_off: 'wifi',
+    proxy_account: 'plug', proxy_off: 'plug', mute: 'volume-low', screen_rotate_lock: 'rotate',
+    shell: 'terminal',
+};
+
 /* compact — готовые действия: название без пояснения (оно в подсказке).
    Пятнадцать карточек с абзацем текста под каждой читались как статья. */
 function addStepCard(onclick, icon, title, desc, off, compact, sec) {
@@ -210,7 +227,8 @@ function addStepBuildCards(plan, presets) {
             if (it.key === 'presets') {
                 (presets || []).forEach((preset, index) => {
                     const first = (preset.steps || [])[0];
-                    const icon = (first && ADD_STEP_PRESET_ICON[first.kind]) || 'plus';
+                    const icon = ADD_STEP_PRESET_KEY_ICON[preset.key]
+                        || (first && ADD_STEP_PRESET_ICON[first.kind]) || 'plus';
                     const sect = ADD_STEP_SECTIONS.includes(preset.group) ? preset.group : 'system';
                     out.push({key: 'p:' + preset.key, preset: preset.key, group: sect, tab: 'action', title: preset.title, desc: preset.desc,
                         words: (preset.keywords || []).join(' '), sec: addStepSectionName(sect),
@@ -255,16 +273,36 @@ function addStepActionPane(cards) {
     }
     const saved = window.store ? store.get(ADD_STEP_CHIP_KEY, '') : '';
     const active = lists.some(l => l.key === saved) ? saved : 'freq';
-    const chips = lists.map(l => `<button type="button" class="addpick-chip" data-chip="${l.key}"
-        aria-pressed="${l.key === active}" onclick="addStepChip('${l.key}')">${esc(l.name)}<small>${l.list.length}</small></button>`).join('');
+    /* Вкладки в один ряд с подчёркиванием, без цифр: восемь «таблеток» со
+       счётчиками в два ряда читались как россыпь, а число карточек выбору не
+       помогает. */
+    const chips = lists.map(l => `<button type="button" class="addpick-chip" role="tab" data-chip="${l.key}"
+        aria-pressed="${l.key === active}" aria-selected="${l.key === active}" onclick="addStepChip('${l.key}')">${esc(l.name)}</button>`).join('');
     const grids = lists.map(l => `<div class="addpick-grid" data-chipgrid="${l.key}"${l.key === active ? '' : ' hidden'}>${l.list.map(c => c.html()).join('')}</div>`).join('');
-    return `<div class="addpick-chips">${chips}</div>${grids}`;
+    return `<div class="addpick-chips" role="tablist" onkeydown="addStepChipKey(event)">${chips}</div>${grids}`;
 }
 
 function addStepChip(key) {
-    document.querySelectorAll('.addpick-chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.chip === key)));
+    document.querySelectorAll('.addpick-chip').forEach(b => {
+        const on = b.dataset.chip === key;
+        b.setAttribute('aria-pressed', String(on));
+        b.setAttribute('aria-selected', String(on));
+        if (on && b.scrollIntoView) b.scrollIntoView({block: 'nearest', inline: 'nearest'});
+    });
     document.querySelectorAll('[data-chipgrid]').forEach(g => { g.hidden = g.dataset.chipgrid !== key; });
     try { if (window.store) store.set(ADD_STEP_CHIP_KEY, key); } catch (e) { /* без памяти обходимся */ }
+}
+
+/* Стрелки ←→ листают вкладки групп: ряд длиннее окна, и мышью до дальних неудобно. */
+function addStepChipKey(ev) {
+    if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+    const tabs = [...document.querySelectorAll('.addpick-chip')];
+    const at = tabs.findIndex(b => b.getAttribute('aria-selected') === 'true');
+    const next = tabs[at + (ev.key === 'ArrowRight' ? 1 : -1)];
+    if (!next) return;
+    ev.preventDefault();
+    next.click();
+    next.focus();
 }
 
 /* Условия: подзаголовки «На экране», «На телефоне», «По шансу». */

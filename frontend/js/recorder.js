@@ -2452,7 +2452,7 @@ async function recLibOpen() {
     $('mBody').innerHTML = addStepHtml(addStepPlan(recAddCtx()), REC.lib);
     $('mActs').innerHTML = `<span class="sp"></span>
         <button class="sm" onclick="closeModal()">${esc(t('modal.zakryt'))}</button>`;
-    modalSheet('wide');
+    modalSheet('wide', 'addpick-sheet');
     openModal();
 }
 
