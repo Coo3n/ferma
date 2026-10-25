@@ -398,7 +398,11 @@ function recLabel(step) {
             if (a.account) {
                 return `Ввести ${REC_ACC_FIELDS[a.field] || a.field} аккаунта ${PLATFORM_NAMES[a.account] || a.account}`;
             }
-            return (a.clear ? 'Стереть и ввести «' : 'Ввести «') + a.value + '»';
+            {
+                const вариантов = phrCount(a.value);
+                if (вариантов > 1) return t('rec.vvesti_variant', {n: вариантов});
+                return (a.clear ? 'Стереть и ввести «' : 'Ввести «') + a.value + '»';
+            }
         case 'key':
             return `Кнопка «${REC_KEYS[String(a.name).toUpperCase()] || a.name}»`;
         case 'unlock':
@@ -431,6 +435,8 @@ function recLabel(step) {
             return a.result === 'fail'
                 ? t('rec.zakonchit_oshibka', {why: a.reason || '—'})
                 : t('rec.zakonchit_uspeh');
+        case 'budget':
+            return t('rec.potolok_label', {name: a.name, n: a.limit});
         case 'call':
             return t('rec.zapustit_stsenariy', {name: recScenName(a.scenario)});
         default:
@@ -1697,6 +1703,7 @@ const SCH_ICONS = {
     ensure_app: ['block', 'phone'],
     break: ['block', 'stop'],
     finish: ['block', 'check'],
+    budget: ['block', 'shield'],
     call: ['block', 'layers'],
     expect: ['anchor', 'crosshair'],
     launch_app: ['block', 'app'],
@@ -2526,6 +2533,15 @@ function recLogicPick(key) {
             <button class="sm primary" onclick="recLogicFinish()">${esc(t('rec.dobavit'))}</button>`;
         return;
     }
+    if (key === 'budget') {
+        const step = recPush({kind: 'budget', args: {name: '', limit: 50}});
+        REC.open = step.id;
+        closeModal();
+        recRender();
+        recSave();
+        toast(t('rec.potolok_dobavlen'));
+        return;
+    }
     if (key === 'call') {
         const свой = REC.edit ? REC.edit.key : null;
         const own = (S.scenarios || []).filter(x => /^[a-z][a-z0-9_]{0,47}$/.test(x.key) && x.key !== свой && !x.error);
@@ -2712,6 +2728,12 @@ function recCode(step, index) {
         return `ctx.click(${[step.selector.args].concat(место).join(', ')})`;
     }
 
+    if (step.kind === 'budget') {
+        const parts = [JSON.stringify(a.name), String(a.limit)];
+        if (a.platform) parts.push(`platform=${JSON.stringify(a.platform)}`);
+        return `ctx.budget(${parts.join(', ')})`;
+    }
+
     if (step.kind === 'ensure_app') {
         const parts = [step.param ? `ctx.params[${JSON.stringify(step.param)}]` : JSON.stringify(a.package)];
         if (a.min_version) parts.push(`min_version=${JSON.stringify(a.min_version)}`);
@@ -2725,7 +2747,10 @@ function recCode(step, index) {
             ? `ctx.params["${step.param}"]`
             : (step.kind === 'sleep' ? recNum(a.seconds) : JSON.stringify(a[key] ?? ''));
         if (step.kind === 'type') {
-            const src = a.account ? `ctx.account("${a.account}")["${a.field}"]` : value;
+            /* Пароль из аккаунта не через ctx.phrase: скобка в пароле — знак
+               пароля. Варианты разворачиваются на прогоне, а не здесь. */
+            const src = a.account ? `ctx.account("${a.account}")["${a.field}"]`
+                : (!step.param && phrCount(a.value) > 1) ? `ctx.phrase(${value})` : value;
             return `ctx.type(${src}${a.clear ? ', clear=True' : ''})`;
         }
         if (step.kind === 'screenshot' && !a.name && !step.param) return 'ctx.screenshot()';
@@ -2954,9 +2979,31 @@ function recValueEditor(step) {
     if (!key) return '';
     if (step.kind === 'type') {
         if (step.args.account) return recTypeSource(step);
-        return recTypeSource(step) + recValueEditorPlain(step, key);
+        return recTypeSource(step) + recValueEditorPlain(step, key) + recSpinHint(step);
     }
     return recValueEditorPlain(step, key);
+}
+
+/* Варианты текста. Сорок телефонов с одним и тем же текстом — заметный
+   след, поэтому подсказка висит всегда, а не только когда уже написали
+   скобки. Пример — настоящий: ровно то, что уйдёт на телефон. */
+function recSpinHint(step) {
+    if (step.param) return '';
+    const value = step.args.value || '';
+    const n = phrCount(value);
+    if (n > 1) {
+        return `<p class="blk-ed-hint" id="spin${step.id}">${esc(t('rec.variantov', {n: n}))}
+      <button class="sm ghost" onclick="recSpinSample(${step.id})">${esc(t('rec.variant_primer'))}</button>
+      <span class="spin-ex" id="spinEx${step.id}">${esc(phrPick(value))}</span></p>`;
+    }
+    return `<p class="blk-ed-hint">${esc(t('rec.variant_sovet'))}
+      <span class="fmt"><b>{</b>привет<b>|</b>здравствуй<b>}</b></span></p>`;
+}
+
+function recSpinSample(id) {
+    const step = recFind(id);
+    const box = step && $('spinEx' + id);
+    if (box) setText(box, phrPick(step.args.value || ''));
 }
 
 /* «Приложение готово»: версия и «ставить ли». Нет в библиотеке — говорим
@@ -2974,6 +3021,41 @@ function recEnsureEditor(step) {
       <label class="inline-check"><input type="checkbox" ${a.install !== false ? 'checked' : ''}
              onchange="recEnsureSet(${step.id}, 'install', this.checked)">
         <span>${esc(t('rec.gotov_stavit'))}<small class="ens-note">${esc(note)}</small></span></label>`;
+}
+
+/* «Потолок за сутки»: что считаем, сколько и по какому аккаунту. Платформа
+   по умолчанию любая — у большинства телефонов аккаунт один. */
+function recBudgetEditor(step) {
+    if (step.kind !== 'budget') return '';
+    const a = step.args;
+    const chip = (on, platform, label) => `<button class="chip ${on ? 'on' : ''}" aria-pressed="${on}"
+        onclick="recBudgetSet(${step.id}, 'platform', '${platform}')">${esc(label)}</button>`;
+    const plats = chip(!a.platform, '', t('rec.potolok_lyuboy'))
+        + Object.entries(PLATFORM_NAMES).map(([p, pn]) => chip(a.platform === p, p, pn)).join('');
+    return `<div class="row"><label for="budName${step.id}">${esc(t('rec.potolok_chto'))}</label>
+        <input type="text" id="budName${step.id}" class="grow" placeholder="${esc(t('rec.potolok_chto_primer'))}"
+               value="${esc(a.name || '')}" oninput="recBudgetSet(${step.id}, 'name', this.value)"></div>
+      <div class="row"><label for="budLim${step.id}">${esc(t('rec.potolok_skolko'))}</label>
+        <input type="number" id="budLim${step.id}" min="1" max="10000" value="${esc(a.limit ?? 50)}"
+               oninput="recBudgetSet(${step.id}, 'limit', this.value)"></div>
+      <div class="blk-ed-row"><span class="blk-ed-k">${esc(t('rec.potolok_akkaunt'))}</span>
+        <div class="chips" role="group">${plats}</div></div>
+      <p class="blk-ed-hint">${esc(t('rec.potolok_podskazka'))}</p>`;
+}
+
+function recBudgetSet(id, key, value) {
+    const step = recFind(id);
+    if (!step) return;
+    if (key === 'limit') {
+        const n = Math.round(Number(value));
+        step.args.limit = Number.isFinite(n) && n >= 1 ? Math.min(n, 10000) : 1;
+    } else if (key === 'platform') {
+        if (value) step.args.platform = value; else delete step.args.platform;
+        recRender();
+    } else {
+        step.args.name = value;
+    }
+    recSave();
 }
 
 function recEnsureSet(id, key, value) {
@@ -3073,7 +3155,7 @@ function recRow(step, index) {
    сам, если запасные уже выбраны: спрятать заданное — потерять его из виду. */
 function recStepBody(step, index) {
     const main = recThumb(step) + recHowHtml(step) + recAnchorEditor(step) + recBranchEditor(step)
-        + recValueEditor(step) + recEnsureEditor(step) + recBlockEditor(step) + recScrollEditor(step, index)
+        + recValueEditor(step) + recEnsureEditor(step) + recBudgetEditor(step) + recBlockEditor(step) + recScrollEditor(step, index)
         + recFlexEditor(step);
     /* «Дополнительно» закрыто всегда: запасные способы — для того, кто их
        ищет, остальным в раскрытом шаге нужны только его настройки. Что внутри

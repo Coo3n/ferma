@@ -963,6 +963,18 @@ button.armed {
     text-overflow: ellipsis;
 }
 
+/* «Сегодня» — только чтение: не поле, а факт. Счётчиков у аккаунта обычно
+   один-два, поэтому они в строку, а не списком. */
+.acc-table .acc-bud {
+    width: 150px;
+    max-width: 150px;
+    color: var(--dim);
+    font-size: var(--fs-1);
+}
+
+.acc-bud-i { white-space: nowrap; }
+.acc-bud-i b { color: var(--text); font-weight: 600; }
+
 .acc-none {
     padding: var(--s4) !important;
     color: var(--dim);

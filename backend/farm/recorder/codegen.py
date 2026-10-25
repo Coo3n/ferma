@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from datetime import date
 
+from .. import phrases
+
 INDENT = "    "
 
 
@@ -165,6 +167,11 @@ def _call(step: dict):
         return f'ctx.finish({literal(args.get("reason") or "")})'
     if kind == "call":
         return f'ctx.run({literal(args["scenario"])})'
+    if kind == "budget":
+        parts = [literal(args["name"]), str(int(args["limit"]))]
+        if args.get("platform"):
+            parts.append(f'platform={literal(args["platform"])}')
+        return f"ctx.budget({', '.join(parts)})"
     if kind == "ensure_app":
         parts = [_value(step, literal(args["package"]))]
         if args.get("min_version"):
@@ -214,9 +221,18 @@ def _call(step: dict):
     if kind == "type":
         tail = ", clear=True" if args.get("clear") else ""
         if args.get("account"):
+            # Пароль через ctx.phrase не идёт: фигурная скобка в пароле —
+            # это знак пароля, а не вариант текста.
             return (f'ctx.type(ctx.account({literal(args["account"])})'
                     f'[{literal(args["field"])}]{tail})')
-        return f'ctx.type({_value(step, literal(args["value"]))}{tail})'
+        value = _value(step, literal(args["value"]))
+        # Варианты текста разворачиваются на прогоне, а не здесь: выбери
+        # сейчас — и все сорок телефонов отправят один и тот же вариант.
+        # Параметр не заворачиваем: что в нём будет, отсюда не видно, а
+        # оборачивать вслепую значит трогать и адреса, и пути.
+        if not step.get("param") and phrases.count(args["value"]) > 1:
+            value = f"ctx.phrase({value})"
+        return f'ctx.type({value}{tail})'
     if kind == "key":
         return f'ctx.key({literal(args["name"])})'
     if kind == "unlock":

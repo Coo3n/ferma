@@ -9,7 +9,7 @@
    выделение галочками — пачкой удалить, отвязать; каждая пачка — один
    запрос, а не 500. */
 
-const ACC = window.ACC = {items: [], platform: '', query: '', status: '', sel: new Set()};
+const ACC = window.ACC = {items: [], platform: '', query: '', status: '', sel: new Set(), budget: {}};
 
 function accPlatformOptions() {
     return Object.entries(PLATFORM_NAMES)
@@ -39,6 +39,13 @@ async function loadAccounts() {
         ACC.loaded = true;
     } catch (e) {
         return toast(e.message, 'bad');
+    }
+    /* Счётчики потолка — не причина не показать аккаунты: упали, значит
+       столбца «сегодня» просто не будет. */
+    try {
+        ACC.budget = (await api('/api/budget')).counters || {};
+    } catch (e) {
+        ACC.budget = {};
     }
     /* Выбор переживает перезагрузку списка, но не удалённые строки. */
     const ids = new Set(ACC.items.map(a => a.id));
@@ -123,8 +130,8 @@ function renderAccounts() {
             ${rows.length && shownSel === rows.length ? 'checked' : ''}></th>
         <th>${t('accounts.platforma')}</th><th>${t('accounts.login')}</th><th>${t('accounts.parol')}</th>
         <th>${t('accounts.proksi')}</th><th>${t('accounts.telefon')}</th><th>${t('accounts.status')}</th>
-        <th>${t('accounts.zametka')}</th><th></th></tr></thead>
-      <tbody>${rows.length ? rows.map(accRowHtml).join('') : `<tr><td colspan="9" class="acc-none">
+        <th>${t('accounts.zametka')}</th>${accAnyBudget() ? `<th>${t('accounts.segodnya')}</th>` : ''}<th></th></tr></thead>
+      <tbody>${rows.length ? rows.map(accRowHtml).join('') : `<tr><td colspan="${accAnyBudget() ? 10 : 9}" class="acc-none">
         ${t('accounts.nichego')} <button class="sm ghost" onclick="accResetFilters()">${t('accounts.sbrosit_filtry')}</button></td></tr>`}</tbody></table>`);
     const all = $('accSelAll');
     if (all) all.indeterminate = shownSel > 0 && shownSel < rows.length;
@@ -153,9 +160,25 @@ function accRowHtml(a) {
         <td><select data-f="status" aria-label="${t('accounts.status')}" class="acc-st acc-st--${a.status}">${Object.entries(ACC_STATUS)
             .map(([k, v]) => `<option value="${k}"${k === a.status ? ' selected' : ''}>${v}</option>`).join('')}</select></td>
         <td><input data-f="note" value="${esc(a.note)}" placeholder="—" aria-label="${t('accounts.zametka')}"></td>
+        ${accAnyBudget() ? `<td class="acc-bud">${accBudgetHtml(a)}</td>` : ''}
         <td><button class="sm danger" title="${t('accounts.udalit_akkaunt')}" aria-label="${t('accounts.udalit_akkaunt')}"
                     onclick="accDelete('${a.id}', this)"><svg class="ic"><use href="#i-trash"/></svg></button></td>
       </tr>`;
+}
+
+/* Потолок за сутки: сколько этот аккаунт уже сделал сегодня. Столбца нет,
+   пока ни один сценарий не считал, — пустой столбец на сорока строках
+   только мешает. Предела здесь не показываем: он живёт в сценарии, и у
+   двух сценариев он разный. */
+function accAnyBudget() {
+    return Object.keys(ACC.budget || {}).length > 0;
+}
+
+function accBudgetHtml(a) {
+    const counters = (ACC.budget || {})['account:' + a.id] || {};
+    const rows = Object.entries(counters);
+    if (!rows.length) return '<span class="dim">—</span>';
+    return rows.map(([name, n]) => `<span class="acc-bud-i">${esc(name)} <b>${n}</b></span>`).join(' ');
 }
 
 /* ------------------------------------------------------------ фильтры */

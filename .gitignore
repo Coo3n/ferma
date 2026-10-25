@@ -18,6 +18,10 @@ groups.json
 schedules.json
 tags.json
 
+# состояние стражей: что человек отметил на своей ферме, а не правила окон
+backend/guards/scenarios_off.json
+backend/guards/obstacles_ignored.json
+
 # служебные файлы для обмена правками — не в git
 /*.patch
 /*.zip

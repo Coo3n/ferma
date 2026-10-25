@@ -14,7 +14,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from . import accounts, adb, apklib, config, control, deviations as dv, guards, obstacle, resolve
+from . import (accounts, adb, apklib, budget as budget_store, config, control,
+               deviations as dv, guards, obstacle, phrases, resolve)
 from .adb import AdbError
 from .control import facts as phone_facts
 from .devices import pool as u2pool
@@ -87,6 +88,16 @@ class Cancelled(Exception):
 
 class Finished(Exception):
     """Сценарий закончен досрочно шагом «закончить сценарий» — это успех."""
+
+
+class BudgetReached(Finished):
+    """Потолок за сутки исчерпан — заканчивается весь прогон, а не блок.
+
+    Отдельный вид нужен из-за ctx.run: там Finished означает «блок кончился»
+    и гасится, чтобы вызывающий сценарий шёл дальше. Для потолка это было бы
+    дыркой — действие ограничено, а сценарий продолжает его делать, — поэтому
+    ctx.run пробрасывает его наружу, как отмену.
+    """
 
 
 class StepFailed(AssertionError):
@@ -531,6 +542,17 @@ class DeviceContext:
             control.humanize.send_text(self.serial, value, clear=clear)
         else:
             control.text(self.serial, value, clear=clear)
+
+    def phrase(self, text: str) -> str:
+        """Один из вариантов текста: «{привет|здравствуй}» → «привет».
+
+        Вариант выбирается на каждом телефоне свой, поэтому сорок телефонов
+        не отправляют один и тот же текст. Вариантов нет — текст как есть.
+        """
+        out = phrases.pick(text)
+        if out != text:
+            self.log(f"вариант текста: «{out}»")
+        return out
 
     def key(self, name: str) -> None:
         self.check_cancel()
@@ -1261,6 +1283,33 @@ class DeviceContext:
             raise StepFailed(f"к телефону не привязан аккаунт{where} — привяжите в разделе «Аккаунты»")
         return acc
 
+    def budget(self, name: str, limit: int, platform: str | None = None) -> None:
+        """Потолок действий за сутки. Исчерпан — сценарий заканчивается.
+
+        Шаг ставят перед действием, которое надо ограничить:
+        ``ctx.budget("подписки", 50)`` — пятьдесят первая подписка за сутки
+        уже не случится, а прогон завершится как успех, а не упадёт
+        ошибкой: потолок — это не поломка, это и была цель.
+
+        Считается на аккаунт телефона (банят личность). Аккаунт не привязан
+        — считаем на телефон, о чём и говорим в журнале.
+        """
+        limit = int(limit)
+        ключ, чей = self._budget_key(platform)
+        можно, сколько = budget_store.take(ключ, name, limit)
+        if not можно:
+            self.log(f"потолок за сутки: {name} — {сколько} из {limit} у {чей}, останавливаюсь")
+            raise BudgetReached(f"потолок за сутки исчерпан: {name} — {limit}")
+        self.log(f"{name}: {сколько} из {limit} за сутки ({чей})")
+
+    def _budget_key(self, platform: str | None):
+        """Чей это счётчик: (ключ для файла, как назвать человеку)."""
+        acc = accounts.for_device(self.serial, platform)
+        if acc and acc.get("id"):
+            кто = acc.get("login") or acc.get("id")
+            return f"account:{acc['id']}", f"аккаунта {кто}"
+        return f"phone:{self.serial}", f"телефона {self.device_name} (аккаунт не привязан)"
+
     # ------------------------------------------------------------------ shell
     def shell(self, cmd: str | list[str], timeout: float = 30) -> str:
         self.check_cancel()
@@ -1736,6 +1785,8 @@ class DeviceContext:
         try:
             self.params = scenarios.resolve_params(sc, params)
             sc.module.run(self)
+        except BudgetReached:
+            raise                     # потолок останавливает весь прогон, не блок
         except Finished as e:
             self.log(f"блок «{key}» закончен: {e}")   # конец блока, не всего прогона
         except Cancelled:

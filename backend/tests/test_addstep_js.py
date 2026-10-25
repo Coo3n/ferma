@@ -24,7 +24,7 @@ assert.deepStrictEqual(items(p, 'phone').map(i => i.key),
     ['phone_app', 'phone_no_app', 'phone_older', 'phone_battery', 'phone_offline', 'phone_space', 'phone_account']);
 assert.deepStrictEqual(items(p, 'repeat').map(i => i.key), ['loop', 'until']);
 assert.deepStrictEqual(items(p, 'seen').map(i => i.key), ['if_seen', 'if_not', 'anchor']);
-assert.deepStrictEqual(items(p, 'other').map(i => i.key), ['finish']);
+assert.deepStrictEqual(items(p, 'other').map(i => i.key), ['budget', 'finish']);
 assert.deepStrictEqual(items(p, 'mine').map(i => i.key), ['mine']);
 assert.ok(p.groups.flatMap(g => g.items).every(i => i.off === null));
 

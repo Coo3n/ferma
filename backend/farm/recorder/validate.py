@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 
 from ..context import is_weak_anchor
+from ..phrases import check as phrase_check
 from ..ui.selectors import is_obfuscated_id
 from . import steps as schema
 
@@ -81,6 +82,10 @@ def validate(payload: dict, blocks: dict | None = None,
                 add("warning", i, f"id «{m.group(2).rsplit('/', 1)[-1]}» похож на "
                                   "обфусцированный: после обновления приложения он "
                                   "изменится — выберите поиск по тексту или добавьте запасной")
+        if kind == "type" and not step["args"].get("account"):
+            беда = phrase_check(step["args"].get("value", ""))
+            if беда:
+                add("warning", i, беда)
         if kind == "expect" and is_weak_anchor(
                 [{"a": a} for a in step.get("any") or []]):
             add("warning", i, "якорь опирается только на системную панель: он "

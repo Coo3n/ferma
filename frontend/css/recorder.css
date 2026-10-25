@@ -922,6 +922,13 @@
     font-size: var(--fs-1);
 }
 
+/* Пример варианта текста: это то, что уйдёт на телефон, — читается как
+   текст, а не как значение поля, поэтому цвет обычный, а не --dim. */
+.spin-ex {
+    color: var(--text);
+    font-style: italic;
+}
+
 .blk-ed input[type="number"] { width: 72px; }
 .blk-ed .blk-ed-n { width: 88px; }
 .blk-ed input[type="text"] { flex: 1; min-width: 160px; }

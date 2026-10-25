@@ -31,7 +31,7 @@ function addStepPlan(c) {
     groups.push({key: 'phone', items: ['phone_app', 'phone_no_app', 'phone_older', 'phone_battery',
         'phone_offline', 'phone_space', 'phone_account'].map(k => item(k, deep))});
     groups.push({key: 'chance', items: [item('chance', deep)]});
-    if (!wrap) groups.push({key: 'other', items: [item('finish')]});
+    if (!wrap) groups.push({key: 'other', items: [item('budget'), item('finish')]});
     return {wrap, groups};
 }
 
@@ -63,6 +63,7 @@ function addStepItemText(key) {
         case 'phone_offline': return {icon: 'wifi', title: t('rec.dob_tel_offline'), desc: t('rec.dob_tel_offline_d')};
         case 'phone_space': return {icon: 'download', title: t('rec.dob_tel_space'), desc: t('rec.dob_tel_space_d')};
         case 'phone_account': return {icon: 'shield', title: t('rec.dob_tel_account'), desc: t('rec.dob_tel_account_d')};
+        case 'budget': return {icon: 'shield', title: t('rec.dob_budget'), desc: t('rec.dob_budget_d')};
         default: return {icon: 'check', title: t('rec.l_finish'), desc: t('rec.l_finish_d')};
     }
 }

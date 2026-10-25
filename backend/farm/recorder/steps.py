@@ -10,6 +10,8 @@ import ast
 import math
 import re
 
+from .. import phrases
+
 PARAM_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 
 # kind -> (обязательные аргументы, необязательные)
@@ -55,6 +57,9 @@ ARGS = {
     # см. PHONE_CHECKS.
     "if_phone": (("span", "check"), ("negate", "package", "version", "percent", "gb",
                                      "platform")),
+    # «Потолок за сутки»: сколько действий с таким названием ферма допустит
+    # за сутки на аккаунт телефона. Исчерпан — сценарий заканчивается.
+    "budget": (("name", "limit"), ("platform",)),
     # «Приложение готово»: установлено и не старее min_version; нет — поставить
     # из библиотеки APK фермы (install=False — только проверить).
     "ensure_app": (("package",), ("min_version", "install")),
@@ -85,8 +90,15 @@ _PHONE_WORDS = {"package": "приложение", "version": "версия", "p
                 "gb": "место", "platform": "аккаунт"}
 VERSION_RE = re.compile(r"^\d+(\.\d+){0,4}\Z")
 
+# Потолок за сутки: название счётчика человеческими словами («подписки») и
+# предел. Десять тысяч действий одним аккаунтом за сутки — это уже не
+# потолок, а его отсутствие.
+BUDGET_NAME_MAX = 32
+BUDGET_LIMIT_MAX = 10000
+
 NUMERIC = {"x", "y", "x1", "y1", "x2", "y2", "duration", "seconds", "timeout",
-           "span", "times", "minutes", "pause_min", "pause_max", "percent", "tries", "gb"}
+           "span", "times", "minutes", "pause_min", "pause_max", "percent", "tries", "gb",
+           "limit"}
 BOOLEAN = {"clear", "watch", "negate", "install"}
 
 # Потолки повтора: сутки и десять тысяч кругов — дальше это уже не сценарий,
@@ -117,6 +129,7 @@ _LABELS = {
     "chance": "С шансом", "until": "Пока не найдёшь",
     "if_seen": "Если на экране", "break": "Выйти из повтора",
     "finish": "Закончить сценарий", "call": "Сценарий",
+    "budget": "Потолок за сутки",
     "if_phone": "Если на телефоне", "ensure_app": "Приложение готово",
 }
 
@@ -131,8 +144,15 @@ def label_of(step: dict) -> str:
     elif kind in ("launch_app", "stop_app"):
         tail = args.get("package", "")
     elif kind == "type":
-        tail = (f'{ACCOUNT_FIELDS.get(args.get("field"), "")} {args["account"]}'
-                if args.get("account") else args.get("value", ""))
+        if args.get("account"):
+            tail = f'{ACCOUNT_FIELDS.get(args.get("field"), "")} {args["account"]}'
+        else:
+            tail = args.get("value", "")
+            вариантов = phrases.count(tail)
+            if вариантов > 1:
+                tail = f"один из {вариантов} вариантов"
+    elif kind == "budget":
+        tail = f'{args.get("name", "")} — не больше {args.get("limit", "")} за сутки'
     elif kind == "key":
         tail = args.get("name", "")
     elif kind == "loop":
@@ -622,6 +642,8 @@ def normalize_step(raw) -> dict:
         _check_if_phone(step["args"])
     elif kind == "ensure_app":
         _check_ensure_app(step["args"])
+    elif kind == "budget":
+        _check_budget(step["args"])
     elif kind == "finish":
         _check_finish(step["args"])
     elif kind == "call":
@@ -745,6 +767,27 @@ def _check_ensure_app(args: dict) -> None:
             raise StepError("«приложение готово»: версия — числа через точку, например 8.40")
         args["min_version"] = version
     args["install"] = bool(args.get("install", True))
+
+
+def _check_budget(args: dict) -> None:
+    name = _text(args.get("name"))
+    if not name:
+        raise StepError("«потолок за сутки»: назовите, что считаем, например «подписки»")
+    if len(name) > BUDGET_NAME_MAX:
+        raise StepError(f"«потолок за сутки»: название не длиннее {BUDGET_NAME_MAX} знаков")
+    args["name"] = name
+    limit = args["limit"]
+    if limit != int(limit) or not 1 <= limit <= BUDGET_LIMIT_MAX:
+        raise StepError(f"«потолок за сутки»: сколько — целое от 1 до {BUDGET_LIMIT_MAX}")
+    args["limit"] = int(limit)
+    # Платформа не задана — счёт по любому аккаунту телефона: у большинства
+    # телефонов он один, и спрашивать человека не о чем.
+    platform = (args.pop("platform", "") or "").strip()
+    if platform:
+        from ..accounts import PLATFORMS
+        if platform not in PLATFORMS:
+            raise StepError(f"«потолок за сутки»: аккаунт одной из платформ {', '.join(PLATFORMS)}")
+        args["platform"] = platform
 
 
 def _check_finish(args: dict) -> None:
