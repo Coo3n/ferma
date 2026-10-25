@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import FileResponse, Response, StreamingResponse
 
-from .. import adb, config, control, streaming
+from .. import adb, config, contacts, control, streaming
 from ..control import display
 from ..devices import registry
 
@@ -153,7 +153,30 @@ def _resolution_reset(serial, p):
     return {"ok": True}
 
 
+def _contacts_add(serial, p):
+    """Контакты на телефон: список из файла (одинаковый у всех) или случайные
+    по шаблону (у каждого телефона свои — одинаковые «друзья» у сорока
+    аккаунтов выглядят подозрительно)."""
+    if p.get("items"):
+        items = p["items"]
+    elif p.get("generate"):
+        g = p["generate"]
+        numbers = contacts.generate(g.get("prefix"), g.get("length"), g.get("count"))
+        items = [{"name": n, "number": n} for n in numbers]
+    else:
+        raise ValueError("нет ни списка контактов, ни шаблона номеров")
+    for script in contacts.insert_scripts(items):
+        contacts.check_output(adb.shell(serial, script, timeout=120))
+    return {"ok": True, "added": len(items)}
+
+
+def _contacts_clear(serial, p):
+    contacts.check_output(adb.shell(serial, contacts.CLEAR_SCRIPT, timeout=60))
+    return {"ok": True}
+
 ACTIONS = {
+    "contacts_add": _contacts_add,
+    "contacts_clear": _contacts_clear,
     "resolution_set": _resolution_set,
     "resolution_reset": _resolution_reset,
     "tap": _tap,

@@ -418,6 +418,45 @@ function bulkSendLines() {
         clear: $('bulkLinesClear').checked}));
 }
 
+function bulkContactsGenerate() {
+    const prefix = $('bulkCtPrefix').value.trim();
+    if (!prefix) return toast('впишите начало номера', 'bad');
+    bulkAction({type: 'contacts_add', generate: {
+        prefix, length: Number($('bulkCtLen').value), count: Number($('bulkCtCount').value)}}, 'Контакты');
+}
+
+async function bulkContactsFile(file) {
+    if (!file) return;
+    const buf = await file.arrayBuffer();
+    let text;
+    try {
+        text = new TextDecoder('utf-8', {fatal: true}).decode(buf);
+    } catch (e) {
+        text = new TextDecoder('windows-1251').decode(buf);
+    }
+    const items = bulkContactsParse(text);
+    $('bulkCtInfo').textContent = items.length ? `Из файла: ${items.length} контактов` : 'В файле нет номеров';
+    if (items.length) bulkAction({type: 'contacts_add', items}, 'Контакты');
+}
+
+function bulkContactsParse(text) {
+    const out = [];
+    for (const line of String(text || '').split(/\r?\n/)) {
+        const parts = line.trim().split(/[;,\t]/);
+        const number = (parts[parts.length - 1] || '').replace(/[^\d+]/g, '');
+        if (!/^\+?\d{7,15}$/.test(number)) continue;
+        out.push({name: parts.length > 1 ? parts[0].trim() : number, number});
+        if (out.length >= 2000) break;
+    }
+    return out;
+}
+
+function bulkContactsClear(ev) {
+    const n = bulkTargets().length;
+    if (!armConfirm(ev.currentTarget, `Стереть ВСЕ контакты на ${n} ${declOfNum(n, ['телефоне', 'телефонах', 'телефонах'])}?`)) return;
+    bulkAction({type: 'contacts_clear'}, 'Очистка контактов');
+}
+
 function bulkMenu() {
     const n = bulkTargets().length;
     const busy = bulkBusyCount();
@@ -454,6 +493,7 @@ function bulkMenu() {
     <div class="bulk-grid">
       ${tile("bulkPanel('text')", 'keyboard', 'Ввести текст', 'в поле, где стоит курсор', 'text')}
       ${tile("bulkPanel('lines')", 'keyboard', 'Каждому своё', 'строка файла — на свой телефон', 'lines')}
+      ${tile("bulkPanel('contacts')", 'layers', 'Контакты', 'добавить пачкой или очистить', 'contacts')}
       ${tile("bulkPanel('group')", 'layers', 'Группа', groups.length ? 'назначить или убрать' : 'например, «VK-10»', 'group')}
       ${tile("bulkPanel('tags')", 'layers', 'Теги', 'добавить или снять, например «прогрет»', 'tags')}
     </div>
@@ -553,6 +593,15 @@ function bulkPanel(kind) {
             <input id="bulkLinesTpl" placeholder="шаблон, например {1}@mail.ru" aria-label="Шаблон">
             <button class="sm primary" onclick="bulkSendLines()">Ввести</button></div>
           <small class="dim" id="bulkLinesInfo"></small>`,
+        contacts: `<div class="bp-row">
+            <input id="bulkCtPrefix" placeholder="начало номера, например +7999" aria-label="Начало номера">
+            <input id="bulkCtLen" type="number" value="11" min="7" max="15" aria-label="Длина номера">
+            <input id="bulkCtCount" type="number" value="20" min="1" max="1000" aria-label="Сколько">
+            <button class="sm primary" onclick="bulkContactsGenerate()">Случайные, у каждого свои</button></div>
+          <div class="bp-row">
+            <input type="file" accept=".txt,.csv" aria-label="Файл" onchange="bulkContactsFile(this.files[0])">
+            <button class="sm danger" onclick="bulkContactsClear(event)"><span>Очистить все контакты</span></button></div>
+          <small class="dim" id="bulkCtInfo">Файл: «номер» или «имя;номер» по строке. Проверьте на одном телефоне: не все прошивки дают писать контакты.</small>`,
     }[kind];
     const first = box.querySelector('input, select');
     if (first) first.focus();
