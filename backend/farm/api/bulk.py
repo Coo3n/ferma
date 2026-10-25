@@ -21,6 +21,7 @@ from pathlib import Path
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
 from .. import adb
+from ..control import display
 from ..devices import registry
 from .screen import ACTIONS
 
@@ -254,6 +255,23 @@ def bulk_warm(serials: list[str] = Body(..., embed=True)):
     for s in targets:
         threading.Thread(target=warm, args=(s,), daemon=True, name=f"warm-{s}").start()
     return {"ok": True, "warming": len(targets)}
+
+
+def _display_info(serial: str) -> dict:
+    """Текущий размер и плотность одного телефона для сводки «у вас N разных»."""
+    size = display.parse_wm_size(adb.shell(serial, "wm size", timeout=10))
+    dens = display.parse_density(adb.shell(serial, "wm density", timeout=10))
+    as_list = lambda v: list(v) if v else None  # noqa: E731
+    return {"size": as_list(size["current"]), "physical": as_list(size["physical"]),
+            "overridden": size["override"] is not None or dens["override"] is not None,
+            "density": dens["current"], "physical_density": dens["physical"]}
+
+
+@router.post("/display")
+def bulk_display(serials: list[str] = Body(..., embed=True)):
+    """Размер и плотность выбранных телефонов: окно «Разрешение» показывает,
+    есть ли среди них разные, до того как что-то менять."""
+    return _each(_online(serials), _display_info, serials)
 
 
 # Список приложений меняется редко, а pm list на 40 телефонах — 40 вызовов adb.

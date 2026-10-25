@@ -19,6 +19,7 @@ from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import FileResponse, Response, StreamingResponse
 
 from .. import adb, config, control, streaming
+from ..control import display
 from ..devices import registry
 
 router = APIRouter(prefix="/api/devices")
@@ -132,7 +133,29 @@ def _rotate(serial, p):
     return {"ok": True, "landscape": nxt == "1"}
 
 
+def _resolution_set(serial, p):
+    """Размер (и плотность) экрана одинаковые на всех телефонах — чтобы
+    записанные клики попадали в те же места. Сначала проверка чисел, потом
+    телефон: кривой запрос не должен оставить экран наполовину переставленным."""
+    commands = [display.size_command(p.get("width"), p.get("height"))]
+    if p.get("density") not in (None, ""):
+        commands.append(display.density_command(p.get("density")))
+    for cmd in commands:
+        adb.shell(serial, cmd, timeout=SHELL_TIMEOUT)
+    control.forget_size(serial)   # кэш размера устарел: тапы по нему попадали бы мимо
+    return {"ok": True}
+
+
+def _resolution_reset(serial, p):
+    for cmd in display.RESET_COMMANDS:
+        adb.shell(serial, cmd, timeout=SHELL_TIMEOUT)
+    control.forget_size(serial)
+    return {"ok": True}
+
+
 ACTIONS = {
+    "resolution_set": _resolution_set,
+    "resolution_reset": _resolution_reset,
     "tap": _tap,
     "long_tap": _long_tap,
     "swipe": _swipe,

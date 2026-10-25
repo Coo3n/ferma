@@ -299,6 +299,65 @@ function syncRoute(payload) {
 
 /* ------------------------------------------------------------- диалог */
 
+/* разрешение: начало */
+/* Разрешение и плотность: у всех выбранных одинаковые, чтобы записанные
+   клики попадали в одни и те же места. */
+function bulkResSummary(results) {
+    const groups = new Map();
+    for (const r of Object.values(results || {})) {
+        if (!r || !r.ok || !r.size) continue;
+        const key = `${r.size[0]}×${r.size[1]}`;
+        const g = groups.get(key) || {size: key, count: 0, w: r.size[0], h: r.size[1]};
+        g.count += 1;
+        groups.set(key, g);
+    }
+    return [...groups.values()].sort((a, b) => b.count - a.count);
+}
+
+function bulkResFit(w, h, newW) {
+    return Math.round(newW * h / w / 2) * 2;
+}
+/* разрешение: конец */
+
+const BULK_RES = {base: null};
+
+async function bulkResLoad() {
+    const info = $('bulkResInfo');
+    try {
+        const res = await post('/api/bulk/display', {serials: bulkTargets()});
+        const groups = bulkResSummary(res.results);
+        BULK_RES.base = groups[0] || null;
+        info.textContent = groups.length
+            ? 'Сейчас: ' + groups.map(g => `${g.size} — ${g.count}`).join(', ')
+                + (groups.length > 1 ? ` · у вас ${groups.length} разных размера` : '')
+            : 'Размер телефонов узнать не удалось';
+        if (BULK_RES.base) {
+            $('bulkResW').value = BULK_RES.base.w;
+            $('bulkResH').value = BULK_RES.base.h;
+        }
+    } catch (e) {
+        info.textContent = e.message;
+    }
+}
+
+function bulkResWidthChanged() {
+    const base = BULK_RES.base;
+    if (!base || !$('bulkResKeep').checked) return;
+    const w = Number($('bulkResW').value);
+    if (w > 0) $('bulkResH').value = bulkResFit(base.w, base.h, w);
+}
+
+function bulkResApply() {
+    const width = Number($('bulkResW').value), height = Number($('bulkResH').value);
+    const density = $('bulkResD').value.trim();
+    if (!width || !height) return toast('впишите ширину и высоту', 'bad');
+    bulkAction({type: 'resolution_set', width, height, density}, 'Разрешение');
+}
+
+function bulkResReset() {
+    bulkAction({type: 'resolution_reset'}, 'Вернуть разрешение');
+}
+
 function bulkMenu() {
     const n = bulkTargets().length;
     const busy = bulkBusyCount();
@@ -322,6 +381,7 @@ function bulkMenu() {
       ${tile("bulkAction({type:'screen_off'},'Погасить экран')", 'moon', 'Погасить экран', 'телефон останется в сети')}
       ${tile('bulkShots()', 'image', 'Скриншоты', 'что сейчас на экранах')}
       ${tile('prepareSelected()', 'sliders', 'Подготовить', 'без анимаций, экран не гаснет')}
+      ${tile("bulkPanel('res')", 'grid', 'Разрешение', 'одинаковое на всех, чтобы клики попадали', 'res')}
     </div>
     <div class="bulk-sect">Приложения и файлы</div>
     <div class="bulk-grid">
@@ -406,10 +466,24 @@ function bulkPanel(kind) {
               placeholder="имя группы, пусто — убрать" onkeydown="if(event.key==='Enter')bulkSetGroup()">
             <datalist id="bulkGroups">${groups.map(g => `<option value="${esc(g)}">`).join('')}</datalist>
             <button class="sm primary" onclick="bulkSetGroup()">Назначить</button></div>`,
+        res: `<small class="dim" id="bulkResInfo">считаю размеры…</small>
+          <div class="bp-row">
+            <input id="bulkResW" type="number" min="320" max="4000" placeholder="ширина" aria-label="Ширина"
+                   oninput="bulkResWidthChanged()">
+            <span>×</span>
+            <input id="bulkResH" type="number" min="320" max="4000" placeholder="высота" aria-label="Высота">
+            <input id="bulkResD" type="number" min="80" max="800" placeholder="плотность (необязательно)" aria-label="Плотность">
+          </div>
+          <div class="bp-row">
+            <label><input type="checkbox" id="bulkResKeep" checked> сохранить пропорции</label>
+            <button class="sm primary" onclick="bulkResApply()">Применить</button>
+            <button class="sm" onclick="bulkResReset()">Вернуть как было</button></div>
+          <small class="dim">Проверьте на одном телефоне: на некоторых прошивках после смены обрывается трансляция экрана — «Вернуть как было» всегда доступно.</small>`,
     }[kind];
     const first = box.querySelector('input, select');
     if (first) first.focus();
     if (kind === 'app') bulkLoadApps();
+    if (kind === 'res') bulkResLoad();
     bulkLock();
 }
 
