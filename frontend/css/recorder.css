@@ -1527,3 +1527,29 @@ img.pop-thumb.shot { width: 40px; height: 52px; object-fit: cover; object-positi
 @media (min-width: 1100px) {
     .addpick-g .addpick-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 }
+
+/* «Добавить шаг», палитра. Раньше всё было зелёным: значок у каждой из
+   десятков карточек, и выбранное нельзя было отличить от остального. Теперь
+   нейтральный фон и значки, а акцент — только у выбранного (вкладка, чип) и у
+   карточки под курсором: акцент работает как «вот это». */
+.addpick-nav button[aria-selected="true"] {
+    background: color-mix(in srgb, var(--accent) 20%, var(--panel2));
+    color: var(--text);
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+.addpick-nav button[aria-selected="true"] .ic { color: var(--accent); }
+.addpick-nav button:not([aria-selected="true"]):hover { background: var(--panel2); color: var(--text); }
+
+.addpick-chip { background: var(--panel2); border-color: transparent; color: var(--text2); }
+.addpick-chip:hover { background: var(--panel3); border-color: transparent; color: var(--text); }
+.addpick-chip[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+}
+.addpick-chip[aria-pressed="true"] small { color: color-mix(in srgb, var(--accent-ink) 70%, transparent); }
+
+.addpick-ic { background: var(--panel3); color: var(--text2); }
+.addpick-card:hover:not(:disabled) .addpick-ic { background: var(--accent-dim); color: var(--accent); }

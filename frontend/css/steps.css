@@ -1,192 +1,31 @@
-/* Панель шагов конструктора: карточки вместо плоских строк.
+/* Панель шагов конструктора.
 
-   Шаг — мягкая карточка (--panel2) с зазором, номером в круге и значком в
-   цветном чипе по категории. Блок — шапка-карточка с цветной полоской слева,
-   вложенные шаги сидят правее на «нити». Подключается после recorder.css и
-   steptools.css и переопределяет их строки; прежние классы не переименованы. */
+   Вид строк и блоков — прежний, плоский (recorder.css, steptools.css): тонкие
+   разделители, номер, мелкий значок, у блока цветная линия слева. Карточки с
+   заливкой, кружки у номеров и цветные плашки у значков пробовали и убрали:
+   на длинном сценарии они превращали список в «приборную панель» и спорили с
+   палитрой фермы (спокойное нормально, громкое — только исключения).
 
-#recSteps .rs {
-    --rs-fill: var(--panel2);
-    --rs-sel-fill: color-mix(in srgb, var(--accent) 12%, var(--panel2));
-    --rs-lead: 120px;
-    position: relative;
-    margin: 0 0 var(--s1);
-    padding: var(--s2) var(--s3);
-    border: 0;
-    border-radius: var(--r2);
-    background: var(--rs-fill);
-    --rs-tint: var(--rs-fill);
-}
+   Здесь осталось только то, чего в прежнем виде не было: сворачивание блока и
+   счётчик шагов в нём. Оба тихие. */
 
-/* состояния: один шаг токена, без теней */
-#recSteps .rs:not(.sel):hover,
-#recSteps .rs.open:not(.sel) { --rs-fill: var(--panel3); background: var(--rs-fill); --rs-tint: var(--rs-fill); }
-#recSteps .rs.sel,
-#recSteps .rs.mq-on {
-    --rs-fill: var(--rs-sel-fill);
-    --rs-tint: var(--rs-fill);
-    background: var(--rs-fill);
-    outline: 1px solid var(--accent-line);
-    outline-offset: -1px;
-}
-#recSteps .rs:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
-#recSteps .rs.rs-empty:hover { --rs-fill: transparent; background: transparent; }
+/* Значок раньше стоял в строке без обёртки — обёртка не должна менять вид. */
+.rs-chip { display: contents; }
 
-/* ---- шапка карточки */
-#recSteps .rs-head {
-    gap: var(--s2);
-    min-height: 40px;
-    padding-right: 72px;           /* место под тихие кнопки: высота и текст не прыгают */
-}
-#recSteps .rs-head > .rs-n {
-    flex: 0 0 22px;
-    width: 22px;
-    height: 22px;
-    display: grid;
-    place-items: center;
-    border-radius: var(--pill);
-    background: var(--well);
-    color: var(--text2);
-    font: var(--fs-1) / 1 inherit;
-    font-family: inherit;
-    font-variant-numeric: tabular-nums;
-    min-width: 0;
-}
+/* Вторая строка с деталями: на каждой строке шума больше, чем пользы
+   («по тексту», «по подписи» — это для того, кто строит, а не читает). */
+.rs-sub { display: none; }
+.rs-text { flex: 1; min-width: 0; }
 
-.rs-chip {
-    flex: 0 0 30px;
-    width: 30px;
-    height: 30px;
-    display: grid;
-    place-items: center;
-    border-radius: var(--r1);
-    --chip: var(--text2);
-    color: var(--chip);
-    background: color-mix(in srgb, var(--chip) 14%, transparent);
-}
-.rs-chip .ic { width: var(--icon-md); height: var(--icon-md); }
-.rs-cat-act .rs-chip { --chip: var(--accent); }
-.rs-cat-wait .rs-chip { --chip: var(--busy); }
-.rs-cat-sys .rs-chip { --chip: var(--warn); }
-.rs-cat-plain .rs-chip { --chip: var(--text2); background: var(--panel3); }
-.rs-vis { flex: 0 0 30px; width: 30px; height: 30px; background: var(--well); }
-
-.rs-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
-#recSteps .rs-label {
-    font-size: var(--fs-2);
-    line-height: 1.3;
-    color: var(--text);
-}
-.rs-sub {
-    font-size: var(--fs-1);
-    line-height: 1.3;
-    color: var(--text2);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* тихие действия: место зарезервировано, показываются по hover/focus/выбору */
-#recSteps .rs-acts {
-    right: var(--s2);
-    padding: 0;
-    background: transparent;
-    border-radius: var(--r1);
-}
-#recSteps .rs.sel:not(.has-sel) .rs-acts { opacity: 1; }
-#recSteps.has-sel .rs.sel .rs-acts { opacity: 0; }
-
-/* метки состояния: маленький чип, не заливка строки */
-#recSteps .rs-badge {
-    border: 0;
-    background: var(--panel3);
-    color: var(--text2);
-    padding: 0 var(--s2);
-    height: 20px;
-    border-radius: var(--pill);
-}
-#recSteps .rs-badge.opt { color: var(--warn); background: var(--warn-dim); }
-#recSteps .rs-badge.retry { color: var(--busy); background: var(--busy-dim); }
-#recSteps .rs.run-fail,
-#recSteps .rs.run-blind { background: var(--rs-fill); }
-#recSteps .rs.run-fail { outline: 1px solid var(--bad-line); outline-offset: -1px; }
-#recSteps .rs.run-blind { box-shadow: inset 3px 0 0 var(--warn); }
-#recSteps .rs.run-now { outline-offset: -2px; }
-
-/* раскрытый редактор — внутри той же карточки, без второй рамки */
-#recSteps .rs-body { padding-left: var(--rs-lead); }
-#recSteps .rs-body:not(:empty) { padding-top: var(--s1); }
-#recSteps .rs-more { border: 0; }
-@container build (max-width: 600px) { #recSteps .rs-body { padding-left: 0; } }
-
-/* ---- блоки: шапка-карточка с цветной полоской, дети на «нити» */
-#recSteps .rs.rs-block {
-    --blk-c: var(--line-hover);
-    --rs-fill: color-mix(in srgb, var(--blk-c) 9%, var(--panel2));
-    background: var(--rs-fill);
-    border: 0;
-}
-#recSteps .rs.rs-block:not(.sel):hover { --rs-fill: color-mix(in srgb, var(--blk-c) 15%, var(--panel2)); }
-#recSteps .rs.rs-block-loop { --blk-c: var(--accent); }
-#recSteps .rs.rs-block-chance { --blk-c: var(--warn); }
-#recSteps .rs.rs-block-until { --blk-c: var(--busy); }
-#recSteps .rs.rs-block-if_seen,
-#recSteps .rs.rs-block-if_phone { --blk-c: var(--line-hover); }
-#recSteps .rs.rs-block::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: var(--s2);
-    bottom: var(--s2);
-    width: 3px;
-    border-radius: var(--pill);
-    background: var(--blk-c);
-}
-#recSteps .rs.rs-block .rs-label { font-weight: 600; }
-#recSteps .rs.rs-block .rs-chip { --chip: var(--blk-c); }
-#recSteps .rs.rs-block-if_seen .rs-chip,
-#recSteps .rs.rs-block-if_phone .rs-chip { --chip: var(--text2); background: var(--panel3); }
-
-#recSteps .rs.rs-depth-1,
-#recSteps .rs.rs-depth-2,
-#recSteps .rs.rs-depth-3 {
-    border-left: 0;
-    padding-left: var(--s3);
-    margin-left: calc(var(--s4) * var(--d, 1));
-}
-#recSteps .rs.rs-depth-1 { --d: 1; }
-#recSteps .rs.rs-depth-2 { --d: 2; }
-#recSteps .rs.rs-depth-3 { --d: 3; }
-/* нить: тонкая вертикаль слева от вложенных шагов, сквозь зазоры */
-#recSteps .rs.rs-depth-1::after,
-#recSteps .rs.rs-depth-2::after,
-#recSteps .rs.rs-depth-3::after {
-    content: "";
-    position: absolute;
-    left: calc(-1 * var(--s2));
-    top: calc(-1 * var(--s1));
-    bottom: calc(-1 * var(--s1));
-    width: 2px;
-    background: var(--blk);
-}
-#recSteps .rs.rs-block-end { border: 0; margin-bottom: var(--s2); }
-#recSteps .rs.rs-block-end::after { bottom: var(--s1); }
-
-#recSteps .rs.rs-empty { padding-left: var(--rs-lead); background: transparent; }
-
+/* Счётчик шагов в блоке — приглушённый текст, не плашка. */
 .rs-count {
     flex: 0 0 auto;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    padding: 0 var(--s2);
-    border-radius: var(--pill);
-    background: var(--panel3);
     color: var(--text2);
     font-size: var(--fs-1);
     white-space: nowrap;
 }
 
+/* Свернуть блок: маленькая стрелка, видна всегда, но не кнопка-плашка. */
 .rs-fold {
     flex: 0 0 24px;
     width: 24px;
@@ -206,10 +45,9 @@
 .rs-fold .ic { transition: transform var(--fast) var(--ease); }
 .rs-fold.closed .ic { transform: rotate(-90deg); }
 
-/* свёрнутый блок: дети скрыты, данные на месте */
+/* Свёрнутый блок: дети скрыты, данные на месте. */
 #recSteps .rs.rs-folded { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
-    #recSteps .rs, .rs-fold .ic { transition: none; }
-    #recSteps .rs.run-now { animation: none; }
+    .rs-fold .ic { transition: none; }
 }

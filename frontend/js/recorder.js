@@ -1723,7 +1723,7 @@ const SCH_ICONS = {
     until: ['until', 'search'],
     if_seen: ['until', 'eye'],
     if_phone: ['until', 'phone'],
-    ensure_app: ['block', 'phone'],
+    ensure_app: ['block', 'check-square'],
     break: ['block', 'stop'],
     finish: ['block', 'check'],
     budget: ['block', 'shield'],
@@ -1740,10 +1740,10 @@ const SCH_ICONS = {
     unlock: ['', 'unlock'],
     swipe: ['', 'swipe'],
     long_tap: ['', 'hand'],
-    double_tap: ['', 'pointer'],
-    wait: ['until', 'eye'],
-    wait_gone: ['until', 'eye-off'],
-    proxy: ['block', 'wifi'],
+    double_tap: ['', 'target'],
+    wait: ['until', 'history'],
+    wait_gone: ['until', 'history'],
+    proxy: ['block', 'plug'],
 };
 
 function schIcon(step) {
