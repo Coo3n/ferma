@@ -20,6 +20,21 @@ class VlmError(RuntimeError):
     """Нейросеть не ответила. Текст — для человека, без секретов."""
 
 
+def _human(reason) -> str:
+    """Причина сбоя сети человеческими словами: «Errno 61» оператору ничего не
+    говорит, а по тексту он понимает, что чинить — адрес или сам сервер."""
+    text = str(reason).lower()
+    if isinstance(reason, TimeoutError) or "timed out" in text:
+        return "не дождались ответа"
+    if "refused" in text:
+        return "по этому адресу никто не отвечает"
+    if "name or service not known" in text or "nodename nor servname" in text or "getaddrinfo" in text:
+        return "такого адреса нет"
+    if "unreachable" in text:
+        return "адрес не достать из этой сети"
+    return str(reason)
+
+
 def endpoint(url: str) -> str:
     url = (url or "").strip().rstrip("/")
     if urlsplit(url).scheme not in ("http", "https") or not urlsplit(url).netloc:
@@ -78,6 +93,6 @@ def ask(image_bytes: bytes, prompt: str, cfg: "settings.Settings | None" = None)
     except urllib.error.HTTPError as e:
         raise VlmError(f"нейросеть ответила ошибкой {e.code}") from None
     except (urllib.error.URLError, OSError) as e:
-        raise VlmError(f"нейросеть недоступна: {getattr(e, 'reason', e)}") from None
+        raise VlmError(f"нейросеть недоступна: {_human(getattr(e, 'reason', e))}") from None
     except ValueError:
         raise VlmError("нейросеть прислала не JSON") from None

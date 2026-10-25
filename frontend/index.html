@@ -896,6 +896,10 @@
             <div class="hs-legend" id="dvnKinds" role="group" aria-label="Тип проблемы" data-t-aria-label="problems.tip_problemy"></div>
             <span class="stat" id="dvnCount"></span>
             <span class="sp"></span>
+            <button class="sm vlm-chip" id="vlmChip" onclick="vlmOpen()" data-t-title="vlm.chip_podskazka"
+                    title="Помощник-нейросеть: настройки">
+                <span class="vlm-dot" aria-hidden="true"></span><span id="vlmChipText"></span>
+            </button>
             <button class="sm" onclick="deviationsSeenAll()" data-t="problems.otmetit_vse_prochitannym">
                 <svg class="ic" aria-hidden="true">
                     <use href="#i-check"/>
@@ -909,10 +913,6 @@
                 Очистить список
             </button>
         </div>
-        <details class="vlm-panel" id="vlmPanel" ontoggle="vlmLoad()">
-            <summary data-t="vlm.zagolovok">Помощник-нейросеть</summary>
-            <div class="vlm-body" id="vlmBody"></div>
-        </details>
         <div class="scroll" id="dvnList"></div>
     </section>
 

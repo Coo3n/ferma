@@ -339,3 +339,10 @@ def test_сетевая_ошибка_не_списывает_квоту(monkeypa
     assert locate.locate(Ctx(), {"text": ["Далее"]}) is None
     assert usage.used_today() == before
     assert locate.usage.reserve("jref", 1, 10)[0]   # лимит на задачу не съеден
+
+
+def test_причина_сбоя_человеческими_словами():
+    from farm.vlm import client
+    assert "никто не отвечает" in client._human(ConnectionRefusedError(61, "Connection refused"))
+    assert client._human(TimeoutError("timed out")) == "не дождались ответа"
+    assert client._human("что-то своё") == "что-то своё"

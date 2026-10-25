@@ -397,6 +397,9 @@ async function pollDeviations() {
     setText($('dvnCount'), data.deviations.length ? `всего: ${data.deviations.length}` : '');
     renderDeviations();
     refreshDeviationAges();
+    /* Счётчик помощника живой, но только пока раздел на экране: в фоне
+       лишний запрос раз в опрос ни к чему. */
+    if ($('vlmChip') && $('vlmChip').offsetParent) vlmChipRefresh();
     repointModalReturn();
 }
 

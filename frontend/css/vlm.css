@@ -1,10 +1,32 @@
-/* Панель «Помощник-нейросеть» в разделе проблем. Спокойная: свёрнута, пока не нужна. */
-.vlm-panel { margin: 0 16px var(--s2); border-bottom: 1px solid var(--line-soft); font-size: var(--fs-2); }
-.vlm-panel > summary { cursor: pointer; padding: var(--s2) 0; color: var(--text2); }
-.vlm-body { display: grid; gap: var(--s2); padding-bottom: var(--s3); max-width: 62ch; }
-.vlm-body label { display: grid; gap: 4px; color: var(--text2); font-size: var(--fs-1); }
-.vlm-body label.vlm-check { display: flex; align-items: center; gap: var(--s2); color: var(--text); font-size: var(--fs-2); }
-.vlm-body p { margin: 0; color: var(--text2); line-height: var(--lh); }
-.vlm-priv { color: var(--warn); }
-.vlm-row { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; }
-.vlm-count { color: var(--text2); font-variant-numeric: tabular-nums; }
+/* «Помощник-нейросеть»: кнопка-статус в шапке «Проблем» и диалог настроек.
+   Спокойно: в норме это одна тихая кнопка, форма — только по запросу. */
+.vlm-chip { gap: var(--s2); color: var(--text2); }
+.vlm-dot { width: 8px; height: 8px; border-radius: var(--pill); background: var(--dim); flex: none; }
+.vlm-chip[data-on="1"] { color: var(--text); }
+.vlm-chip[data-on="1"] .vlm-dot { background: var(--accent); }
+
+.vlm-form { display: grid; gap: var(--s4); max-width: 56ch; font-size: var(--fs-2); }
+.vlm-form p { margin: 0; line-height: var(--lh); }
+.vlm-lead { color: var(--text2); }
+.vlm-form label { display: grid; gap: var(--s1); color: var(--text2); font-size: var(--fs-1); }
+.vlm-form input:not([type="checkbox"]) { width: 100%; }
+
+.vlm-switch { display: flex !important; align-items: flex-start; gap: var(--s3); padding: var(--s3);
+              background: var(--well); border-radius: var(--r2); color: var(--text); cursor: pointer; }
+.vlm-switch input { margin-top: 3px; flex: none; }
+.vlm-switch b { display: block; font-weight: 600; font-size: var(--fs-2); }
+.vlm-switch small { display: block; color: var(--text2); font-size: var(--fs-1); }
+
+.vlm-group { display: grid; gap: var(--s3); }
+.vlm-group h4 { margin: 0; font-size: var(--fs-2); font-weight: 600; color: var(--text); }
+.vlm-two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+@container (max-width: 420px) { .vlm-two { grid-template-columns: 1fr; } }
+
+.vlm-warn { color: var(--warn); font-size: var(--fs-1); padding-left: var(--s3);
+            border-left: 2px solid var(--warn); }
+.vlm-calm, .vlm-note { color: var(--text2); font-size: var(--fs-1); }
+
+.vlm-status { font-size: var(--fs-1); color: var(--text2); }
+.vlm-status:empty { display: none; }
+.vlm-status[data-ok="1"] { color: var(--accent); }
+.vlm-status[data-ok="0"] { color: var(--bad); }
