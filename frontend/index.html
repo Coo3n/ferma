@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="css/vlm.css">
     <link rel="stylesheet" href="css/files.css">
     <link rel="stylesheet" href="css/apklib.css">
+    <link rel="stylesheet" href="css/gallery.css">
     <link rel="stylesheet" href="css/onboarding.css">
     <link rel="stylesheet" href="css/coach.css">
     <link rel="stylesheet" href="css/tooltip.css">
@@ -782,6 +783,8 @@
                         onclick="showView('apps')"><span data-t="apk.tab_prilozheniya">Приложения</span><b class="tab-n" data-count="apps"></b></button>
                 <button class="sm" role="tab" aria-selected="false"
                         onclick="showView('schedule')"><span data-t="apk.tab_raspisanie">Расписание</span></button>
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('gallery')"><span data-t="gallery.tab">Готовые</span></button>
             </div>
             <span class="sp"></span>
             <button class="sm ghost" onclick="recTipsOpen()" data-t="tips.link"><svg class="ic" aria-hidden="true"><use href="#i-lightbulb"/></svg>Советы</button>
@@ -814,6 +817,8 @@
                         onclick="showView('apps')"><span data-t="apk.tab_prilozheniya">Приложения</span><b class="tab-n" data-count="apps"></b></button>
                 <button class="sm" role="tab" aria-selected="false"
                         onclick="showView('schedule')"><span data-t="apk.tab_raspisanie">Расписание</span></button>
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('gallery')"><span data-t="gallery.tab">Готовые</span></button>
             </div>
             <span class="sp"></span>
             <button class="sm" id="btnApkAdd" onclick="apkPick()" data-t="apk.dobavit">
@@ -826,6 +831,24 @@
                    onchange="apkUpload(this.files[0]); this.value=''">
         </div>
         <div class="scroll" id="apkList"></div>
+    </section>
+
+    <!-- Готовые сюжеты: вкладка «Сценариев». «Добавить в мои» копирует файл
+         из backend/scenarios/gallery в обычный список. -->
+    <section class="view" id="view-gallery" aria-label="Готовые сюжеты" data-t-aria-label="gallery.razdel">
+        <div class="bar">
+            <div class="seg runs-seg" role="tablist" aria-label="Сценарии и приложения" data-t-aria-label="apk.stsenarii_tabs">
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('scen')"><span data-t="apk.tab_stsenarii">Сценарии</span><b class="tab-n" data-count="scen"></b></button>
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('apps')"><span data-t="apk.tab_prilozheniya">Приложения</span><b class="tab-n" data-count="apps"></b></button>
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('schedule')"><span data-t="apk.tab_raspisanie">Расписание</span></button>
+                <button class="sm on" role="tab" aria-selected="true"
+                        onclick="showView('gallery')"><span data-t="gallery.tab">Готовые</span></button>
+            </div>
+        </div>
+        <div class="scroll" id="galList"></div>
     </section>
 
     <!-- ========================================================== ЗАДАЧИ -->
@@ -929,6 +952,8 @@
                         onclick="showView('apps')"><span data-t="apk.tab_prilozheniya">Приложения</span><b class="tab-n" data-count="apps"></b></button>
                 <button class="sm on" role="tab" aria-selected="true"
                         onclick="showView('schedule')"><span data-t="apk.tab_raspisanie">Расписание</span></button>
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('gallery')"><span data-t="gallery.tab">Готовые</span></button>
             </div>
             <span class="stat" id="schCount"></span>
             <span class="sp"></span>
@@ -1052,6 +1077,7 @@
 <script src="js/files.js"></script>
 <script src="js/notify.js"></script>
 <script src="js/inbox.js"></script>
+<script src="js/gallery.js"></script>
 <script src="js/app.js"></script>
 <script src="js/onboarding.js"></script>
 <script src="js/coach.js"></script>

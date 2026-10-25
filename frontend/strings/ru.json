@@ -1135,5 +1135,14 @@
   "rec.sub_steps_2": "{n} шага",
   "rec.sub_steps_5": "{n} шагов",
   "rec.sub_fold": "Свернуть блок",
-  "rec.sub_unfold": "Развернуть блок"
+  "rec.sub_unfold": "Развернуть блок",
+  "gallery.dobavit": "Добавить в мои",
+  "gallery.dobavlen": "Сюжет добавлен в «Мои» — найдите его на вкладке «Сценарии»",
+  "gallery.ne_proveren": "Не проверено на телефоне",
+  "gallery.ne_proveren_d": "Селекторы взяты из рабочего скрипта, но на вашем парке не прогонялись. Запустите на одном телефоне, прежде чем на всех",
+  "gallery.pusto": "Готовых сюжетов пока нет",
+  "gallery.pusto_d": "Положите файлы сюжетов в папку backend/scenarios/gallery",
+  "gallery.razdel": "Готовые сюжеты",
+  "gallery.tab": "Готовые",
+  "gallery.uzhe_v_moih": "Уже в моих"
 }

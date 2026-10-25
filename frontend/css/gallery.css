@@ -1,0 +1,53 @@
+/* Галерея готовых сюжетов (gallery.js). */
+.gal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--s3);
+    padding: var(--s3) var(--s4);
+}
+
+.gal-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2);
+    padding: var(--s3);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--r2);
+    background: var(--panel);
+}
+
+.gal-card header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s2);
+}
+
+.gal-card p {
+    margin: 0;
+    color: var(--dim);
+}
+
+.gal-card footer {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    margin-top: auto;
+}
+
+.gal-plat {
+    color: var(--dim);
+    font-size: 0.85em;
+}
+
+.gal-badge {
+    padding: 2px var(--s2);
+    border-radius: var(--r2);
+    background: var(--panel2);
+    color: var(--dim);
+    font-size: 0.85em;
+}
+
+.gal-done {
+    color: var(--dim);
+}

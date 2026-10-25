@@ -11,7 +11,7 @@ const POLL_SCENARIOS_MS = 15000;
    разделе. */
 const POLL_DEVIATIONS_MS = 6000;
 
-const VIEWS = ['fleet', 'device', 'scen', 'apps', 'jobs', 'deviations', 'schedule', 'accounts'];
+const VIEWS = ['fleet', 'device', 'scen', 'apps', 'gallery', 'jobs', 'deviations', 'schedule', 'accounts'];
 
 /* ------------------------------------------------------------- навигация */
 
@@ -31,7 +31,7 @@ function showView(name) {
     document.querySelectorAll('.view').forEach(view =>
         view.classList.toggle('on', view.id === 'view-' + name));
     /* «Приложения» и «Расписание» — вкладки раздела «Сценарии». */
-    const navName = (name === 'apps' || name === 'schedule') ? 'scen' : name;
+    const navName = (name === 'apps' || name === 'schedule' || name === 'gallery') ? 'scen' : name;
     document.querySelectorAll('.navbtn').forEach(button => {
         const on = button.dataset.view === navName;
         button.classList.toggle('on', on);
@@ -55,6 +55,7 @@ function showView(name) {
     if (name === 'fleet') renderFleet();
     if (name === 'accounts') loadAccounts();
     if (name === 'apps') apkShow();
+    if (name === 'gallery') galleryShow();
     /* Фильтр «этот запуск» подменяет S.jobs; вне «Запусков» он только
        прятал бы чужие задачи от экрана телефона и «Проблем». */
     if (name !== 'jobs' && S.runBatch) S.runBatch = '';
