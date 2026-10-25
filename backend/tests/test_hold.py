@@ -25,7 +25,7 @@ class КликCtx(DeviceContext):
         self.попытки = 0
         self.клики = 0
 
-    def _settle(self):
+    def _settle(self, *a, **k):
         pass
 
     def _rescue(self):
@@ -346,7 +346,7 @@ def _blind_ctx(monkeypatch, answers, hold_on=True):
 
     ctx = DeviceContext("s", logger=lambda m: None, hold=hold)
     ctx.step_mark = lambda st: None
-    monkeypatch.setattr(ctx, "_settle", lambda: None)
+    monkeypatch.setattr(ctx, "_settle", lambda *a, **k: None)
     return ctx, asked
 
 

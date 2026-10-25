@@ -29,7 +29,7 @@ class Ctx(DeviceContext):
     def __init__(self, **kw):
         super().__init__("s", logger=lambda m: None, **kw)
 
-    def _settle(self):
+    def _settle(self, *a, **k):
         pass
 
     def _rescue(self):

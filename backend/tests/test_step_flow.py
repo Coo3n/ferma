@@ -203,7 +203,7 @@ def test_expect_на_системной_панели_помечает_вслеп
     ctx = DeviceContext("s", logger=lambda m: None)
     marks = []
     ctx.step_mark = marks.append
-    monkeypatch.setattr(ctx, "_settle", lambda: None)
+    monkeypatch.setattr(ctx, "_settle", lambda *a, **k: None)
     monkeypatch.setattr(ctx, "_wait_features", lambda f, t: True)
     ctx.expect_screen("экран", any=[{"resourceId": "com.android.systemui:id/status_bar"}])
     assert marks == ["blind"]

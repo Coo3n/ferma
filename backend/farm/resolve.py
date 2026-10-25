@@ -9,6 +9,7 @@ import difflib
 import time
 from dataclasses import dataclass
 
+from . import config
 from .ui import scope, tree
 from .vision import ocr as ocr_mod
 from .vision import synonyms
@@ -71,6 +72,9 @@ class Hit:
     y: float
     layer: str
     detail: str = ""
+    # Узел — переключатель/галочка: проверка «нажатие подействовало» для него
+    # повторять тап не должна (второй тап вернул бы переключатель назад).
+    checkable: bool = False
 
     def __post_init__(self) -> None:
         # geometry.to_pixels() считает долями только строго 0..1: OCR
@@ -105,6 +109,12 @@ def resolve(ctx, sel=None, text=None, img=None, at=None, timeout: float = 10.0,
     if not (sel or text or img or at):
         raise ValueError("пустая цель: нужен хотя бы один слой")
 
+    # Память нейросети: селекторы, которые она уже подобрала для ЭТОЙ цели на
+    # другом телефоне. Добавляются в конец: свои селекторы сценария главнее.
+    vlm_key, learned = _vlm_learned(ctx, sel, text, img, at)
+    orig_sel = list(sel)
+    sel = sel + [s for s in learned if s not in sel]
+
     deadline = time.time() + timeout
     while sel or text:   # без этих слоёв круг только жёг бы процессор
         ctx.check_cancel()
@@ -113,7 +123,15 @@ def resolve(ctx, sel=None, text=None, img=None, at=None, timeout: float = 10.0,
             if el is not None:
                 center = _center(el, ctx.size)
                 if center:
-                    return Hit(center[0], center[1], "selector", str(s))
+                    if s not in orig_sel:
+                        _say(ctx, "цель найдена селектором из памяти нейросети — без вызова")
+                    if s not in orig_sel and _learned_denied(ctx, el):
+                        continue   # выученный селектор не обходит запрет необратимого
+                    node, nodes = _node_of_el(ctx, el) if config.TAPCOVER else (None, [])
+                    if node is not None:
+                        center = free_point(nodes, node)
+                    return Hit(center[0], center[1], "selector", str(s),
+                               checkable=_el_checkable(el))
         if text:
             hit = _by_tree_text(ctx, text)
             if hit:
@@ -135,9 +153,59 @@ def resolve(ctx, sel=None, text=None, img=None, at=None, timeout: float = 10.0,
         hit = _by_template(ctx, img, at)
         if hit:
             return hit
+    # Шестой слой — нейросеть. Стоит ПЕРЕД точкой: точка слепа (помнит место, но
+    # не видит экран, и перед ней приходится спрашивать человека), а нейросеть
+    # смотрит на кадр. Выключена по умолчанию; без blind (листание) и с местом
+    # поиска не зовётся: там каждый круг был бы платным вызовом.
+    if blind and (sel or text):
+        hit = _by_vlm(ctx, orig_sel, text, vlm_key)
+        if hit:
+            return hit
     if at and blind:
         return Hit(float(at[0]), float(at[1]), "point")
     return None
+
+
+def _say(ctx, msg):
+    try:
+        ctx.log(msg)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _vlm_learned(ctx, sel, text, img, at):
+    try:
+        from .vlm import learn
+        k = learn.key(ctx, sel, text, img, at)
+        return k, learn.lookup(k)
+    except Exception:  # noqa: BLE001 — память нейросети не должна ломать поиск
+        return "", []
+
+
+def _learned_denied(ctx, el) -> bool:
+    """Узел, найденный выученным селектором, оказался необратимым действием?
+    Тогда это промах слоя + отклонение vlm_denied. Не смогли прочесть узел —
+    тоже отказ: осторожность по умолчанию."""
+    try:
+        from .vlm import locate as vlm_locate, safety
+        info = el.info if hasattr(el, "info") else {}
+        texts = [info.get("text"), info.get("contentDescription")]
+        bad = safety.irreversible(*[t for t in texts if t])
+        if bad:
+            vlm_locate._refuse(ctx, [t for t in texts if t], bad, "выученный селектор")
+        return bool(bad)
+    except Exception:  # noqa: BLE001
+        return True
+
+
+def _by_vlm(ctx, sel, text, key):
+    try:
+        from .vlm import locate as vlm_locate
+        what = {"text": text, "sel": sel, "key": key,
+                "label": getattr(ctx, "step_label", "")}
+        return vlm_locate.locate(ctx, what)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 # ------------------------------------------------ место поиска у запасных слоёв
@@ -153,8 +221,10 @@ def place_of(nodes, within=None, near=None):
     if within:
         found = scope.find(nodes, dict(within))
         return ("within", tuple(found[0].bounds), found[0]) if found else None
-    found = scope.find(nodes, dict(near))
-    return ("near", _box_center(found[0].bounds), found[0]) if found else None
+    sel, direction = scope.split_near(near)
+    found = scope.find(nodes, dict(sel))
+    return (("near", _box_center(found[0].bounds), found[0], direction)
+            if found else None)
 
 
 def point_from(place, rel):
@@ -198,7 +268,8 @@ def match_tier(items, wanted):
 def _tree_text_scoped(nodes, wanted, place):
     """Слой текста по дереву с местом: только внутри контейнера / из всех
     подходящих надписей — ближайшая к ориентиру (как scope.closest)."""
-    kind, _, box = place
+    kind, box = place[0], place[2]
+    direction = place[3] if len(place) > 3 else ""
     if kind == "within":
         pool = [n for n in nodes if scope.inside(nodes, n, box)]
     else:
@@ -217,9 +288,13 @@ def _tree_text_scoped(nodes, wanted, place):
     for it in items:
         by_item.setdefault(it[:3], nodes[it[3]])
     if kind == "near":
-        node = scope.closest(nodes, [by_item[it] for it in tier], box)[0]
-        c = _box_center(node.bounds)
-        return Hit(c[0], c[1], "tree-text", (node.text or node.description).strip())
+        ranked = scope.closest(nodes, [by_item[it] for it in tier], box, direction)
+        if not ranked:
+            return None      # подходящие надписи есть, но не с той стороны
+        node = ranked[0]
+        c = free_point(nodes, node)
+        return Hit(c[0], c[1], "tree-text", (node.text or node.description).strip(),
+                   checkable=node.checkable)
     found = match_text(tier, wanted)
     return Hit(found[1], found[2], "tree-text", found[0])
 
@@ -244,8 +319,9 @@ def _resolve_scoped(ctx, sel, text, img, at_rel, timeout, within, near, blind, w
                 for s in sel:
                     node, _ = scope.pick(nodes, dict(s), within, near)
                     if node is not None:
-                        c = _box_center(node.bounds)
-                        return Hit(c[0], c[1], "selector", str(s))
+                        c = free_point(nodes, node)
+                        return Hit(c[0], c[1], "selector", str(s),
+                                   checkable=node.checkable)
                 if text:
                     hit = _tree_text_scoped(nodes, text, place)
                     if hit:
@@ -284,6 +360,41 @@ def _resolve_scoped(ctx, sel, text, img, at_rel, timeout, within, near, blind, w
     return None
 
 
+def free_point(nodes, node):
+    """Центр узла или, если его перекрыл кликабельный брат, свободная точка рамки.
+
+    Перекрытие доказывается только порядком детей одного родителя
+    (tree.coverers); иначе это ровно центр, как раньше."""
+    try:
+        point = tree.tap_point(node, tree.coverers(nodes, node))
+    except Exception:  # noqa: BLE001 — геометрия не должна ронять поиск цели
+        point = None
+    return point or _box_center(node.bounds)
+
+
+def _node_of_el(ctx, el):
+    """Узел дампа, соответствующий элементу uiautomator2 (по рамке), и все
+    узлы; (None, []) — не нашли или дамп не снялся."""
+    try:
+        w, h = ctx.size
+        b = el.info["bounds"]
+        nodes = tree.parse(ctx.dump_hierarchy(), w, h)
+        want = (b["left"] / w, b["top"] / h, b["right"] / w, b["bottom"] / h)
+        for n in nodes:
+            if all(abs(n.bounds[i] - want[i]) < 1.5 / max(w, h) for i in range(4)):
+                return n, nodes
+    except Exception:  # noqa: BLE001 — перекрытие необязательно, тап пойдёт в центр
+        pass
+    return None, []
+
+
+def _el_checkable(el) -> bool:
+    try:
+        return bool(el.info.get("checkable"))
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _center(el, size):
     try:
         b = el.info["bounds"]
@@ -299,18 +410,38 @@ def _by_tree_text(ctx, wanted):
         nodes = tree.parse(ctx.dump_hierarchy(), w, h)
     except Exception:  # noqa: BLE001 — дамп не снялся
         return None
-    items = []
+    items, owners = [], {}
     for node in nodes:
         label = (node.text or node.description or "").strip()
         if label:
-            items.append((label,
-                          (node.bounds[0] + node.bounds[2]) / 2,
-                          (node.bounds[1] + node.bounds[3]) / 2))
+            item = (label,
+                    (node.bounds[0] + node.bounds[2]) / 2,
+                    (node.bounds[1] + node.bounds[3]) / 2)
+            items.append(item)
+            owners.setdefault(item, node)
     found = match_text(items, wanted)
-    return Hit(found[1], found[2], "tree-text", found[0]) if found else None
+    if not found:
+        return None
+    node = owners.get(found)
+    if node is not None and config.TAPCOVER:
+        x, y = free_point(nodes, node)
+        return Hit(x, y, "tree-text", found[0], checkable=node.checkable)
+    return Hit(found[1], found[2], "tree-text", found[0])
+
+
+def screen_secure(ctx) -> bool:
+    """Экран защищён от снимков (FLAG_SECURE): кадр чёрный, OCR и шаблону
+    нечего искать. Контексты-заглушки без serial считаются обычными."""
+    serial = getattr(ctx, "serial", None)
+    if not isinstance(serial, str):
+        return False
+    from .control import capture
+    return capture.is_secure(serial)
 
 
 def _by_ocr(ctx, wanted, box=None, point=None):
+    if screen_secure(ctx):
+        return None
     try:
         boxes = ocr_mod.ocr(ctx.screen_bytes())
     except Exception:  # noqa: BLE001 — OCR не должен ронять шаг
@@ -331,7 +462,7 @@ def _by_ocr(ctx, wanted, box=None, point=None):
 
 
 def _by_template(ctx, img, at=None, region=None):
-    if not tpl_mod.available():
+    if not tpl_mod.available() or screen_secure(ctx):
         return None
     try:
         data, base_scale = ctx.asset(img)

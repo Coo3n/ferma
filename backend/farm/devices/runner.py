@@ -67,6 +67,9 @@ class Job:
     held_kind: str = ""     # "blind" — вопрос про шаг вслепую, "lost" — экран не тот
     held_obstacle: str = ""  # слепок экрана для «показать, как быть» (lost)
     held_at: float | None = None
+    # Подсказка нейросети «что на экране и что мешает» (farm/vlm/advise.py);
+    # приходит в фоне, пока выключено или лимит — пусто.
+    held_hint: str = ""
     decision: str = ""
     # Исправленная цель к решению «повторить»; click_target забирает её раз.
     target_patch: dict | None = None
@@ -86,6 +89,9 @@ class Job:
     step_total: int = 0
     step_label: str = ""
     timeline: list = field(default_factory=list)
+    # Секунды по причинам (settle | wait_target | sleep | resolve); тот же dict,
+    # что у ctx, поэтому растёт вживую. «other» считается при выдаче.
+    time_by_reason: dict = field(default_factory=dict)
     _cancel: threading.Event = field(default_factory=threading.Event, repr=False)
     _decided: threading.Event = field(default_factory=threading.Event, repr=False)
 
@@ -100,6 +106,13 @@ class Job:
         self.lines.append(f"{stamp}  {text}")
         if len(self.lines) > 2000:
             del self.lines[:500]
+
+    def time_report(self) -> dict:
+        """Время по причинам; остаток от длительности — «other»."""
+        out = {k: round(self.time_by_reason.get(k, 0.0), 2)
+               for k in ("settle", "wait_target", "sleep", "resolve")}
+        out["other"] = round(max(0.0, self.duration - sum(out.values())), 2)
+        return out
 
     def to_dict(self, with_log: bool = False) -> dict:
         d = {
@@ -126,6 +139,7 @@ class Job:
             "held_kind": self.held_kind,
             "held_obstacle": self.held_obstacle,
             "held_at": self.held_at,
+            "held_hint": self.held_hint,
             "decision": self.decision,
             "batch": self.batch,
             "start_step": self.start_step,
@@ -140,6 +154,7 @@ class Job:
             "repairable": self.status == HELD and self.held_kind not in ("blind", "lost")
                           and hold_repairable(self.scenario_key, self.step_index),
         }
+        d["time_by_reason"] = self.time_report()
         if self.error:
             d["error_info"] = explain(self.error)
         if with_log:
@@ -221,6 +236,36 @@ def _mark_step(job: Job, status: str) -> None:
         cur["status"] = status
 
 
+def _note_layer(job: Job, hit) -> None:
+    """Запомнить, каким слоем найдена цель текущего шага.
+
+    В повторе по кругу шаг один на все проходы: побеждает худший слой —
+    один «запасной» проход среди сотни чистых нельзя затирать чистым.
+    """
+    if not job.timeline:
+        return
+    cur = job.timeline[-1]
+    if cur.get("degraded") and hit.layer == "selector":
+        return
+    cur["layer"] = hit.layer
+    cur["detail"] = hit.detail
+    cur["degraded"] = hit.layer != "selector"
+
+
+def _app_version(job: Job) -> dict | None:
+    """Версия целевого приложения для шапки отчёта: пакет берётся из
+    параметров запуска; устройство недоступно или пакета нет — просто None."""
+    pkg = (job.params or {}).get("package")
+    if not pkg or not isinstance(pkg, str):
+        return None
+    try:
+        from ..control import facts
+        v = facts.app_version(job.serial, pkg)
+    except Exception:  # noqa: BLE001 — отчёт важнее версии
+        return None
+    return dict(v, package=pkg) if v else None
+
+
 def _finish_timeline(job: Job, art_dir: Path) -> None:
     """Закрыть последний шаг и положить отчёт `report.json` рядом с артефактами."""
     if not job.timeline:
@@ -235,8 +280,12 @@ def _finish_timeline(job: Job, art_dir: Path) -> None:
         report = {"job": job.id, "scenario": job.scenario_name,
                   "device": job.device_name, "status": job.status,
                   "error": job.error,
+                  "time_by_reason": job.time_report(),
                   "error_info": explain(job.error) if job.error else None,
-                  "steps": [{k: v for k, v in t.items() if k != "t0"}
+                  "serial": job.serial, "finished_at": job.finished_at,
+                  "app_version": _app_version(job),
+                  "steps": [{"layer": None, "detail": "", "degraded": False,
+                             **{k: v for k, v in t.items() if k != "t0"}}
                             for t in job.timeline]}
         (art_dir / "report.json").write_text(
             json.dumps(report, ensure_ascii=False, indent=1), "utf-8")
@@ -375,6 +424,7 @@ def _hold(job: Job, что: str, miss: str = "", sc=None, kind: str = "",
     job.target_patch = None
     job._decided.clear()
     job.held_reason = что
+    job.held_hint = ""
     job.held_at = time.time()
     # Строка ожидания — до флипа: decide пишет «человек решил» сразу после HELD,
     # и запись после флипа могла оказаться в журнале позже неё.
@@ -388,6 +438,12 @@ def _hold(job: Job, что: str, miss: str = "", sc=None, kind: str = "",
         job._decided.set()
     else:
         _record_hold(job, что, miss, sc, obstacle)
+        if not слепой:
+            try:   # подсказка в фоне; её сбой HELD не касается
+                from ..vlm import advise as _vlm_advise
+                _vlm_advise.start(job, что)
+            except Exception as e:  # noqa: BLE001
+                job.add_line(f"подсказка нейросети не запустилась: {e}")
 
     job._decided.wait(timeout=config.HOLD_TIMEOUT)
     # Чтение решения и возврат статуса — под замком decide: иначе ответ,
@@ -411,6 +467,7 @@ def _hold(job: Job, что: str, miss: str = "", sc=None, kind: str = "",
         job.held_reason = ""
         job.held_kind = ""
         job.held_obstacle = ""
+        job.held_hint = ""
         job.held_at = None
     # И ответ, и молчаливый таймаут одинаково снимают HELD — оба пути ведут
     # сюда, поэтому строка «ждёт» в «Отклонениях» гасится тут же, а не только
@@ -633,6 +690,7 @@ def _execute(job: Job) -> None:
             take_target_patch=lambda: _take_patch(job),
         )
         control.clear_logcat(job.serial)
+        job.time_by_reason = ctx.time_by_reason
         ctx.speed = job.speed
         module = sc.module
         line_map = verified_line_map(sc)
@@ -648,6 +706,7 @@ def _execute(job: Job) -> None:
             job.add_line(f"запуск с шага {job.start_step + 1}: предыдущие пропущены, "
                          f"экран должен быть в нужном состоянии")
         ctx.step_mark = lambda st: _mark_step(job, st)
+        ctx.layer_note = lambda hit: _note_layer(job, hit)
         try:
             if line_map:
                 with stepflow.StepTracer(module.run.__code__, line_map,

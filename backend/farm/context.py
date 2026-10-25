@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import contextlib
 import inspect
 import json
 import logging
@@ -19,7 +20,9 @@ from . import (accounts, adb, apklib, budget as budget_store, config, control,
 from .adb import AdbError
 from .control import facts as phone_facts
 from .devices import pool as u2pool
+from . import fingerprint as fprint
 from .ui import scope, tree
+from .vision import diff as vdiff
 
 log = logging.getLogger("farm.ctx")
 
@@ -313,6 +316,10 @@ def normalize_target(raw) -> dict:
 
 
 class DeviceContext:
+    # Сколько необязательных шагов сейчас выполняется (см. attempt). Атрибут
+    # класса, чтобы не трогать __init__: ноль — обычный шаг.
+    _optional_depth = 0
+
     def __init__(
             self,
             serial: str,
@@ -363,7 +370,15 @@ class DeviceContext:
         self.speed = 1.0
         # Колбэк отметки статуса текущего шага («retried», «skipped»): даёт runner.
         self.step_mark: Callable[[str], None] | None = None
+        # Каким слоем резолвера найдена цель текущего шага (для отчёта о запуске).
+        self.layer_note: Callable[[Any], None] | None = None
         self.settle = True
+        # Учёт времени по причинам (settle/wait_target/sleep/resolve) и признак
+        # «только что листали»: после свайпа ждём рамку цели, а не весь экран.
+        self.time_by_reason: dict[str, float] = {}
+        self._spend_stack: list[list] = []
+        self.recent_scroll = False
+        self._watch_frame = None
         self._stack: list[str] = []   # цепочка вызванных блоков, см. run()
         self._guards = guards.GuardEngine()
 
@@ -382,9 +397,26 @@ class DeviceContext:
         if self.speed and self.speed < 1:
             seconds = seconds / self.speed
         end = time.time() + seconds
-        while time.time() < end:
-            self.check_cancel()
-            time.sleep(min(0.2, end - time.time()))
+        with self.spend("sleep"):
+            while time.time() < end:
+                self.check_cancel()
+                time.sleep(min(0.2, end - time.time()))
+
+    @contextlib.contextmanager
+    def spend(self, reason: str):
+        """Записать время блока на причину. Вложенное время вычитается из
+        внешней причины, иначе sleep внутри resolve считался бы дважды."""
+        frame = [time.monotonic(), 0.0]
+        self._spend_stack.append(frame)
+        try:
+            yield
+        finally:
+            self._spend_stack.pop()
+            total = time.monotonic() - frame[0]
+            own = max(0.0, total - frame[1])
+            self.time_by_reason[reason] = self.time_by_reason.get(reason, 0.0) + own
+            if self._spend_stack:
+                self._spend_stack[-1][1] += total
 
     def fail(self, message: str, miss: str = "") -> None:
         e = StepFailed(message)
@@ -409,6 +441,11 @@ class DeviceContext:
         # потолок, сорванный вопрос): DROP для промаха шага, «идти дальше» для
         # сторожа долгого цикла — он и раньше листал до конца.
         if self._hold is None or not config.HOLD:
+            return refusal
+        if self._optional_depth:
+            # Необязательный шаг: человек заранее сказал «не нашёл — не страшно».
+            # Останавливать из-за него задачу и держать устройство — значит
+            # нарушить это обещание, поэтому отвечаем за человека.
             return refusal
         if self._holds >= config.HOLD_MAX_PER_JOB:
             self.log(f"остановок в этой задаче уже {self._holds}, "
@@ -437,6 +474,24 @@ class DeviceContext:
         self.log(f"решение человека: {HOLD_WORDS[решение]}")
         return решение
 
+    def _secure_cause(self, беда: str) -> str:
+        """Промах на защищённом экране: назвать настоящую причину и записать
+        отклонение. «Не найдена цель» человеку ничего не скажет — зрение тут
+        слепо, и чинится это селектором, а не картинкой."""
+        причина = "экран защищён от снимков — зрение здесь не работает"
+        self.log(причина)
+        try:
+            dv.deviations.record(
+                kind=dv.SECURE, title=причина,
+                detail="Приложение закрыло экран от снимков (FLAG_SECURE): текст и "
+                       "картинка на нём не видны, работают только селекторы.",
+                device_name=self.device_name, job_id=self.job_id,
+                scenario_key=self.scenario_key, scenario_name=self.scenario_name,
+                signature=self.scenario_key or причина)
+        except Exception:  # noqa: BLE001 — отчёт не должен ломать разбор промаха
+            pass
+        return f"{причина}. {беда}"
+
     def _ask_blind(self, что: str) -> str:
         """Шаг собирается пройти вслепую — спросить человека, что делать.
 
@@ -449,6 +504,10 @@ class DeviceContext:
         """
         if self._hold is None or not config.HOLD or not config.HOLD_BLIND:
             return HOLD_GO
+        if self._optional_depth:
+            # Вслепую по необязательному шагу не тапаем: честный пропуск лучше
+            # тапа по координатам, которых уже может не быть.
+            return HOLD_DROP
         self.check_cancel()
         try:
             решение = self._hold(что)
@@ -481,10 +540,25 @@ class DeviceContext:
             # sleep() растягивает на 1/speed: при 0.5 это секунда «на подумать».
             self.sleep((1 - self.speed))
 
-    def _settle(self) -> None:
-        """Дождаться, пока экран дорисуется, прежде чем искать цель."""
-        if self.settle and config.SETTLE:
-            control.wait_stable(self.serial)
+    def _settle(self, target: dict | None = None) -> None:
+        """Дождаться, пока экран дорисуется, прежде чем искать цель.
+
+        После свайпа весь экран (лента) может дорисовываться вечно, поэтому
+        ждём только рамку цели, а без цели — укороченный таймаут.
+        """
+        if not (self.settle and config.SETTLE):
+            return
+        if self.recent_scroll and target:
+            with self.spend("wait_target"):
+                control.wait_target_stable(
+                    self.serial, lambda xml: control.stability.find_bounds(xml, **target))
+        elif self.recent_scroll:
+            with self.spend("settle"):
+                control.wait_stable(self.serial, timeout=min(
+                    config.SETTLE_TIMEOUT, config.SCROLL_SETTLE_TIMEOUT))
+        else:
+            with self.spend("settle"):
+                control.wait_stable(self.serial)
 
     @property
     def d(self):
@@ -505,6 +579,7 @@ class DeviceContext:
     def tap(self, x: float, y: float) -> None:
         self.check_cancel()
         self._pre_action()
+        self.recent_scroll = False
         self.last_tap = (x, y)
         if self.human:
             control.humanize.tap(self.serial, x, y)
@@ -514,11 +589,13 @@ class DeviceContext:
     def long_tap(self, x: float, y: float, duration: float = 0.8) -> None:
         self.check_cancel()
         self._pre_action()
+        self.recent_scroll = False
         control.long_tap(self.serial, x, y, duration)
 
     def swipe(self, x1: float, y1: float, x2: float, y2: float, duration: float = 0.25) -> None:
         self.check_cancel()
         self._pre_action()
+        self.recent_scroll = True
         if self.human:
             control.humanize.swipe(self.serial, x1, y1, x2, y2, duration)
         else:
@@ -605,7 +682,7 @@ class DeviceContext:
         беда = f"не найден элемент {selector} за {timeout} с"
         while True:
             self.check_cancel()
-            self._settle()
+            self._settle(selector)
             el = self.find(timeout=timeout, **selector)
             if el is None and scroll:
                 el = self._scroll_to(**selector)
@@ -910,7 +987,12 @@ class DeviceContext:
             pass
         return path.read_bytes(), base
 
-    def click_target(self, sel=None, text=None, img=None, at=None,
+    def click_target(self, *a, **kw) -> None:
+        # Остаток времени (за вычетом settle/sleep внутри) — это поиск цели.
+        with self.spend("resolve"):
+            return self._click_target(*a, **kw)
+
+    def _click_target(self, sel=None, text=None, img=None, at=None,
                      timeout: float = 10, within: dict | None = None,
                      near: dict | None = None, at_rel=None, scroll_until=None) -> None:
         """Клик по многослойной цели: селекторы → текст → OCR → шаблон → точка.
@@ -984,6 +1066,8 @@ class DeviceContext:
             if hit is not None:
                 break
             miss = _miss_json(sel, text, img, at)
+            if resolve.screen_secure(self):
+                беда = self._secure_cause(беда)
             решение = self._stuck(беда, miss)
             if решение == HOLD_RETRY:
                 патч = self._take_target_patch() if self._take_target_patch else None
@@ -1003,6 +1087,11 @@ class DeviceContext:
             if решение == HOLD_SKIP:
                 return
             self.fail(беда, miss)
+        if self.layer_note:
+            try:
+                self.layer_note(hit)
+            except Exception:  # noqa: BLE001 — отчёт не должен ронять клик
+                pass
         if hit.layer == "point":
             self.log("тап вслепую по координатам: результат не проверен")
         if hit.layer != "selector":
@@ -1035,7 +1124,115 @@ class DeviceContext:
                 )
             except Exception as e:  # noqa: BLE001 — запись не роняет прогон
                 self.log(f"отклонение об устаревшем селекторе не записалось: {e}")
+        self._tap_checked(hit, sel, text)
+
+    # ------------------------------------------------------------------ эффект тапа
+    def _probe(self, with_frame: bool = True):
+        """Что на экране сейчас: (отпечаток дампа, кадр или None). None — дамп
+        не снялся и проверять нечем. Кадр снимаем только если его есть чем
+        сравнивать (cv2/numpy): иначе лишний скриншот на каждый клик впустую."""
+        try:
+            fp = control.stability._fingerprint(self.dump_hierarchy())
+        except Exception:  # noqa: BLE001 — проверка не должна мешать шагу
+            return None
+        frame = None
+        if with_frame and vdiff.available():
+            try:
+                frame = self.screen_bytes()
+            except Exception:  # noqa: BLE001
+                frame = None
+        return fp, frame
+
+    def _tap_changed(self, before) -> bool | None:
+        """Подействовал ли тап: True/False; None — сравнить не удалось."""
+        self.sleep(config.TAPCHECK_DELAY)
+        self._settle()
+        # Дамп один до и один после; кадр после — только если дампы равны
+        # (иначе экран и так изменился и скриншот лишний).
+        after = self._probe(with_frame=False)
+        if after is None:
+            return None
+        if after[0] != before[0]:
+            return True
+        if before[1] and vdiff.available():
+            try:
+                after = (after[0], self.screen_bytes())
+            except Exception:  # noqa: BLE001
+                pass
+        # Дамп тот же: экран мог поменяться без изменений в дереве (картинка,
+        # канвас, видео) — сверяем кадры. Нет кадров — полагаемся на дамп.
+        differ = vdiff.frames_differ(before[1], after[1]) if before[1] and after[1] else None
+        return bool(differ)
+
+    def _tap_repeatable(self, hit, sel, text) -> bool:
+        """Повтор тапа безопасен только для обычной кнопки по селектору: повтор
+        «Отправить»/«Купить»/лайка продублировал бы необратимое. Слои vlm и point
+        и переключатели не повторяем."""
+        if getattr(hit, "layer", "") != "selector" or hit.checkable:
+            return False
+        from .vlm import safety
+        names = [str(t) for t in (text or ())]
+        for s in sel or ():
+            names += [str(v) for v in (s.values() if isinstance(s, dict) else ())]
+        return not safety.irreversible(*names)
+
+    def _tap_checked(self, hit, sel=None, text=None) -> None:
+        """Тап и проверка «эффект есть». Ничего не изменилось — один повтор;
+        снова пусто — отклонение `noeffect` и строка в журнал, шаг идёт дальше.
+
+        Не роняем и не останавливаем: кнопка может по природе ничего не менять.
+        Переключатель/галочка (checkable) не повторяем: второй тап вернул бы
+        его в исходное состояние, поэтому для них только отклонение.
+        """
+        before = self._probe() if config.TAPCHECK else None
         self.tap(hit.x, hit.y)
+        if before is None:
+            return
+        try:
+            changed = self._tap_changed(before)
+            if changed is None or changed:
+                return
+            if self._tap_repeatable(hit, sel, text):
+                self.log("нажатие без последствий — экран не изменился, повторяю тап")
+                before = self._probe()
+                self.tap(hit.x, hit.y)
+                if before is None:
+                    return
+                changed = self._tap_changed(before)
+                if changed is None or changed:
+                    return
+            self._report_noeffect(hit, sel, text)
+        except (StepFailed, Cancelled):
+            raise
+        except Exception as e:  # noqa: BLE001 — проверка вторична, шаг уже сделан
+            self.log(f"проверка нажатия не удалась: {e}")
+
+    def _report_noeffect(self, hit, sel, text) -> None:
+        what = (text[0] if text else sel_name((sel or [{}])[0])) if (text or sel) else "цель"
+        повторяли = self._tap_repeatable(hit, sel, text)
+        self.log(f"нажатие по «{what}» ничего не изменило"
+                 f"{' даже после повтора' if повторяли else ' (без повтора)'}")
+        подпись = f"noeffect|{sel}|{text}"
+        shot = ""
+        if подпись not in self._layer_shots:
+            self._layer_shots.add(подпись)
+            shot = self._deviation_shot("noeffect")
+        try:
+            dv.deviations.record(
+                kind=dv.NOEFFECT,
+                title=f"нажатие по «{what}» без последствий",
+                detail=f"Тап по «{what}» не изменил ни дерево экрана, ни кадр"
+                       f"{' — и повторный тоже' if повторяли else ''}. "
+                       f"Кнопка могла не сработать или оказаться под другим элементом.",
+                device_name=self.device_name,
+                job_id=self.job_id,
+                scenario_key=self.scenario_key,
+                scenario_name=self.scenario_name,
+                shot=shot,
+                signature=подпись,
+            )
+        except Exception as e:  # noqa: BLE001 — запись не роняет прогон
+            self.log(f"отклонение «без последствий» не записалось: {e}")
 
     def expect_screen(self, name: str, any: list | None = None,
                       timeout: float = 10) -> None:
@@ -1079,7 +1276,7 @@ class DeviceContext:
             except Exception:  # noqa: BLE001
                 app = "?"
             texts = ", ".join(self._screen_texts())
-            беда = f"ожидал экран «{name}», вижу {app}: [{texts}]"
+            беда = f"ожидал экран «{name}», вижу {app}: [{texts}]" + self._likeness([name])
             # Спрашиваем до артефактов: на «повторить» они не понадобятся, а
             # эталон с актуальным кадром стоит секунды на каждом устройстве.
             решение = self._stuck(беда)
@@ -1168,7 +1365,7 @@ class DeviceContext:
                        f"{', '.join(варианты)}. Сценарий пошёл дальше как "
                        f"«{default}». Допишите ветку для этого экрана — или "
                        "снимите у шага галку «жаловаться», если «никакая» тут "
-                       "штатный случай.",
+                       "штатный случай." + self._likeness(list(варианты)),
                 device_name=self.device_name,
                 job_id=self.job_id,
                 scenario_key=self.scenario_key,
@@ -1181,6 +1378,31 @@ class DeviceContext:
             )
         except Exception as e:  # noqa: BLE001 — запись не роняет прогон
             self.log(f"отклонение о незнакомой ветке не записалось: {e}")
+
+    def _likeness(self, names: list) -> str:
+        """« Ближе всего к эталону «имя»: 87%» — насколько экран похож на эталон.
+
+        Голое «не нашёл» не отличает «экран чуть сдвинулся» от «попали
+        совсем не туда»; процент отличает. Эталонный отпечаток лежит в
+        meta.json папки ассетов (`screens[имя]`); пока конструктор его не
+        записывает, а старые сценарии его не имеют, — молчим, как и при любой
+        другой неудаче чтения: подсказка не должна мешать сообщению о промахе.
+        """
+        try:
+            if not self.scenario_assets:
+                return ""
+            meta = json.loads((Path(self.scenario_assets) / "meta.json").read_text("utf-8"))
+            эталоны = {n: meta["screens"][n] for n in names
+                       if isinstance((meta.get("screens") or {}).get(n), dict)}
+            if not эталоны:
+                return ""
+            w, h = self.size
+            сейчас = fprint.from_xml(self.dump_hierarchy(), w, h, self.current_app())
+            имя, счёт = max(((n, fprint.similarity(сейчас, e)) for n, e in эталоны.items()),
+                            key=lambda p: p[1])
+            return f" (похож на эталон «{имя}» на {fprint.percent(счёт)})"
+        except Exception:  # noqa: BLE001 — подсказка не должна ронять разбор промаха
+            return ""
 
     def _wait_features(self, features: list, timeout: float) -> bool:
         end = time.time() + timeout
@@ -1328,6 +1550,8 @@ class DeviceContext:
         return str(path)
 
     def dump_hierarchy(self) -> str:
+        control.bind_log(self.serial, self.log)   # перезапуск uiautomator — строкой в журнал задачи
+        control.bind_cancel(self.serial, self.check_cancel)   # паузы лестницы повторов отменяемы
         return control.dump_hierarchy(self.serial)
 
     def save_hierarchy(self, name: str = "hierarchy") -> str:
@@ -1681,8 +1905,16 @@ class DeviceContext:
             # тревоге, — значит, ничего не поправили.
             return "экран не изменился" if подпись and подпись == self._watch_sig \
                 and self._watch_same >= config.WATCH_SAME else ""
+        # Второе мнение по пикселям: часы в строке состояния меняют дамп каждую
+        # минуту, а картинка та же — такой экран «не изменился».
+        кадр = self._watch_shot()
+        похож = (кадр is not None and self._watch_frame is not None
+                 and not control.stability.frames_differ(self._watch_frame, кадр))
+        if кадр is not None:
+            self._watch_frame = кадр
         # Пустой экран (видео, игра, веб) ничего не говорит: не считаем.
-        if moved and подпись and подпись == self._watch_sig:
+        if moved and подпись and (подпись == self._watch_sig or (
+                похож and self._watch_sig)):
             self._watch_same += 1
         else:
             self._watch_same = 1 if подпись else 0
@@ -1690,6 +1922,13 @@ class DeviceContext:
         if self._watch_same >= config.WATCH_SAME:
             return f"экран не меняется, хотя листаю: [{', '.join(тексты[:4])}]"
         return ""
+
+    def _watch_shot(self):
+        """Мелкий кадр для сравнения пикселей; None — снять не удалось."""
+        try:
+            return control.screenshot(self.serial, max_width=160)
+        except Exception:  # noqa: BLE001 — второе мнение не обязательно
+            return None
 
     def _lost(self, беда: str, fixed: Callable[[], bool]) -> bool:
         """Сбились с пути: стражи → вопрос человеку. True — снова на своём экране."""
@@ -1782,6 +2021,8 @@ class DeviceContext:
         self.log(f"→ блок «{key}»")
         снаружи = self.params
         self._stack.append(key)
+        глубина = self._optional_depth
+        self._optional_depth = 0      # обязательные шаги блока не «необязательные» по наследству
         try:
             self.params = scenarios.resolve_params(sc, params)
             sc.module.run(self)
@@ -1797,6 +2038,7 @@ class DeviceContext:
         finally:
             self._stack.pop()
             self.params = снаружи
+            self._optional_depth = глубина
         self.log(f"← блок «{key}» готов")
 
     def _rescue(self) -> bool:
@@ -1824,6 +2066,10 @@ class DeviceContext:
         last: Exception | None = None
         for i in range(1, total + 1):
             self.check_cancel()
+            # Глубину «необязательности» вложенный обязательный шаг не наследует:
+            # иначе его провал тихо превратился бы в «пропущено».
+            saved_depth = self._optional_depth
+            self._optional_depth = saved_depth + 1 if optional else 0
             try:
                 return fn()
             except Cancelled:
@@ -1835,16 +2081,53 @@ class DeviceContext:
                     if self.step_mark:
                         self.step_mark("retried")
                     self.sleep(delay)
+            finally:
+                self._optional_depth = saved_depth
         if optional:
             self.log(f"{what}: необязательный шаг пропущен ({last})")
+            shot = ""
             try:
-                self.screenshot("skipped")
+                путь = self.screenshot("skipped")
+                shot = Path(путь).name if self.artifacts_dir else ""
             except Exception:  # noqa: BLE001 — кадр пропуска не должен ронять сценарий
                 pass
+            self._report_skipped(what, last, shot)
             if self.step_mark:
                 self.step_mark("skipped")
             return None
         raise last
+
+    def optional(self, fn: Callable[[], Any], what: str = "шаг", retries: int = 0):
+        """Необязательный шаг: не нашёл — записал отклонение и пошёл дальше.
+
+        То же, что `attempt(..., optional=True)`, но читается в ручном сценарии
+        как намерение, а не как набор флагов.
+        """
+        return self.attempt(fn, retries=retries, optional=True, what=what)
+
+    def _report_skipped(self, what: str, причина, shot: str = "") -> None:
+        """Пропущенный необязательный шаг — в «Отклонения».
+
+        Сам прогон он не роняет и в журнале задач выглядит зелёным, так что
+        без записи «кнопка исчезла из приложения» обнаружилась бы только когда
+        пропусков наберётся на целый сломанный сценарий.
+        """
+        try:
+            dv.deviations.record(
+                kind=dv.SKIPPED_OPTIONAL,
+                title=f"необязательный шаг пропущен: {what}",
+                detail=f"Шаг не удался ({причина}), но он помечен «не критично», "
+                       "поэтому сценарий пошёл дальше. Если шаг нужен — проверьте, "
+                       "не изменилось ли приложение.",
+                device_name=self.device_name,
+                job_id=self.job_id,
+                scenario_key=self.scenario_key,
+                scenario_name=self.scenario_name,
+                shot=shot,
+                signature=f"skipped|{what}",
+            )
+        except Exception as e:  # noqa: BLE001 — запись не роняет прогон
+            self.log(f"отклонение о пропущенном шаге не записалось: {e}")
 
     def retry(self, fn: Callable[[], Any], attempts: int = 3, delay: float = 1.0, what: str = "действие"):
         """Повторить нестабильное действие."""

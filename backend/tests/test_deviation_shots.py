@@ -103,7 +103,7 @@ def _ctx(tmp_path, lines):
 
 
 def _слой(monkeypatch, ctx):
-    monkeypatch.setattr(ctx, "_settle", lambda: None)
+    monkeypatch.setattr(ctx, "_settle", lambda *a, **k: None)
     monkeypatch.setattr(ctx, "tap", lambda x, y: None)
     monkeypatch.setattr(resolve, "resolve",
                         lambda c, **kw: resolve.Hit(0.5, 0.6, "ocr", "Войти"))
@@ -151,7 +151,7 @@ def test_слой_снимок_один_раз_на_подпись(monkeypatch, 
     monkeypatch.setattr(control, "save_screenshot",
                         lambda s, p: (snaps.append(p), _пишет(s, p)))
     ctx = _ctx(tmp_path, [])
-    monkeypatch.setattr(ctx, "_settle", lambda: None)
+    monkeypatch.setattr(ctx, "_settle", lambda *a, **k: None)
     monkeypatch.setattr(ctx, "tap", lambda x, y: None)
     monkeypatch.setattr(resolve, "resolve",
                         lambda c, **kw: resolve.Hit(0.5, 0.6, "ocr", "Войти"))

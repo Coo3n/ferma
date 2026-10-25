@@ -121,10 +121,50 @@ def _center(n: Node) -> tuple[float, float]:
     return ((n.bounds[0] + n.bounds[2]) / 2, (n.bounds[1] + n.bounds[3]) / 2)
 
 
-def closest(nodes: list[Node], candidates: list[Node], anchor: Node) -> list[Node]:
+DIRS = ("right", "left", "above", "below")
+
+
+def split_near(near: dict | None) -> tuple[dict | None, str]:
+    """`near` без служебного "dir" и само направление ("" — не задано)."""
+    if not near:
+        return near, ""
+    sel = {k: v for k, v in near.items() if k != "dir"}
+    direction = str(near.get("dir") or "").strip().lower()
+    if direction and direction not in DIRS:
+        raise ScopeError(f"направление «{direction}» неизвестно: {', '.join(DIRS)}")
+    return sel, direction
+
+
+def on_side(node: Node, anchor: Node, direction: str) -> bool:
+    """Лежит ли узел с нужной стороны от ориентира: его центр за дальним краем
+    ориентира по оси направления и рамки пересекаются по перпендикулярной оси.
+    «Справа от ника» — это кнопка в той же строке, а не на два ряда ниже; а
+    объемлющая карточка (её центр над самим ориентиром) не «справа» ни от чего."""
+    nx, ny = _center(node)
+    ax1, ay1, ax2, ay2 = anchor.bounds
+    nb = node.bounds
+    row = nb[1] < ay2 and ay1 < nb[3]       # те же высоты: одна строка
+    col = nb[0] < ax2 and ax1 < nb[2]       # те же ширины: один столбец
+    if direction == "right":
+        return row and nx >= ax2
+    if direction == "left":
+        return row and nx <= ax1
+    if direction == "below":
+        return col and ny >= ay2
+    return col and ny <= ay1
+
+
+def closest(nodes: list[Node], candidates: list[Node], anchor: Node,
+            direction: str = "") -> list[Node]:
     """Кандидаты по близости к ориентиру: сначала глубже общий предок
-    (та же карточка поста), при равной глубине — ближе по экрану."""
+    (та же карточка поста), при равной глубине — ближе по экрану. С направлением
+    остаются только лежащие с этой стороны, и ближайший из них — по экрану:
+    глубина общего предка тут не при чём, «справа от ника» — вопрос геометрии."""
     ax, ay = _center(anchor)
+    if direction:
+        side = [n for n in candidates
+                if n.id != anchor.id and on_side(n, anchor, direction)]
+        return sorted(side, key=lambda n: (_center(n)[0] - ax) ** 2 + (_center(n)[1] - ay) ** 2)
 
     def key(n):
         x, y = _center(n)
@@ -144,14 +184,16 @@ def pick(nodes: list[Node], sel: dict, within: dict | None = None,
             return None, "within"
         among = [n for n in nodes if inside(nodes, n, boxes[0])]
     anchor = None
+    direction = ""
     if near:
+        near, direction = split_near(near)
         anchors = find(nodes, near)
         if not anchors:
             return None, "near"
         anchor = anchors[0]
     found = find(nodes, sel, among)
     if anchor is not None:
-        found = closest(nodes, found, anchor)
+        found = closest(nodes, found, anchor, direction)
     if not found:
         return None, "target"
     return found[0], ""

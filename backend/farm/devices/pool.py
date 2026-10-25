@@ -95,3 +95,38 @@ def drop_all() -> None:
 
 def is_connected(serial: str) -> bool:
     return serial in _clients
+
+
+_recoveries: dict[str, int] = {}
+
+
+def note_recovery(serial: str) -> int:
+    """Записать ещё один перезапуск uiautomator на устройстве. Счётчик нужен
+    здоровью: телефон, которому сервис перезапускают каждые пять минут, — кандидат
+    на замену, даже если сценарии пока доезжают."""
+    with _global_lock:
+        _recoveries[serial] = _recoveries.get(serial, 0) + 1
+        return _recoveries[serial]
+
+
+def recoveries(serial: str) -> int:
+    return _recoveries.get(serial, 0)
+
+
+def reset_uiautomator(serial: str) -> bool:
+    """Перезапустить сервис uiautomator через u2 и забыть кэшированный клиент.
+
+    Клиент сбрасываем всегда: после перезапуска старое соединение указывает на
+    умерший процесс, и следующий get() должен поднять новое. False — u2 недоступен
+    или сам сброс не удался (вызывающий всё равно получит свежий клиент).
+    """
+    d = _clients.get(serial)
+    ok = False
+    if d is not None:
+        try:
+            d.reset_uiautomator()
+            ok = True
+        except Exception as e:  # noqa: BLE001 — сбой сброса не должен ронять чтение
+            log.warning("reset_uiautomator %s: %s", serial, e)
+    drop(serial)
+    return ok

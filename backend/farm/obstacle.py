@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+from . import fingerprint as fp
 from .ui import selectors as sel_utils, tree
 
 MAX_CANDIDATES = 5
@@ -95,6 +96,10 @@ def capture(xml: str, width: int, height: int, package: str = "") -> dict:
         "package": package,
         "texts": texts[:MAX_TEXTS],
         "candidates": [{"selector": s, "label": _label(s)} for s in отобрано],
+        # Отпечаток всего экрана: по первому кандидату две версии одного экрана
+        # (другой счётчик, другая карточка) расходятся в разные строки списка,
+        # по отпечатку — сливаются (см. uncovered).
+        "fingerprint": fp.fingerprint(nodes, package),
     }
 
 
@@ -131,6 +136,16 @@ def uncovered(преграды: list, rules: list) -> list:
         ключ = _key(преграда)
         if not ключ:
             continue
+        # Тот же экран, но первый кандидат другой: сливаем по похожести.
+        # Слепки без отпечатка (старые файлы) сравниваются только по ключу.
+        if ключ not in собрано:
+            отпечаток = преграда.get("fingerprint") or {}
+            if отпечаток.get("keys"):
+                for k, other in собрано.items():
+                    if (other["fingerprint"].get("keys") and fp.similarity(
+                            отпечаток, other["fingerprint"]) >= fp.MERGE_THRESHOLD):
+                        ключ = k
+                        break
         # Правило могли написать не по первому кандидату, а по любому из
         # слепка: преграда тогда уже обойдена.
         if any(str(sorted(c["selector"].items())) in закрыты
@@ -143,6 +158,7 @@ def uncovered(преграды: list, rules: list) -> list:
             continue
         собрано[ключ] = {
             "texts": преграда.get("texts") or [],
+            "fingerprint": преграда.get("fingerprint") or {},
             "package": преграда.get("package") or "",
             "candidates": преграда.get("candidates") or [],
             # Задача и имя файла нужны для обучения: слепок лежит в её
@@ -157,4 +173,6 @@ def uncovered(преграды: list, rules: list) -> list:
             "fails": 0 if обойдена else 1,
         }
     # чаще всего мешает — первым: с этого и стоит начинать
+    for o in собрано.values():
+        o.pop("fingerprint", None)   # внутреннее: списку и интерфейсу оно ни к чему
     return sorted(собрано.values(), key=lambda o: -o["hits"])

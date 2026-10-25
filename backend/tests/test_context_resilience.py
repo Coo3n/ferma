@@ -51,7 +51,7 @@ def test_глобальный_выключатель_отключает_settle(m
 def test_click_ждёт_стабильности_до_поиска(monkeypatch):
     ctx = ctx_()
     order = []
-    monkeypatch.setattr(ctx, "_settle", lambda: order.append("settle"))
+    monkeypatch.setattr(ctx, "_settle", lambda *a, **k: order.append("settle"))
     el = ФейкЭлемент()
     monkeypatch.setattr(ctx, "find",
                         lambda timeout=10, **sel: order.append("find") or el)
@@ -78,7 +78,7 @@ class СпасающиеСтражи:
 
 def test_страж_спасает_промахнувшийся_click(monkeypatch):
     ctx = ctx_()
-    monkeypatch.setattr(ctx, "_settle", lambda: None)
+    monkeypatch.setattr(ctx, "_settle", lambda *a, **k: None)
     monkeypatch.setattr(ctx, "_scroll_to", lambda **sel: None)
     el, state = ФейкЭлемент(), {"rescued": False}
     monkeypatch.setattr(ctx, "find",
@@ -90,7 +90,7 @@ def test_страж_спасает_промахнувшийся_click(monkeypatc
 
 def test_молчащие_стражи_не_мешают_падению(monkeypatch):
     ctx = ctx_()
-    monkeypatch.setattr(ctx, "_settle", lambda: None)
+    monkeypatch.setattr(ctx, "_settle", lambda *a, **k: None)
     monkeypatch.setattr(ctx, "_scroll_to", lambda **sel: None)
     monkeypatch.setattr(ctx, "find", lambda timeout=10, **sel: None)
     ctx._guards = МолчащиеСтражи()
@@ -111,7 +111,7 @@ def test_упавшие_стражи_не_роняют_сценарий():
 
 def test_click_target_тапает_найденную_точку(monkeypatch):
     ctx = ctx_()
-    monkeypatch.setattr(ctx, "_settle", lambda: None)
+    monkeypatch.setattr(ctx, "_settle", lambda *a, **k: None)
     taps = []
     monkeypatch.setattr(ctx, "tap", lambda x, y: taps.append((x, y)))
     monkeypatch.setattr(resolve, "resolve",
@@ -123,7 +123,7 @@ def test_click_target_тапает_найденную_точку(monkeypatch):
 def test_запасной_слой_попадает_в_журнал(monkeypatch):
     lines = []
     ctx = DeviceContext("s", logger=lines.append)
-    monkeypatch.setattr(ctx, "_settle", lambda: None)
+    monkeypatch.setattr(ctx, "_settle", lambda *a, **k: None)
     monkeypatch.setattr(ctx, "tap", lambda x, y: None)
     monkeypatch.setattr(resolve, "resolve",
                         lambda c, **kw: resolve.Hit(0.5, 0.6, "ocr", "Войти"))
@@ -134,7 +134,7 @@ def test_запасной_слой_попадает_в_журнал(monkeypatch)
 def test_слой_селекторов_журнал_не_засоряет(monkeypatch):
     lines = []
     ctx = DeviceContext("s", logger=lines.append)
-    monkeypatch.setattr(ctx, "_settle", lambda: None)
+    monkeypatch.setattr(ctx, "_settle", lambda *a, **k: None)
     monkeypatch.setattr(ctx, "tap", lambda x, y: None)
     monkeypatch.setattr(resolve, "resolve",
                         lambda c, **kw: resolve.Hit(0.5, 0.6, "selector", ""))
@@ -144,7 +144,7 @@ def test_слой_селекторов_журнал_не_засоряет(monkey
 
 def test_click_target_зовёт_стражей_и_падает(monkeypatch):
     ctx = ctx_()
-    monkeypatch.setattr(ctx, "_settle", lambda: None)
+    monkeypatch.setattr(ctx, "_settle", lambda *a, **k: None)
     monkeypatch.setattr(resolve, "resolve", lambda c, **kw: None)
     ctx._guards = МолчащиеСтражи()
     with pytest.raises(StepFailed):

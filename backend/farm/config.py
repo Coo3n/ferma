@@ -69,6 +69,14 @@ ARTIFACT_MAX_WIDTH = int(os.getenv("FARM_ARTIFACT_MAX_WIDTH", "1080"))
 SETTLE = os.getenv("FARM_SETTLE", "1") != "0"
 SETTLE_TIMEOUT = float(os.getenv("FARM_SETTLE_TIMEOUT", "3.0"))
 SETTLE_QUIET = float(os.getenv("FARM_SETTLE_QUIET", "0.4"))
+# После свайпа ждём не весь экран, а рамку цели; ленту, что дорисовывается
+# вечно, не держим дольше этих секунд (иначе полный SETTLE_TIMEOUT на шаг).
+TARGET_STABLE_TIMEOUT = float(os.getenv("FARM_TARGET_STABLE_TIMEOUT", "1.5"))
+SCROLL_SETTLE_TIMEOUT = float(os.getenv("FARM_SCROLL_SETTLE_TIMEOUT", "1.0"))
+# Пиксельный дифф: доля среднего отличия кадров (0..1), ниже которой экран
+# считаем тем же. Запасной путь для вечной анимации, где XML не стабилизируется.
+PIXEL_DIFF_THRESHOLD = float(os.getenv("FARM_PIXEL_DIFF_THRESHOLD", "0.01"))
+SETTLE_PIXEL = os.getenv("FARM_SETTLE_PIXEL", "1") != "0"
 
 # Общий выход: перебор back/закрыть/пропустить, когда экран не тот, а стражи
 # промолчали. Выключается там, где чужие нажатия недопустимы.
@@ -108,6 +116,31 @@ WATCH_SAME = int(os.getenv("FARM_WATCH_SAME", "3"))
 # много поводов. Не путать с тревогами устройств (TEMP_ALERT_C ниже).
 DEVIATION_HISTORY = int(os.getenv("FARM_DEVIATION_HISTORY", "200"))
 
+# Проверка «нажали — эффект есть»: после тапа сверяем дамп, потом кадр; ничего
+# не изменилось — один повтор, и если снова пусто, это отклонение «noeffect».
+TAPCHECK = os.getenv("FARM_TAPCHECK", "1") != "0"
+TAPCHECK_DELAY = float(os.getenv("FARM_TAPCHECK_DELAY", "0.8"))  # пауза на реакцию
+# Тап мимо перекрывашки: если центр цели закрыт кликабельным братом, ищем
+# свободную точку рамки (ui/tree.tap_point). Стоит лишнего дампа на селекторный клик.
+TAPCOVER = os.getenv("FARM_TAPCOVER", "1") != "0"
+
+# Нейросеть-помощник (farm/vlm). По умолчанию ВЫКЛЮЧЕНА: кадры экрана аккаунтов
+# уходят на внешний адрес, и без явного согласия человека этого быть не должно.
+# Здесь только значения по умолчанию и пути файлов; живые значения читает
+# farm/vlm/settings.py заново на каждый вызов (переменные окружения важнее
+# data/vlm.json, который правят из интерфейса).
+VLM = os.getenv("FARM_VLM", "0") == "1"
+VLM_URL = os.getenv("FARM_VLM_URL", "")
+VLM_MODEL = os.getenv("FARM_VLM_MODEL", "")
+VLM_KEY = os.getenv("FARM_VLM_KEY", "")
+VLM_TIMEOUT = float(os.getenv("FARM_VLM_TIMEOUT", "30"))
+VLM_MAX_PER_JOB = int(os.getenv("FARM_VLM_MAX_PER_JOB", "3"))
+VLM_MAX_PER_DAY = int(os.getenv("FARM_VLM_MAX_PER_DAY", "200"))
+VLM_MAX_WIDTH = int(os.getenv("FARM_VLM_MAX_WIDTH", "720"))
+VLM_FILE = Path(os.getenv("FARM_VLM_FILE", DATA_DIR / "vlm.json"))
+VLM_USAGE_FILE = Path(os.getenv("FARM_VLM_USAGE_FILE", DATA_DIR / "vlm_usage.json"))
+VLM_LEARNED_FILE = Path(os.getenv("FARM_VLM_LEARNED_FILE", DATA_DIR / "vlm_learned.json"))
+
 # Тревоги
 TEMP_ALERT_C = float(os.getenv("FARM_TEMP_ALERT_C", "42"))
 BATTERY_LOW = int(os.getenv("FARM_BATTERY_LOW", "20"))
@@ -144,3 +177,13 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 SCENARIOS_DIR.mkdir(parents=True, exist_ok=True)
 GUARDS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Зависший uiautomator: лестница пауз между повторами dump_hierarchy и число
+# подряд идущих провалов, после которого сервис перезапускается.
+DUMP_RETRY_DELAYS = tuple(float(x) for x in os.getenv("FARM_DUMP_RETRY_DELAYS", "1,2,3,5").split(",") if x.strip())
+# Сколько секунд после провала лестницы дамп идёт сразу голым adb: иначе на
+# каждый клик при мёртвом uiautomator уходит около минуты.
+DUMP_DEAD_TTL = float(os.getenv("FARM_DUMP_DEAD_TTL", "20"))
+DUMP_RECOVER_AFTER = int(os.getenv("FARM_DUMP_RECOVER_AFTER", "2"))
+# Защищённый экран: сколько секунд верим последнему кадру, что экран защищён.
+SECURE_TTL = float(os.getenv("FARM_SECURE_TTL", "10"))

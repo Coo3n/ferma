@@ -195,7 +195,7 @@ class Ctx(DeviceContext):
         self.lines = []
         self._logger = self.lines.append
 
-    def _settle(self):
+    def _settle(self, *a, **k):
         pass
 
     def _rescue(self):

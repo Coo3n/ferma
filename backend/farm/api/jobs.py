@@ -178,6 +178,51 @@ def delete_job(job_id: str):
     return {"ok": True}
 
 
+def load_report(job_id: str, job: dict | None = None) -> dict:
+    """report.json задачи; нет файла (шагов не было) — короткий отчёт из
+    записи журнала, чтобы страница открывалась и у упавшей до первого шага."""
+    try:
+        return json.loads((Path(config.ARTIFACTS_DIR) / job_id / "report.json").read_text("utf-8"))
+    except (OSError, ValueError):
+        j = job or {}
+        return {"job": job_id, "scenario": j.get("scenario_name") or j.get("scenario_key"),
+                "device": j.get("device_name") or j.get("serial"), "status": j.get("status"),
+                "error": j.get("error"), "error_info": j.get("error_info"), "steps": []}
+
+
+def load_shots(job_id: str, report: dict) -> dict[str, bytes]:
+    shots = {}
+    base = Path(config.ARTIFACTS_DIR) / job_id
+    for st in report.get("steps") or []:
+        for key in ("shot", "expected"):
+            name = st.get(key)
+            # Имя из файла отчёта, но путь собираем сами: только базовое имя.
+            if name and name == Path(name).name and (base / name).is_file():
+                try:
+                    shots[name] = (base / name).read_bytes()
+                except OSError:
+                    pass
+    return shots
+
+
+@router.get("/{job_id}/report.html")
+def job_report(job_id: str, download: int = 0):
+    """Самодостаточная страница отчёта; download=1 — как файл для пересылки."""
+    from .. import report as report_html
+    if not JOB_ID_RE.match(job_id):
+        raise HTTPException(400, "недопустимый идентификатор задачи")
+    job = runner.get(job_id)
+    jd = runner.job_dict(job) if job else None
+    if jd is None and not (Path(config.ARTIFACTS_DIR) / job_id / "report.json").is_file():
+        raise HTTPException(404, "отчёта нет: задача не найдена")
+    rep = load_report(job_id, jd)
+    headers = {"Content-Security-Policy": "sandbox", "X-Content-Type-Options": "nosniff"}
+    if download:
+        headers["Content-Disposition"] = f'attachment; filename="report-{job_id}.html"'
+    return Response(report_html.render_html(rep, load_shots(job_id, rep)),
+                    media_type="text/html; charset=utf-8", headers=headers)
+
+
 @router.get("/{job_id}/artifacts/{name}")
 def artifact(job_id: str, name: str):
     path = (Path(config.ARTIFACTS_DIR) / job_id / name).resolve()
@@ -232,3 +277,30 @@ def job_obstacle(job_id: str, name: str = "obstacle.json"):
     слепок["serial"] = job.serial if job else None
     слепок["error"] = job.error if job else None
     return слепок
+
+
+batches_router = APIRouter(prefix="/api/batches")
+
+
+@batches_router.get("/{batch}/report.html")
+def batch_report(batch: str, download: int = 0):
+    """Сводка пачки: телефон × результат, у каждого ссылка на его отчёт."""
+    from .. import report as report_html
+    if not re.match(r"^[0-9a-zA-Z_-]{1,40}$", batch):
+        raise HTTPException(400, "недопустимая метка запуска")
+    jobs = runner.list_jobs(limit=10 ** 9, batch=batch)
+    if not jobs:
+        raise HTTPException(404, "в этой пачке нет задач")
+    rows = []
+    for j in reversed(jobs):
+        steps = load_report(j["id"], j).get("steps") or []
+        rows.append({"id": j["id"], "device": j.get("device_name") or j.get("serial"),
+                     "scenario": j.get("scenario_name") or j.get("scenario_key"),
+                     "status": j.get("status"), "error": j.get("error"),
+                     "fallback": report_html.fallback_count(steps)})
+    headers = {"Content-Security-Policy": "sandbox", "X-Content-Type-Options": "nosniff"}
+    if download:
+        headers["Content-Disposition"] = f'attachment; filename="report-batch-{batch}.html"'
+    return Response(report_html.render_batch_html(
+        rows, lambda i: f"/api/jobs/{i}/report.html"),
+        media_type="text/html; charset=utf-8", headers=headers)

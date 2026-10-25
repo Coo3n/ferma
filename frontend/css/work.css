@@ -844,6 +844,7 @@ button.held-shot:hover {
 .dvn--branch, .dk-branch { --dk: var(--accent); }
 .dvn--layer, .dk-layer { --dk: var(--warn); }
 .dvn--lost, .dk-lost { --dk: var(--warn); }
+.dvn--noeffect, .dk-noeffect { --dk: var(--warn); }
 
 .hs-f[class*="dk-"] i { background: var(--dk); }
 
@@ -1090,6 +1091,8 @@ button.held-shot:hover {
 .held-step span:not(.held-age) { color: var(--text2); }
 .held-age { margin-left: auto; color: var(--warn); font-size: var(--fs-1); font-variant-numeric: tabular-nums; }
 .held-what { margin: 4px 0 0; color: var(--text2); font-size: var(--fs-2); line-height: 1.45; max-width: 62ch; }
+.held-hint { margin: 6px 0 0; color: var(--text2); font-size: var(--fs-2); line-height: 1.45; max-width: 62ch; }
+.held-hint b { color: var(--busy); font-weight: 600; }
 .held-choice .held-acts { gap: var(--s2); margin-top: var(--s3); }
 .held-choice .held-main { font-size: var(--fs-2); padding: 0 var(--s3); }
 .held-more { position: relative; }

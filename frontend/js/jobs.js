@@ -238,7 +238,8 @@ function runGroupHtml(g) {
     ${window.rdTrialBarHtml ? rdTrialBarHtml(g.jobs) : ''}
     ${open ? `<div class="rg-body">${g.jobs.map(jobCard).join('')}
       <div class="rg-acts">${rerunFailedButton(g.batch, g.jobs)}
-      <button class="sm ghost" onclick="showRuns('${esc(g.batch)}')">Только этот запуск</button></div></div>` : ''}
+      <button class="sm ghost" onclick="showRuns('${esc(g.batch)}')">Только этот запуск</button>
+      <a class="btn sm ghost" href="/api/batches/${encodeURIComponent(g.batch)}/report.html" target="_blank">${esc(t('jobs.otchet_po_pachke'))}</a></div></div>` : ''}
   </section>`;
 }
 
@@ -392,6 +393,7 @@ function heldChoiceHtml(job, opts) {
     return `<div class="held-choice">
       ${step || ждёт ? `<div class="held-step">${step}${ждёт ? `<span class="held-age">${esc(t('held.zhdet_min', {n: ждёт}))}</span>` : ''}</div>` : ''}
       <p class="held-what" title="${esc(job.held_reason || '')}">${esc(what)}</p>
+      ${job.held_hint ? `<p class="held-hint"><b>${esc(t('vlm.podskazka'))}</b> ${esc(job.held_hint)}</p>` : ''}
       <div class="held-acts">
         <button class="sm primary held-main" onclick="${главное.onclick}">${recIcon(главное.icon)}${esc(главное.label)}</button>
         ${простые.join('')}
@@ -459,6 +461,15 @@ function teachLink(job) {
              style="color:var(--warn)">научить обходить</a>`;
 }
 
+// «Отчёт» — одна страница с кадрами шагов; «Скачать» — тот же файл, чтобы
+// отправить коллеге. Только у завершённой задачи: у идущей отчёта ещё нет.
+function reportLinks(job) {
+    if (!['passed', 'failed', 'cancelled'].includes(job.status)) return '';
+    const u = `/api/jobs/${encodeURIComponent(job.id)}/report.html`;
+    return `<a href="${u}" target="_blank">${esc(t('jobs.otchet'))}</a>`
+        + `<a href="${u}?download=1">${esc(t('jobs.skachat_otchet'))}</a>`;
+}
+
 function renderArtifacts(job) {
     const box = $('jobArts');
     const running = job.status === 'queued' || job.status === 'running'
@@ -470,15 +481,16 @@ function renderArtifacts(job) {
         setHTML(box, job.artifacts.map(name =>
                 `<a href="/api/jobs/${job.id}/artifacts/${encodeURIComponent(name)}"
           target="_blank">${esc(name)}</a>`).join('')
-            + teachLink(job)
+            + reportLinks(job) + teachLink(job)
             + (running ? cancelLink(job, 'остановить') : '')
             + (отменяется ? cancellingNote() : ''));
         return;
     }
 
-    box.style.display = (running || отменяется) ? 'flex' : 'none';
-    setHTML(box, running ? cancelLink(job, 'остановить запуск')
-        : отменяется ? cancellingNote() : '');
+    const rl = reportLinks(job);
+    box.style.display = (running || отменяется || rl) ? 'flex' : 'none';
+    setHTML(box, rl + (running ? cancelLink(job, 'остановить запуск')
+        : отменяется ? cancellingNote() : ''));
 }
 
 /* Живой экран задачи не пересоздаётся на каждый опрос (раз в POLL_JOBS_MS) —

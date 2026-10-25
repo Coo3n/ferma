@@ -21,6 +21,11 @@ const DEVIATION_KIND = {
     branch: {label: 'Новый экран', many: 'Новые экраны', hint: 'развилка не узнала экран'},
     lost: {label: 'Сбился с пути', many: 'Сбился', hint: 'приложение закрылось или экран застыл'},
     layer: {label: 'Шаг на грани', many: 'Шаг на грани', hint: 'кнопка нашлась запасным способом — шаг может сломаться'},
+    noeffect: {label: 'Нажатие без последствий', many: 'Без последствий', hint: 'тапнули, а экран не изменился даже после повтора'},
+    skipped_optional: {label: 'Пропущено', many: 'Пропущено', hint: 'необязательный шаг не нашёл цель и был пропущен'},
+    vlm_assist: {label: t('vlm.kind_assist'), many: t('vlm.kind_assist_many'), hint: t('vlm.kind_assist_hint')},
+    vlm_denied: {label: t('vlm.kind_denied'), many: t('vlm.kind_denied_many'), hint: t('vlm.kind_denied_hint')},
+    secure: {label: 'Экран защищён', many: 'Экран защищён', hint: 'экран закрыт от снимков — зрение здесь не работает'},
 };
 
 /* Фильтр по типу: человек приходит с вопросом «что упало», а не листать всё. */

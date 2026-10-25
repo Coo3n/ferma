@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="css/repair.css">
     <link rel="stylesheet" href="css/steptools.css">
     <link rel="stylesheet" href="css/schedule.css">
+    <link rel="stylesheet" href="css/vlm.css">
     <link rel="stylesheet" href="css/files.css">
     <link rel="stylesheet" href="css/apklib.css">
     <link rel="stylesheet" href="css/onboarding.css">
@@ -908,6 +909,10 @@
                 Очистить список
             </button>
         </div>
+        <details class="vlm-panel" id="vlmPanel" ontoggle="vlmLoad()">
+            <summary data-t="vlm.zagolovok">Помощник-нейросеть</summary>
+            <div class="vlm-body" id="vlmBody"></div>
+        </details>
         <div class="scroll" id="dvnList"></div>
     </section>
 
@@ -1022,6 +1027,7 @@
 <script src="js/scenarios.js"></script>
 <script src="js/jobs.js"></script>
 <script src="js/deviations.js"></script>
+<script src="js/vlm.js"></script>
 <script src="js/schedule.js"></script>
 <script src="js/apppick.js"></script>
 <script src="js/apklib.js"></script>

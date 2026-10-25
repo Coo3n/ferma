@@ -33,6 +33,12 @@ class Node:
     password: bool = False
     focused: bool = False
     hint: str = ""
+    # Доступен ли элемент: в отпечатке экрана «кнопка серая» и «кнопка живая» —
+    # разные состояния. По умолчанию True, чтобы чужие конструкторы Node не ломались.
+    enabled: bool = True
+    # Переключатель/галочка: тап по нему меняет только своё состояние, и «ничего
+    # не изменилось» для такого узла не повод повторять нажатие.
+    checkable: bool = False
 
     @property
     def area(self) -> float:
@@ -90,6 +96,8 @@ def parse(xml: str, width: int, height: int) -> list[Node]:
                 password=element.get("password") == "true",
                 focused=element.get("focused") == "true",
                 hint=(element.get("hint") or "").strip(),
+                checkable=element.get("checkable") == "true",
+                enabled=element.get("enabled") != "false",
             ))
             if parent_id is not None:
                 nodes[parent_id].children.append(own_id)
@@ -111,4 +119,59 @@ def node_at(nodes: list[Node], x: float, y: float):
         # рамками или нарисованный поверх), как recHit в recorder.js.
         if best is None or node.area <= best.area:
             best = node
+    return best
+
+
+# ---------------------------------------------------------- тап мимо перекрывашки
+
+def _intersects(a, b) -> bool:
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def _contains(box, x: float, y: float) -> bool:
+    return box[0] <= x <= box[2] and box[1] <= y <= box[3]
+
+
+def coverers(nodes: list[Node], node: Node) -> list[Node]:
+    """Кликабельные соседи, которые перекрывают рамку узла.
+
+    В дампе uiautomator нет drawingOrder, но порядок детей одного родителя
+    совпадает с порядком отрисовки: поздний рисуется поверх раннего. Поэтому
+    «доказанное» перекрытие — только поздний кликабельный брат с пересекающейся
+    рамкой. Чужие ветки дерева не трогаем: по ним порядок не доказан.
+    """
+    if node.parent is None:
+        return []
+    out = []
+    for sid in nodes[node.parent].children:
+        if sid <= node.id:
+            continue
+        other = nodes[sid]
+        if other.clickable and _intersects(node.bounds, other.bounds):
+            out.append(other)
+    return out
+
+
+def tap_point(node: Node, over: list[Node]):
+    """Куда тапать узел, у которого есть перекрывающие соседи (`coverers`).
+
+    Центр свободен — он и есть. Перекрыт — центр крупнейшего непокрытого
+    куска рамки. Свободного куска нет — None: вызывающий берёт обычный центр,
+    лучше честный тап в центр, чем в случайный пиксель на краю.
+    """
+    x1, y1, x2, y2 = node.bounds
+    cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+    boxes = [o.bounds for o in over if _intersects(node.bounds, o.bounds)]
+    if not any(_contains(b, cx, cy) for b in boxes):
+        return (cx, cy)
+    xs = sorted({x1, x2, *(min(max(b[i], x1), x2) for b in boxes for i in (0, 2))})
+    ys = sorted({y1, y2, *(min(max(b[i], y1), y2) for b in boxes for i in (1, 3))})
+    best, best_area = None, 1e-5      # мельче ~0.3% экрана по стороне не тапнуть
+    for i in range(len(xs) - 1):
+        for j in range(len(ys) - 1):
+            ax, bx, ay, by = xs[i], xs[i + 1], ys[j], ys[j + 1]
+            mx, my = (ax + bx) / 2, (ay + by) / 2
+            area = (bx - ax) * (by - ay)
+            if area > best_area and not any(_contains(b, mx, my) for b in boxes):
+                best, best_area = (mx, my), area
     return best
