@@ -12,6 +12,10 @@ DATA_DIR = Path(os.getenv("FARM_DATA_DIR", PROJECT_DIR / "data"))
 
 # Каталоги
 SCENARIOS_DIR = Path(os.getenv("FARM_SCENARIOS_DIR", ROOT / "scenarios"))
+# Готовые сюжеты лежат отдельно от «Моих» и не запускаются, пока их не
+# скопировали (farm/gallery.py). Каталог идёт вместе с программой, поэтому
+# от FARM_SCENARIOS_DIR не зависит.
+GALLERY_DIR = Path(os.getenv("FARM_GALLERY_DIR", ROOT / "scenarios" / "gallery"))
 ARTIFACTS_DIR = Path(os.getenv("FARM_ARTIFACTS_DIR", DATA_DIR / "artifacts"))
 GUARDS_DIR = Path(os.getenv("FARM_GUARDS_DIR", ROOT / "guards"))
 # Сайт. Сервер раздаёт его сам, чтобы ферма поднималась одной командой;
