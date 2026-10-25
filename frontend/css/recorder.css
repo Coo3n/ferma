@@ -618,13 +618,13 @@
    Кольцо вокруг точки — отдельный слой: расходится и гаснет, как сигнал
    в эфир. Дороже простого мигания на один псевдоэлемент, но именно оно
    читается как «идёт запись», а не «что-то моргает». */
-#btnRecStart.on {
+#btnRecPause {
     color: var(--bad);
     border-color: var(--bad-line);
     background: color-mix(in srgb, var(--bad) 10%, transparent);
 }
 
-#btnRecStart.on .dotrec {
+#btnRecPause .dotrec {
     animation: rec-beat 1.4s var(--ease) infinite;
     transform-origin: center;
 }

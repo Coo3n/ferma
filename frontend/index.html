@@ -294,26 +294,31 @@
                             <svg class="ic" aria-hidden="true">
                                 <use href="#i-grid"/>
                             </svg>
+                            <span data-t="device.pult">Пульт</span>
                         </button>
 
                         <span class="recbar-sep" aria-hidden="true"></span>
 
-                        <button class="sm" id="btnRecStart" onclick="recStart()" data-t="device.zapis">
+                        <!-- Запись — одно состояние, поэтому и кнопка одна: «Начать»,
+                             а пока идёт — «Остановить» (красная, точка пульсирует).
+                             Раньше были «Запись» + «Пауза» + плашка «идёт запись /
+                             запись остановлена»: три элемента на один переключатель. -->
+                        <button class="sm" id="btnRecStart" onclick="recStart()">
                             <svg class="ic dotrec" aria-hidden="true">
                                 <use href="#i-record"/>
                             </svg>
-                            Запись
+                            <span id="recStartLbl" data-t="device.zapis">Начать запись</span>
                         </button>
-                        <button class="sm" id="btnRecPause" onclick="recPause()" disabled title="Пауза записи" data-t="device.pauza" data-t-title="device.pauza_zapisi">
-                            <svg class="ic" aria-hidden="true">
-                                <use href="#i-pause"/>
+                        <button class="sm" id="btnRecPause" onclick="recPause()" hidden title="Остановить запись: сделанные шаги останутся" data-t-title="device.pauza_zapisi">
+                            <svg class="ic dotrec" aria-hidden="true">
+                                <use href="#i-record"/>
                             </svg>
-                            Пауза
+                            <span data-t="device.pauza">Остановить запись</span>
                         </button>
                         <!-- hidden по умолчанию: в покое чип молчит (см.
                              recSync), а показать его до первого recSync
                              значит мигнуть «не записывается» на загрузке. -->
-                        <span class="stat sm" id="recState" hidden data-t="device.ne_zapisyvaetsya">не записывается</span>
+                        <span class="stat sm" id="recState" hidden data-t="device.obnovlyayu_ekran">обновляю экран…</span>
 
 
                         <span class="sp"></span>
@@ -325,12 +330,12 @@
                             </svg>
                             Проверить
                         </button>
-                        <button class="sm" id="btnRecModeOff" onclick="recModeOff()"
+                        <button class="sm ghost" id="btnRecModeOff" onclick="recModeOff()"
                                 title="Выйти из обучения, не сохраняя автозакрытие" hidden data-t-title="device.vyyti_iz_obucheniya_ne">
                             <svg class="ic" aria-hidden="true">
                                 <use href="#i-undo"/>
                             </svg>
-                            <span data-t="device.ne_uchit">Не учить</span>
+                            <span data-t="device.vyyti_bez_sohraneniya">Выйти без сохранения</span>
                         </button>
                         <button class="primary sm" id="btnRecSave" onclick="recSaveForm()">
                             <svg class="ic" aria-hidden="true">

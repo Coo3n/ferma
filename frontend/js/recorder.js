@@ -121,23 +121,29 @@ function recDone() {
 }
 
 function recSync() {
+    /* Плашка молчит, пока нечего сказать: идёт запись или стоит — видно по
+       кнопке (красная «Остановить запись» / обычная «Начать запись»). Говорит
+       она только когда экран ещё обновляется. */
     const state = $('recState');
-    if (state) {
-        state.textContent = REC.on
-            ? (REC.stale ? 'запись · обновляю…' : 'идёт запись')
-            : (REC.steps.length ? 'запись остановлена' : 'не записывается');
-        /* В покое чип молчит: «не записывается» повторяет то, что и так
-           видно по кнопке «Запись» (она активна, «Пауза» погашена), а
-           места в ряду занимает столько же, сколько кнопка. Появляется,
-           когда есть что сказать — идёт запись или стоит на паузе. */
-        state.hidden = !REC.on && !REC.steps.length;
+    if (state) state.hidden = !(REC.on && REC.stale);
+    /* Одна кнопка на два состояния: показываем ту, что сейчас что-то сделает. */
+    /* Пустой список подсказывает по-разному: «нажмите Запись» при уже идущей
+       записи сбивало с толку. Перерисовываем только пустой вид и только при
+       смене состояния. */
+    if (!REC.steps.length && REC.emptyOn !== REC.on) {
+        REC.emptyOn = REC.on;
+        recRender();
     }
     const start = $('btnRecStart');
     if (start) {
-        start.classList.toggle('on', REC.on);
-        disableWithReason(start, REC.on, 'Уже идёт — чтобы остановить, нажмите «Пауза»');
+        start.hidden = REC.on;
+        setText($('recStartLbl'), REC.steps.length ? t('device.prodolzhit_zapis') : t('device.zapis'));
     }
-    disableWithReason($('btnRecPause'), !REC.on, 'Сначала нажмите «Запись»');
+    const stop = $('btnRecPause');
+    if (stop) {
+        stop.hidden = !REC.on;
+        stop.disabled = !REC.on;
+    }
 
     /* Кнопка, которая ничего не сделает, должна об этом говорить заранее. */
     const нечего = !REC.steps.length;
@@ -159,7 +165,7 @@ function recSync() {
     const выход = $('btnRecModeOff');
     if (выход) {
         выход.hidden = !REC.teach && !REC.edit;
-        setText(выход.querySelector('span'), REC.teach ? 'Не учить' : 'Не править');
+        setText(выход.querySelector('span'), t('device.vyyti_bez_sohraneniya'));
         выход.title = REC.teach
             ? 'Выйти из обучения, не сохраняя автозакрытие'
             : 'Выйти из правки, не сохраняя изменения';
@@ -1478,7 +1484,7 @@ function recEmptySteps() {
     return emptyBig({
         art: 'steps',
         title: t('rec.pusto_title'),
-        text: t('rec.pusto_text'),
+        text: REC.on ? t('rec.pusto_text_idet') : t('rec.pusto_text'),
     });
 }
 
