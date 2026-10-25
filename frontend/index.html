@@ -595,9 +595,9 @@
                 <!-- Пульт: кнопки телефона — доком под экраном, как в эмуляторе и
                      Vysor: рука тянется к экрану, а не в панель справа. -->
                 <div class="pult-dock" id="pultDock" role="toolbar" aria-label="Кнопки" data-t-aria-label="pult.knopki">
-                    <button class="dk" data-live onclick="sendKey('back')" title="Назад" aria-label="Назад" data-t-title="pult.nazad" data-t-aria-label="pult.nazad"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg></button>
-                    <button class="dk" data-live onclick="sendKey('home')" title="Домой" aria-label="Домой" data-t-title="pult.domoy" data-t-aria-label="pult.domoy"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg></button>
-                    <button class="dk" data-live onclick="sendKey('recents')" title="Недавние" aria-label="Недавние" data-t-title="pult.nedavnie" data-t-aria-label="pult.nedavnie"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg></button>
+                    <button class="dk" data-live onclick="sendKey('back')" title="Назад" aria-label="Назад" data-t-title="pult.nazad" data-t-aria-label="pult.nazad"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg><span class="dk-l" data-t="pult.nazad">Назад</span></button>
+                    <button class="dk" data-live onclick="sendKey('home')" title="Домой" aria-label="Домой" data-t-title="pult.domoy" data-t-aria-label="pult.domoy"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg><span class="dk-l" data-t="pult.domoy">Домой</span></button>
+                    <button class="dk" data-live onclick="sendKey('recents')" title="Недавние" aria-label="Недавние" data-t-title="pult.nedavnie" data-t-aria-label="pult.nedavnie"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg><span class="dk-l" data-t="pult.nedavnie">Недавние</span></button>
                     <span class="dk-sep" aria-hidden="true"></span>
                     <button class="dk" data-live onclick="sendKey('volume_down')" title="Тише" aria-label="Тише" data-t-title="pult.tishe" data-t-aria-label="pult.tishe"><svg class="ic" aria-hidden="true"><use href="#i-volume-low"/></svg></button>
                     <button class="dk" data-live onclick="sendKey('volume_up')" title="Громче" aria-label="Громче" data-t-title="pult.gromche" data-t-aria-label="pult.gromche"><svg class="ic" aria-hidden="true"><use href="#i-volume-high"/></svg></button>
@@ -607,7 +607,7 @@
                     <button class="dk" data-live onclick="act({type:'screen_off'})" title="Погасить" aria-label="Погасить" data-t-title="pult.pogasit" data-t-aria-label="pult.pogasit"><svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg></button>
                     <button class="dk" data-live onclick="sendKey('power')" title="Питание" aria-label="Питание" data-t-title="pult.pitanie" data-t-aria-label="pult.pitanie"><svg class="ic" aria-hidden="true"><use href="#i-power"/></svg></button>
                     <span class="dk-sep" aria-hidden="true"></span>
-                    <button class="dk" data-live onclick="pultShot()" title="Скриншот" aria-label="Скриншот" data-t-title="pult.skrinshot" data-t-aria-label="pult.skrinshot"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></button>
+                    <button class="dk" data-live onclick="pultShot()" title="Скриншот" aria-label="Скриншот" data-t-title="pult.skrinshot" data-t-aria-label="pult.skrinshot"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg><span class="dk-l" data-t="pult.skrinshot">Скриншот</span></button>
                     <button class="dk" id="btnPultRec" data-live onclick="pultRecord()" title="Видео экрана" aria-label="Видео экрана" data-t-title="pult.video_ekrana" data-t-aria-label="pult.video_ekrana"><svg class="ic" aria-hidden="true"><use href="#i-video"/></svg><span></span></button>
                     <span class="dk-sep" aria-hidden="true"></span>
                     <span class="pult-slot dk-slot" data-slot="stream"></span>

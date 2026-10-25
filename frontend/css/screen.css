@@ -889,3 +889,10 @@ button.pult-job:hover { background: var(--panel3); }
 
 /* Низ: «Запустить» — тихая кнопка, «Записать» — единственная зелёная. */
 .pult-foot { padding: var(--s3) var(--s4); background: var(--panel); }
+
+/* Док: у частых кнопок (назад, домой, недавние, скриншот) видна подпись —
+   остальные остаются значками с подсказкой. Узкая сцена — только значки. */
+.pult-dock .dk .dk-l { font-size: var(--fs-2); white-space: nowrap; }
+.pult-dock .dk:has(.dk-l) { padding: 0 var(--s3); }
+.pult-dock { border: 1px solid var(--line-soft); }
+@media (max-width: 1180px) { .pult-dock .dk .dk-l { display: none; } }
