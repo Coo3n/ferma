@@ -1,7 +1,7 @@
 """REST-слой фермы, собранный из роутеров по зонам ответственности."""
 from fastapi import APIRouter
 
-from . import schedule
+from . import backup, schedule
 from . import vlm as vlm_api
 from . import (accounts, apks, budget, bulk, detours, deviations, devices, files, gallery, jobs, network, recorder,
                scenarios, screen, system)
@@ -27,5 +27,6 @@ router.include_router(deviations.router)
 router.include_router(vlm_api.router)
 router.include_router(schedule.router)
 router.include_router(gallery.router)
+router.include_router(backup.router)
 
 __all__ = ["router"]
