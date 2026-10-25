@@ -899,3 +899,9 @@ button.pult-job:hover { background: var(--panel3); }
 
 /* Док под экраном: одинаковый отступ сверху и снизу, ровно по центру. */
 .work.pult-on .pult-dock { margin: var(--s3) auto; }
+
+/* В конструкторе ввод текста спрятан за «Ввести текст»: шаг «ввести» нужен не
+   на каждой записи, а строка с тремя кнопками жила на экране всегда. В пульте
+   текст нужен постоянно — там он открыт, а кнопки нет. */
+.work:not(.pult-on) #padText:not(.open) { display: none; }
+.work.pult-on #btnTextToggle { display: none; }

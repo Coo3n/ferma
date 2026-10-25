@@ -105,9 +105,9 @@ function mirrorApply(on, save) {
     if (btn) {
         btn.setAttribute('aria-pressed', on ? 'true' : 'false');
         btn.title = on
-            ? 'Свернуть экран'
-            : 'Показать экран';
-        setText(btn.querySelector('span'), on ? 'Экран' : 'Показать экран');
+            ? t('device.svernut_ekran')
+            : t('device.pokazat_ekran');
+        setText(btn.querySelector('span'), on ? t('device.skryt_ekran') : t('device.pokazat_ekran'));
     }
     if (save) mirrorResize(mirrorWidth(), true);
     else if (window.recSchemeSpine && REC.view === 'scheme') recSchemeSpine();

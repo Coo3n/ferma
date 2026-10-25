@@ -19,8 +19,20 @@ function popSelArgs(dict) {
     return Object.entries(dict || {}).map(([k, v]) => `${k}=${typeof v === 'number' ? v : JSON.stringify(String(v))}`).join(', ');
 }
 
+/* Системные кнопки известны по id: «permission allow button» человеку
+   ничего не говорит, а «Разрешить» — то, что он видит на экране. */
+function popKnownId(dict) {
+    const id = String((dict && dict.resourceId) || '').split('/').pop();
+    return {
+        permission_allow_button: t('pop.id_razreshit'),
+        permission_deny_button: t('pop.id_zapretit'),
+        permission_allow_foreground_only_button: t('pop.id_pri_ispolzovanii'),
+        permission_allow_one_time_button: t('pop.id_odin_raz'),
+    }[id] || '';
+}
+
 function popWhat(dict) {
-    return `«${vpFriendly(popSelArgs(dict)).value}»`;
+    return `«${popKnownId(dict) || vpFriendly(popSelArgs(dict)).value}»`;
 }
 
 function popWhenText(rule) {

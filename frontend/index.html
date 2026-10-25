@@ -289,13 +289,6 @@
                                 <use href="#i-down"/>
                             </svg>
                         </button>
-                        <button class="sm ghost" id="btnToPult" onclick="pultBack()"
-                                title="Вернуться к пульту телефона" aria-label="К пульту" data-t-title="device.vernutsya_k_pultu_telefona" data-t-aria-label="device.k_pultu">
-                            <svg class="ic" aria-hidden="true">
-                                <use href="#i-grid"/>
-                            </svg>
-                            <span data-t="device.pult">Пульт</span>
-                        </button>
 
                         <span class="recbar-sep" aria-hidden="true"></span>
 
@@ -439,7 +432,7 @@
                             <svg class="ic" aria-hidden="true">
                                 <use href="#i-sliders"/>
                             </svg>
-                            Управление
+                            Приложения и ссылки
                         </button>
 
                         <button class="sm ghost" id="btnMirror" onclick="mirrorToggle()"
@@ -448,7 +441,7 @@
                             <svg class="ic" aria-hidden="true">
                                 <use href="#i-panel"/>
                             </svg>
-                            <span data-t="device.ekran">Экран</span>
+                            <span data-t="device.skryt_ekran">Скрыть экран</span>
                         </button>
                     </div>
                     <!-- Задача на этом устройстве стоит и ждёт решения: тот же
@@ -609,12 +602,11 @@
                     <button class="dk" data-live onclick="sendKey('volume_up')" title="Громче" aria-label="Громче" data-t-title="pult.gromche" data-t-aria-label="pult.gromche"><svg class="ic" aria-hidden="true"><use href="#i-volume-high"/></svg></button>
                     <button class="dk" data-live onclick="pultRotate()" title="Повернуть" aria-label="Повернуть" data-t-title="pult.povernut" data-t-aria-label="pult.povernut"><svg class="ic" aria-hidden="true"><use href="#i-rotate"/></svg></button>
                     <span class="dk-sep" aria-hidden="true"></span>
-                    <button class="dk" data-live onclick="doUnlock()" title="Разбудить" aria-label="Разбудить" data-t-title="pult.razbudit" data-t-aria-label="pult.razbudit"><svg class="ic" aria-hidden="true"><use href="#i-unlock"/></svg></button>
-                    <button class="dk" data-live onclick="act({type:'screen_off'})" title="Погасить" aria-label="Погасить" data-t-title="pult.pogasit" data-t-aria-label="pult.pogasit"><svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg></button>
-                    <button class="dk" data-live onclick="sendKey('power')" title="Питание" aria-label="Питание" data-t-title="pult.pitanie" data-t-aria-label="pult.pitanie"><svg class="ic" aria-hidden="true"><use href="#i-power"/></svg></button>
+                    <button class="dk" data-live onclick="doUnlock()" title="Разбудить" aria-label="Разбудить" data-t-title="pult.razbudit" data-t-aria-label="pult.razbudit"><svg class="ic" aria-hidden="true"><use href="#i-unlock"/></svg><span class="dk-l" data-t="pult.razbudit">Разбудить</span></button>
+                    <button class="dk" data-live onclick="act({type:'screen_off'})" title="Погасить" aria-label="Погасить" data-t-title="pult.pogasit" data-t-aria-label="pult.pogasit"><svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg><span class="dk-l" data-t="pult.pogasit">Погасить</span></button>
                     <span class="dk-sep" aria-hidden="true"></span>
                     <button class="dk" data-live onclick="pultShot()" title="Скриншот" aria-label="Скриншот" data-t-title="pult.skrinshot" data-t-aria-label="pult.skrinshot"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg><span class="dk-l" data-t="pult.skrinshot">Скриншот</span></button>
-                    <button class="dk" id="btnPultRec" data-live onclick="pultRecord()" title="Видео экрана" aria-label="Видео экрана" data-t-title="pult.video_ekrana" data-t-aria-label="pult.video_ekrana"><svg class="ic" aria-hidden="true"><use href="#i-video"/></svg><span></span></button>
+                    <button class="dk" id="btnPultRec" data-live onclick="pultRecord()" title="Видео экрана" aria-label="Видео экрана" data-t-title="pult.video_ekrana" data-t-aria-label="pult.video_ekrana"><svg class="ic" aria-hidden="true"><use href="#i-video"/></svg><span></span><span class="dk-l" data-t="pult.video_ekrana">Видео экрана</span></button>
                     <span class="dk-sep" aria-hidden="true"></span>
                     <span class="pult-slot dk-slot" data-slot="stream"></span>
                 </div>
@@ -648,6 +640,11 @@
                             <use href="#i-unlock"/>
                         </svg>
                         Разблокировать
+                    </button>
+                    <button class="key" id="btnTextToggle" aria-expanded="false" aria-controls="padText"
+                            onclick="const p=$('padText');const o=p.classList.toggle('open');this.setAttribute('aria-expanded',o)">
+                        <svg class="ic" aria-hidden="true"><use href="#i-keyboard"/></svg>
+                        <span data-t="device.vvesti_tekst">Ввести текст</span>
                     </button>
                     <span class="sp"></span>
                     <label class="kb" id="kbLabel"
@@ -749,7 +746,7 @@
                 </div>
                 <div class="pult-foot">
                     <button class="sm ghost" onclick="devToolsOpen()" title="Ссылка, починка связи, консоль" data-t="pult.upravlenie" data-t-title="pult.ssylka_pochinka_svyazi_konsol">
-                        <svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg>Управление</button>
+                        <svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg>Приложения и ссылки</button>
                     <span class="sp"></span>
                     <!-- Запустить на этом телефоне — без возврата на ферму и галочек. -->
                     <button class="sm" onclick="openRunDialog({serials: [S.active]})"
