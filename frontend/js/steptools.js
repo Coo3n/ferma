@@ -1251,7 +1251,11 @@ function jobLabelWords(label) {
     /* Старая серверная подпись «Тап по элементу: pkg:id/iv_likes — «iv_likes»»
        → «Нажать «iv_likes»»: человеку не нужен ни пакет, ни слово «элемент». */
     const tap = /^Тап по элементу(?::\s*(?:[\w.]+:id\/)?([^\s—]+))?(?:\s+—\s+«?([^»]+)»?)?$/.exec(String(label || ''));
-    if (tap) return tap[2] || tap[1] ? t('job.nazhat_x', {x: tap[2] || tap[1]}) : t('job.nazhat');
+    /* «iv_likes», «btn_login» — имена из кода приложения: приставка вида и
+       подчёркивания человеку ни к чему, как и в подписи шага в конструкторе. */
+    const clean = x => String(x).replace(/^(?:iv|tv|btn|ib|et|ll|rl|fl|cl|rv|vp|img|txt)_/, '').replace(/_/g, ' ');
+    if (tap) return tap[2] || tap[1] ? t('job.nazhat_x', {x: clean(tap[2] || tap[1])}) : t('job.nazhat');
+    label = String(label || '').replace(/«((?:iv|tv|btn|ib|et|ll|rl|fl|cl|rv|vp|img|txt)_[\w]+)»/g, (m, x) => `«${clean(x)}»`);
     return String(label || '').replace(/\b[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+\b/gi,
         m => (window.REC_APPS && REC_APPS[m]) ? recApp(m) : m);
 }

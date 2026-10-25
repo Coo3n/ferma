@@ -184,7 +184,9 @@ function recBanner(message, tone) {
     const box = $('recBanner');
     if (!box) return;
     box.hidden = !message;
-    box.className = tone === 'info' ? 'note' : 'warn';
+    /* .warn несёт раскладку (flex, gap), «note» только гасит жёлтый: без .warn
+       иконка и текст вставали в столбик. */
+    box.className = tone === 'info' ? 'warn note' : 'warn';
     box.innerHTML = message
         ? `<svg class="ic"><use href="#${tone === 'info' ? 'i-info' : 'i-alert'}"/></svg><span>${esc(message)}</span>`
         : '';
