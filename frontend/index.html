@@ -418,9 +418,10 @@
                              панели, и без «вписать» её концы уходили за край. -->
                         <span class="recbar-sep" aria-hidden="true"></span>
 
-                        <!-- Список — для правки, схема — чтобы увидеть сюжет целиком:
-                             блоки рамками, повторы стрелкой, развилки ветками. -->
-                        <div class="chips" id="recViewToggle" role="group">
+                        <!-- «Схема» скрыта: список — единственный вид (см. recSetView('list') в
+                             recOpen), граф путал операторов, а переключатель обещал выбор,
+                             которого нет. Код схемы оставлен: вернуть — убрать hidden. -->
+                        <div class="chips" id="recViewToggle" role="group" hidden>
                             <button class="chip on" data-view="list" aria-pressed="true"
                                     onclick="recSetView('list')" data-t="device.spisok">Список
                             </button>

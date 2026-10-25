@@ -956,7 +956,7 @@ async function recStayAfterSave(key, meta, wasEdit) {
     REC.edit = {key: key, meta: meta};
     REC.savedSig = stCurSig();
     REC.base = stSnap();
-    recBanner(`правим сценарий «${meta.name}»`);
+    recBanner(`Правка «${meta.name}»`, 'info');
     recSync();
     recRender();
     await loadScenarios(true);

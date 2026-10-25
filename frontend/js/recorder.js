@@ -175,13 +175,18 @@ function recSync() {
     if (window.pultSync) pultSync();
 }
 
-function recBanner(message) {
+/* tone 'info' — сообщение о режиме («правим сценарий»), не предупреждение:
+   жёлтая плашка с восклицательным знаком пугала человека, который ничего не
+   сломал. Предупреждения (экран не разобрался) остаются жёлтыми. */
+function recBanner(message, tone) {
     REC.bannerMsg = message || '';
+    REC.bannerTone = tone || '';
     const box = $('recBanner');
     if (!box) return;
     box.hidden = !message;
+    box.className = tone === 'info' ? 'note' : 'warn';
     box.innerHTML = message
-        ? `<svg class="ic"><use href="#i-alert"/></svg><span>${esc(message)}</span>`
+        ? `<svg class="ic"><use href="#${tone === 'info' ? 'i-info' : 'i-alert'}"/></svg><span>${esc(message)}</span>`
         : '';
 }
 
@@ -211,7 +216,7 @@ function recPause() {
     REC.on = false;
     if (REC.insertAfter) {
         REC.insertAfter = null;
-        recBanner(REC.bannerBefore || '');   // вернуть плашку правки, если была
+        recBanner(REC.bannerBefore || '', REC.bannerBeforeTone);   // вернуть плашку правки, если была
     }
     recOverlayOff();
     recSync();
@@ -453,7 +458,7 @@ function recLabel(step) {
 function recRecordAfter(id) {
     const index = REC.steps.findIndex(s => s.id === id);
     if (index < 0) return;
-    if (!REC.insertAfter) REC.bannerBefore = REC.bannerMsg || '';
+    if (!REC.insertAfter) { REC.bannerBefore = REC.bannerMsg || ''; REC.bannerBeforeTone = REC.bannerTone; }
     REC.insertAfter = id;
     recBanner(`Запись после шага ${index + 1}. Пауза — вернуться в конец.`);
     if (!REC.on) recStart();
@@ -4111,8 +4116,7 @@ async function editScenario(key) {
 
     recOpen(true);
     /* recBanner сам экранирует текст — esc() здесь дал бы «&laquo;» в глаза. */
-    recBanner(`правим сценарий «${recRecipeName(рецепт)}»: шаги можно удалять,`
-        + ' переставлять и дописывать.');
+    recBanner(`Правка «${recRecipeName(рецепт)}»: шаги можно удалять, переставлять и дописывать.`, 'info');
     recSync();
     recEditRestore(key, рецепт.assets || {});
 }

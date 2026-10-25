@@ -314,6 +314,13 @@ button.jchip:hover { filter: brightness(1.25); }
 
 #recBanner .ic { flex: 0 0 auto; }
 
+/* Сообщение о режиме — спокойное, без жёлтого. */
+#recBanner.note:not([hidden]) {
+    color: var(--text2);
+    border-color: var(--line-soft);
+    background: var(--well);
+}
+
 /* Сводка замечаний: по центру строки, с теми же боковыми отступами. */
 .iss-box { padding: 0 var(--s4); }
 .iss-box[open] { padding-bottom: var(--s3); }
