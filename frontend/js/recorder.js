@@ -1749,6 +1749,13 @@ const SCH_ICONS = {
 function schIcon(step) {
     /* «Если на экране нет» — перечёркнутый глаз, «есть» — обычный. */
     if (step.kind === 'if_seen' && step.args && step.args.negate) return ['until', 'eye-off'];
+    /* У клавиши значок по её имени: «Домой» со стрелкой Enter читался как ошибка. */
+    if (step.kind === 'key') {
+        const by = {back: 'left', home: 'home', recents: 'layers', power: 'power',
+            volume_up: 'volume-high', volume_down: 'volume-low'};
+        const name = step.args && step.args.name;
+        if (by[name]) return ['', by[name]];
+    }
     return SCH_ICONS[step.kind] || ['', 'pointer'];   // click / tap
 }
 
@@ -3162,13 +3169,93 @@ function recRowVis(step) {
     return grIcon(schIcon(step)[1]);
 }
 
+/* ---------------------------------------------------- карточки шагов
+   Категория задаёт цвет значка-чипа: действие — акцент, ожидание — голубой,
+   система/сеть — янтарь, остальное — нейтральное. */
+const REC_CAT = {
+    click: 'act', tap: 'act', long_tap: 'act', double_tap: 'act', swipe: 'act', loop: 'act',
+    wait: 'wait', wait_gone: 'wait', sleep: 'wait', until: 'wait',
+    proxy: 'sys', launch_app: 'sys', stop_app: 'sys', open_url: 'sys', shell: 'sys', unlock: 'sys',
+    ensure_app: 'sys', budget: 'sys', call: 'sys', finish: 'sys', break: 'sys', screenshot: 'sys', chance: 'sys',
+};
+
+function recCat(step) {
+    return REC_CAT[step.kind] || 'plain';
+}
+
+/* Вторая строка карточки: как найдено / чем кончится. Чистая функция от
+   данных шага; пусто — строки нет. */
+function recStepSub(step) {
+    const a = step.args || {};
+    switch (step.kind) {
+        case 'click': {
+            const args = step.selector && typeof step.selector.args === 'string' ? step.selector.args : '';
+            if (/^text/.test(args)) return t('rec.sub_text');
+            if (/^description/.test(args)) return t('rec.sub_desc');
+            if (/^resourceId/.test(args)) return t('rec.sub_id');
+            if (step.crop && !step.selector) return t('rec.sub_image');
+            return step.point ? t('rec.sub_point') : '';
+        }
+        case 'sleep':
+            return a.seconds_max != null && Number(a.seconds_max) > Number(a.seconds) ? t('rec.sub_random') : '';
+        case 'wait':
+        case 'wait_gone': {
+            const n = recNum(a.timeout ?? 20);
+            if (a.on_fail === 'skip') return t('rec.sub_wait_skip', {n});
+            if (a.on_fail === 'ask') return t('rec.sub_wait_ask', {n});
+            return t('rec.sub_wait_fail', {n});
+        }
+        case 'type':
+            return a.clear && !a.account ? t('rec.sub_clear') : '';
+        default:
+            return '';
+    }
+}
+
+/* «1 шаг / 2 шага / 5 шагов» — чип на шапке блока. */
+function recStepsCount(n) {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return t('rec.sub_steps_1', {n});
+    return m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? t('rec.sub_steps_2', {n}) : t('rec.sub_steps_5', {n});
+}
+
+/* Свёрнутые блоки помним в памяти страницы (REC.fold), не в рецепте. */
+function recFolded(step) {
+    return !!(REC.fold && REC.fold.size && blockChain(step).some(id => REC.fold.has(id)));
+}
+
+function recFoldToggle(id) {
+    REC.fold = REC.fold || new Set();
+    if (REC.fold.has(id)) REC.fold.delete(id); else REC.fold.add(id);
+    recRender();
+}
+
+function recRowHead(step) {
+    const vis = recRowVis(step);
+    const chip = vis.startsWith('<span class="rs-vis"') ? vis
+        : `<span class="rs-chip rs-cat-${recCat(step)}">${vis}</span>`;
+    const sub = recStepSub(step);
+    let fold = '', count = '';
+    if (blockIsHead(step)) {
+        const closed = !!(REC.fold && REC.fold.has(step.id));
+        const label = esc(closed ? t('rec.sub_unfold') : t('rec.sub_fold'));
+        fold = `<button type="button" class="rs-fold ${closed ? 'closed' : ''}" title="${label}" aria-label="${label}"
+                aria-expanded="${closed ? 'false' : 'true'}"
+                onclick="event.stopPropagation();recFoldToggle(${step.id})">${recIcon('down')}</button>`;
+        count = `<span class="rs-count">${esc(recStepsCount(blockInside(step).length))}</span>`;
+    }
+    return {chip, fold, count, text: `<span class="rs-text"><span class="rs-label">${esc(recLabel(step))}</span>${
+        sub ? `<span class="rs-sub">${esc(sub)}</span>` : ''}</span>`};
+}
+
 /* Главное в строке — проверить шаг; остальное (записать после, дублировать,
    двигать, удалить) живёт в «⋯»: семь иконок без подписей подряд читались
    как шум, а корзина рядом со стрелкой «вниз» ловила промахи. */
 function recRow(step, index) {
     const open = REC.open === step.id;
     const sel = REC.sel && REC.sel.has(step.id);
-    return `<div class="rs ${open ? 'open' : ''} ${sel ? 'sel' : ''} ${blockRowClass(step)}"
+    const hd = recRowHead(step);
+    return `<div class="rs ${open ? 'open' : ''} ${sel ? 'sel' : ''} ${blockRowClass(step)} rs-cat-${recCat(step)}${recFolded(step) ? ' rs-folded' : ''}"
        data-id="${step.id}"
        ondragstart="recDragStart(event, ${step.id})" ondragend="recDragEnd(event)"
        ondragover="recDragOver(event, ${step.id})" ondragleave="recDragLeave(event)"
@@ -3180,9 +3267,9 @@ function recRow(step, index) {
              ${sel ? 'checked' : ''}
              onclick="event.stopPropagation();recSelToggle(${step.id}, event)">
       <span class="rs-n">${index + 1}</span>
-      ${recRowVis(step)}
-      <span class="rs-label">${esc(recLabel(step))}</span>
-      ${recBadges(step)}
+      ${hd.fold}${hd.chip}
+      ${hd.text}
+      ${hd.count}${recBadges(step)}
       <span class="rs-acts">
         <button class="sm ghost" title="${esc(t('rec.m_proverit'))}" aria-label="${esc(t('rec.m_proverit'))}"
                 onclick="event.stopPropagation();recRunStep(${index})">${recIcon('play')}</button>

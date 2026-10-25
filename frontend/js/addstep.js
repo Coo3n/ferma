@@ -23,14 +23,16 @@ function addStepPlan(c) {
     const repeat = [item('loop', deep), item('until', deep)];
     if (!wrap && c.inLoop) repeat.push(item('break'));
     groups.push({key: 'repeat', items: repeat});
-    const seen = [item('if_seen', deep), item('if_not', deep)];
-    if (!wrap) seen.push(item('anchor', c.phone ? null : 'phone'));
-    groups.push({key: 'seen', items: seen});
-    /* Факты о телефоне — не о экране: свой раздел. Телефон для них не
-       нужен — проверка идёт на прогоне. */
-    groups.push({key: 'phone', items: ['phone_app', 'phone_no_app', 'phone_older', 'phone_battery',
-        'phone_offline', 'phone_space', 'phone_account'].map(k => item(k, deep))});
-    groups.push({key: 'chance', items: [item('chance', deep)]});
+    /* «Условия» — один пункт слева, внутри подзаголовки (sub): на экране,
+       на телефоне, по шансу. Факты о телефоне телефон не требуют —
+       проверка идёт на прогоне. */
+    const sub = (s, it) => Object.assign(it, {sub: s});
+    const cond = [sub('seen', item('if_seen', deep)), sub('seen', item('if_not', deep))];
+    if (!wrap) cond.push(sub('seen', item('anchor', c.phone ? null : 'phone')));
+    ['phone_app', 'phone_no_app', 'phone_older', 'phone_battery', 'phone_offline', 'phone_space', 'phone_account']
+        .forEach(k => cond.push(sub('phone', item(k, deep))));
+    cond.push(sub('chance', item('chance', deep)));
+    groups.push({key: 'cond', items: cond});
     if (!wrap) groups.push({key: 'other', items: [item('budget'), item('finish')]});
     return {wrap, groups};
 }
@@ -39,11 +41,14 @@ function addStepPlan(c) {
 function addStepGroupName(key) {
     return key === 'action' ? t('rec.dob_deystvie') : key === 'mine' ? t('rec.dob_moi')
         : key === 'repeat' ? t('rec.dob_povtoryat')
-        : key === 'seen' ? t('rec.dob_esli') : key === 'phone' ? t('rec.dob_telefon')
-        : key === 'chance' ? t('rec.dob_inogda') : t('rec.dob_drugoe');
+        : key === 'cond' ? t('rec.dob_usl') : t('rec.dob_drugoe');
 }
 
-const ADD_STEP_GROUP_ICON = {action: 'pointer', mine: 'zap', repeat: 'repeat', seen: 'eye', phone: 'phone', chance: 'dices', other: 'layers'};
+function addStepSubName(key) {
+    return key === 'seen' ? t('rec.dob_sub_screen') : key === 'phone' ? t('rec.dob_sub_phone') : t('rec.dob_sub_chance');
+}
+
+const ADD_STEP_GROUP_ICON = {action: 'pointer', mine: 'zap', repeat: 'repeat', cond: 'eye', other: 'layers'};
 
 function addStepItemText(key) {
     switch (key) {
@@ -119,6 +124,10 @@ function addStepMineHtml() {
 const ADD_STEP_TAB_KEY = 'farm.addstep.tab';
 const ADD_STEP_RECENT_KEY = 'farm.addstep.recent';
 const ADD_STEP_RECENT_MAX = 4;
+const ADD_STEP_CHIP_KEY = 'farm.addstep.chip';
+/* «Частые»: недавние + эти готовые действия, всего не больше 8 карточек. */
+const ADD_STEP_POPULAR = ['launch_app', 'double_like', 'scroll_feed_minutes', 'sleep_range', 'type_variants', 'new_ip', 'swipe_up', 'home'];
+const ADD_STEP_FREQ_MAX = 8;
 
 /* Разделы вкладки «Действие» — в этом порядке; старый ответ сервера без
    поля group целиком попадает в «Система». */
@@ -216,7 +225,8 @@ function addStepBuildCards(plan, presets) {
                 const inWait = it.key === 'wait' || it.key === 'wait_gone';
                 out.push({key: it.key, group: inWait ? 'wait' : group.key, tab: group.key, title: text.title, desc: text.desc,
                     words: ADD_STEP_KEYWORDS[it.key] || '', off: it.off,
-                    sec: inWait ? addStepSectionName('wait') : addStepGroupName(group.key),
+                    sec: inWait ? addStepSectionName('wait') : it.sub ? addStepSubName(it.sub) : addStepGroupName(group.key),
+                    sub: it.sub,
                     html: sec => addStepCard(`recAddPick('${it.key}')`, text.icon, text.title, text.desc, it.off, false, sec)});
             }
         }
@@ -224,18 +234,46 @@ function addStepBuildCards(plan, presets) {
     return out;
 }
 
+function addStepFrequent(mine) {
+    const recent = addStepRecentKeys().map(k => mine.find(c => c.preset === k)).filter(Boolean).slice(0, ADD_STEP_RECENT_MAX);
+    const out = [...recent];
+    for (const k of ADD_STEP_POPULAR) {
+        const c = mine.find(x => x.preset === k);
+        if (c && !out.includes(c) && out.length < ADD_STEP_FREQ_MAX) out.push(c);
+    }
+    return out;
+}
+
+/* Вкладка «Действие»: ряд чипов-фильтров и одна сетка выбранной группы —
+   не простыня из сорока карточек. */
 function addStepActionPane(cards) {
     const mine = cards.filter(c => c.tab === 'action');
-    const recent = addStepRecentKeys().map(k => mine.find(c => c.preset === k)).filter(Boolean).slice(0, ADD_STEP_RECENT_MAX);
-    let html = recent.length ? `<h5 class="addpick-sub">${esc(t('rec.dob_recent'))}</h5>
-        <div class="addpick-grid">${recent.map(c => c.html()).join('')}</div>` : '';
+    const lists = [{key: 'freq', name: t('rec.dob_chastye'), list: addStepFrequent(mine)}];
     for (const sect of ADD_STEP_SECTIONS) {
         const list = mine.filter(c => c.group === sect);
-        if (!list.length) continue;
-        html += `<h5 class="addpick-sub">${esc(addStepSectionName(sect))}</h5>
-            <div class="addpick-grid">${list.map(c => c.html()).join('')}</div>`;
+        if (list.length) lists.push({key: sect, name: addStepSectionName(sect), list});
     }
-    return html;
+    const saved = window.store ? store.get(ADD_STEP_CHIP_KEY, '') : '';
+    const active = lists.some(l => l.key === saved) ? saved : 'freq';
+    const chips = lists.map(l => `<button type="button" class="addpick-chip" data-chip="${l.key}"
+        aria-pressed="${l.key === active}" onclick="addStepChip('${l.key}')">${esc(l.name)}<small>${l.list.length}</small></button>`).join('');
+    const grids = lists.map(l => `<div class="addpick-grid" data-chipgrid="${l.key}"${l.key === active ? '' : ' hidden'}>${l.list.map(c => c.html()).join('')}</div>`).join('');
+    return `<div class="addpick-chips">${chips}</div>${grids}`;
+}
+
+function addStepChip(key) {
+    document.querySelectorAll('.addpick-chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.chip === key)));
+    document.querySelectorAll('[data-chipgrid]').forEach(g => { g.hidden = g.dataset.chipgrid !== key; });
+    try { if (window.store) store.set(ADD_STEP_CHIP_KEY, key); } catch (e) { /* без памяти обходимся */ }
+}
+
+/* Условия: подзаголовки «На экране», «На телефоне», «По шансу». */
+function addStepCondPane(cards) {
+    return ['seen', 'phone', 'chance'].map(sub => {
+        const list = cards.filter(c => c.tab === 'cond' && c.sub === sub);
+        return list.length ? `<h5 class="addpick-sub">${esc(addStepSubName(sub))}</h5>
+            <div class="addpick-grid">${list.map(c => c.html()).join('')}</div>` : '';
+    }).join('');
 }
 
 function addStepHtml(plan, presets) {
@@ -253,6 +291,7 @@ function addStepHtml(plan, presets) {
         const hint = group.key === 'action' ? `<p class="addpick-hint">${esc(t('rec.dob_deystvie_d'))}</p>` : '';
         const body = group.key === 'mine' ? addStepMineHtml()
             : group.key === 'action' ? addStepActionPane(ADD_STEP_CARDS)
+            : group.key === 'cond' ? addStepCondPane(ADD_STEP_CARDS)
             : `<div class="addpick-grid">${cards.map(c => c.html()).join('')}</div>`;
         return `<section class="addpick-g" data-pane="${group.key}"${group.key === active ? '' : ' hidden'}>
         <h4>${esc(addStepGroupName(group.key))}</h4>${hint}${body}</section>`;

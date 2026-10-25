@@ -19,11 +19,13 @@ const item = (p, k) => p.groups.flatMap(g => g.items).find(i => i.key === k);
 // Обычное место: все разделы, по порядку из спеки; «выйти из повтора» нет.
 let p = plan({sel: 0, depth: 0, inLoop: false, phone: true});
 assert.strictEqual(p.wrap, false);
-assert.deepStrictEqual(keys(p), ['action', 'mine', 'repeat', 'seen', 'phone', 'chance', 'other']);
-assert.deepStrictEqual(items(p, 'phone').map(i => i.key),
+assert.deepStrictEqual(keys(p), ['action', 'mine', 'repeat', 'cond', 'other']);
+const sub = (p, s) => items(p, 'cond').filter(i => i.sub === s).map(i => i.key);
+assert.deepStrictEqual(sub(p, 'phone'),
     ['phone_app', 'phone_no_app', 'phone_older', 'phone_battery', 'phone_offline', 'phone_space', 'phone_account']);
 assert.deepStrictEqual(items(p, 'repeat').map(i => i.key), ['loop', 'until']);
-assert.deepStrictEqual(items(p, 'seen').map(i => i.key), ['if_seen', 'if_not', 'anchor']);
+assert.deepStrictEqual(sub(p, 'seen'), ['if_seen', 'if_not', 'anchor']);
+assert.deepStrictEqual(sub(p, 'chance'), ['chance']);
 assert.deepStrictEqual(items(p, 'other').map(i => i.key), ['budget', 'finish']);
 assert.deepStrictEqual(items(p, 'mine').map(i => i.key), ['mine']);
 assert.deepStrictEqual(items(p, 'action').map(i => i.key), ['presets', 'wait', 'wait_gone']);
@@ -47,7 +49,7 @@ for (const k of ['break', 'anchor', 'mine', 'finish']) assert.strictEqual(item(p
 // экрана, «выйти из повтора» и «другого». Глубину проверит recBlockWrap.
 p = plan({sel: 2, depth: 3, inLoop: true, phone: true});
 assert.strictEqual(p.wrap, true);
-assert.deepStrictEqual(keys(p), ['repeat', 'seen', 'phone', 'chance']);
+assert.deepStrictEqual(keys(p), ['repeat', 'cond']);
 assert.deepStrictEqual(p.groups.flatMap(g => g.items).map(i => i.key),
     ['loop', 'until', 'if_seen', 'if_not', 'phone_app', 'phone_no_app', 'phone_older', 'phone_battery',
      'phone_offline', 'phone_space', 'phone_account', 'chance']);

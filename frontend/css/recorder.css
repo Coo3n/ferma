@@ -1496,3 +1496,34 @@ img.pop-thumb.shot { width: 40px; height: 52px; object-fit: cover; object-positi
 
 /* У поля поиска свой крестик «очистить»: родной у браузера давал второй. */
 .addpick-search input[type=search]::-webkit-search-cancel-button { display: none; -webkit-appearance: none; }
+
+/* «Действие»: чипы-фильтры групп и одна сетка. Карточки одной высоты,
+   на широком окне — три в ряд; подсказка — одной строкой. */
+.addpick-chips { display: flex; flex-wrap: wrap; gap: var(--s2); margin: 0 0 var(--s3); }
+.addpick-chip {
+    display: inline-flex; align-items: center; gap: var(--s1); min-height: 32px;
+    padding: 0 var(--s3); border: 1px solid var(--line-soft); border-radius: var(--pill);
+    background: var(--panel2); color: var(--text2); font-size: var(--fs-2);
+}
+.addpick-chip small { color: var(--dim); font-size: var(--fs-1); }
+.addpick-chip:hover { border-color: var(--accent-line); color: var(--text); }
+.addpick-chip[aria-pressed="true"] { background: var(--accent-dim); border-color: var(--accent-line); color: var(--text); font-weight: 600; }
+.addpick-grid[hidden] { display: none; }
+.addpick-g .addpick-card.compact { height: 56px; }
+.addpick-g .addpick-card.compact .addpick-tx b {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25;
+}
+@media (min-width: 1100px) {
+    .addpick-g .addpick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.addpick-g .addpick-hint { font-size: var(--fs-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Названия не обрезаем многоточием: «Лайк двойным…» и «Сменить IP (перезап…»
+   нельзя было отличить друг от друга. Колонки — по ширине самого окна, а не
+   по окну браузера; карточка растёт до трёх строк, но не меньше 56px. */
+.addpick-g .addpick-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.addpick-g .addpick-card.compact { height: auto; min-height: 56px; }
+.addpick-g .addpick-card.compact .addpick-tx b { -webkit-line-clamp: 3; }
+@media (min-width: 1100px) {
+    .addpick-g .addpick-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}
