@@ -210,6 +210,18 @@ if ($adbCmd) { $env:ADB = $adbCmd.Source; $env:ADB_PATH = $adbCmd.Source }
 $hostName = if ($env:FARM_HOST) { $env:FARM_HOST } else { '127.0.0.1' }
 $port = if ($env:FARM_PORT) { $env:FARM_PORT } else { '8777' }
 $url = "http://${hostName}:${port}"
+# Старый сервер этой папки останавливаем сами (иначе новый не займёт порт или
+# два сервера делили бы телефоны). Чужие программы не трогаем: только процессы
+# `farm.server` из нашего .venv.
+if ($win) {
+    $old = Get-CimInstance Win32_Process -Filter "Name like 'python%'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -like '*farm.server*' -and $_.ExecutablePath -like "$PSScriptRoot*" -and $_.ProcessId -ne $PID }
+    foreach ($p in $old) {
+        Say "Останавливаю старый сервер фермы (pid $($p.ProcessId))"
+        Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    if ($old) { Start-Sleep -Milliseconds 800 }
+}
 Say "Ферма поднимается на $url  (остановить — Ctrl+C)"
 if ($win) { Start-Process $url }
 # Журнал нужен для установки; логи сервера в него не пишем — иначе PowerShell

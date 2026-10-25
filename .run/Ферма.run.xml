@@ -1,26 +1,20 @@
 <component name="ProjectRunConfigurationManager">
-  <!-- Запуск фермы кнопкой ▶ в PyCharm (Windows, Mac, Linux): модуль farm.server
-       из папки backend. Интерпретатор — интерпретатор проекта (.venv, который
-       создаёт run.bat / run.sh, или выбранный в Settings → Python Interpreter). -->
-  <configuration default="false" name="Ферма" type="PythonConfigurationType" factoryName="Python">
-    <option name="ENV_FILES" value="" />
+  <!-- Запуск фермы кнопкой ▶ (Mac, Linux). Идёт через run.sh: он сам создаёт .venv,
+       ставит зависимости и останавливает старый сервер, поэтому интерпретатор в
+       PyCharm выбирать не нужно. Отладка с точками останова — «Ферма (отладка)». -->
+  <configuration default="false" name="Ферма" type="ShConfigurationType">
+    <option name="SCRIPT_TEXT" value="" />
+    <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
+    <option name="SCRIPT_PATH" value="$PROJECT_DIR$/run.sh" />
+    <option name="SCRIPT_OPTIONS" value="" />
+    <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
+    <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="INDEPENDENT_INTERPRETER_PATH" value="true" />
+    <option name="INTERPRETER_PATH" value="/bin/bash" />
     <option name="INTERPRETER_OPTIONS" value="" />
-    <option name="PARENT_ENVS" value="true" />
-    <envs>
-      <env name="PYTHONUNBUFFERED" value="1" />
-    </envs>
-    <option name="SDK_HOME" value="" />
-    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/backend" />
-    <option name="IS_MODULE_SDK" value="false" />
-    <option name="ADD_CONTENT_ROOTS" value="true" />
-    <option name="ADD_SOURCE_ROOTS" value="true" />
-    <option name="SCRIPT_NAME" value="farm.server" />
-    <option name="PARAMETERS" value="" />
-    <option name="SHOW_COMMAND_LINE" value="false" />
-    <option name="EMULATE_TERMINAL" value="false" />
-    <option name="MODULE_MODE" value="true" />
-    <option name="REDIRECT_INPUT" value="false" />
-    <option name="INPUT_FILE" value="" />
+    <option name="EXECUTE_IN_TERMINAL" value="true" />
+    <option name="EXECUTE_SCRIPT_FILE" value="true" />
+    <envs />
     <method v="2" />
   </configuration>
 </component>

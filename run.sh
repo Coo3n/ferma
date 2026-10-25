@@ -98,6 +98,44 @@ HOST="${FARM_HOST:-127.0.0.1}"
 PORT="${FARM_PORT:-8777}"
 URL="http://${HOST}:${PORT}"
 
+# Старый сервер этой же папки останавливаем сами: иначе новый не займёт порт, а
+# если порт свободен — два сервера делили бы телефоны и мешали друг другу.
+# Чужие программы не трогаем: убиваем только `farm.server` из нашей папки
+# backend, и только тот, что слушает НАШ порт, либо завис и не слушает ничего.
+# Вторую ферму на другом порту (её могли запустить нарочно) не трогаем.
+# Мягко (TERM), через 5 с — жёстко: зависший при остановке сервер TERM иногда
+# переживает.
+ROOT="$(pwd)"
+proc_cwd() {
+  if [ -d "/proc/$1" ]; then readlink "/proc/$1/cwd" 2>/dev/null
+  else lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'; fi
+}
+stop_old() {
+  local pid ports old=""
+  for pid in $(pgrep -f 'farm\.server' 2>/dev/null || true); do
+    [ "$pid" = "$$" ] && continue
+    [ "$(proc_cwd "$pid")" = "$ROOT/backend" ] || continue
+    ports="$(lsof -nP -a -p "$pid" -iTCP -sTCP:LISTEN -Fn 2>/dev/null | sed -n 's/^n.*://p')"
+    # слушает, но не наш порт — это другая ферма
+    if [ -n "$ports" ] && ! printf '%s\n' "$ports" | grep -qx "$PORT"; then continue; fi
+    old="$old $pid"
+  done
+  [ -z "$old" ] && return 0
+  say "Останавливаю старый сервер фермы (pid:${old})"
+  kill $old 2>/dev/null || true
+  for _ in $(seq 1 25); do
+    kill -0 $old 2>/dev/null || return 0
+    sleep 0.2
+  done
+  kill -9 $old 2>/dev/null || true
+  sleep 0.5
+}
+stop_old
+if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  warn "Порт ${PORT} занят не фермой. Освободите его или задайте другой: FARM_PORT=8778 ./run.sh"
+  exit 1
+fi
+
 say "Ферма поднимается на ${URL}"
 ( sleep 2; { command -v open >/dev/null && open "$URL"; } || { command -v xdg-open >/dev/null && xdg-open "$URL"; } || true ) >/dev/null 2>&1 &
 
