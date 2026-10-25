@@ -149,6 +149,9 @@ VLM_LEARNED_FILE = Path(os.getenv("FARM_VLM_LEARNED_FILE", DATA_DIR / "vlm_learn
 TEMP_ALERT_C = float(os.getenv("FARM_TEMP_ALERT_C", "42"))
 BATTERY_LOW = int(os.getenv("FARM_BATTERY_LOW", "20"))
 BATTERY_HIGH = int(os.getenv("FARM_BATTERY_HIGH", "95"))
+# Тревоги памяти телефона (farm/health.py): место занято, оперативки почти нет.
+ROM_ALERT_PCT = int(os.getenv("FARM_ROM_ALERT_PCT", "92"))
+RAM_ALERT_FREE_PCT = int(os.getenv("FARM_RAM_ALERT_FREE_PCT", "8"))
 # Защита от разряда и перегрева (devices/power.py): критичный заряд даёт время
 # на реакцию, дальше запуски на телефоне снимаются и он «отдыхает».
 BATTERY_CRITICAL = int(os.getenv("FARM_BATTERY_CRITICAL", "15"))

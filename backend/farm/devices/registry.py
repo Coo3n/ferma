@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
-from .. import adb, config, streaming
+from .. import adb, config, health, streaming
 from . import pool, power
 from .network import net
 
@@ -48,6 +48,9 @@ class Device:
     height: int = 0
     battery: int | None = None
     temperature: float | None = None
+    ram_free: int | None = None    # % оперативной памяти свободно
+    rom_used: int | None = None    # % места на /data занято
+    cpu: int | None = None         # % загрузки процессора между опросами
     charging: str = ""
     busy_job: str | None = None
     enabled: bool = True  # можно вывести устройство из ротации вручную
@@ -77,6 +80,7 @@ class Device:
         """Забыть метрики живого устройства: у отключённого их знать неоткуда."""
         self.battery = None
         self.temperature = None
+        self.ram_free = self.rom_used = self.cpu = None
         self.charging = ""
 
     def warnings(self) -> list[str]:
@@ -89,6 +93,10 @@ class Device:
                     w.append(f"заряд {self.battery}%")
                 elif self.battery >= config.BATTERY_HIGH and self.charging:
                     w.append(f"держит {self.battery}% на зарядке")
+            if self.rom_used is not None and self.rom_used >= config.ROM_ALERT_PCT:
+                w.append(f"память почти заполнена: занято {self.rom_used}%")
+            if self.ram_free is not None and self.ram_free <= config.RAM_ALERT_FREE_PCT:
+                w.append(f"мало оперативной памяти: свободно {self.ram_free}%")
         if self.rest:
             w.append(self.rest)
         if self.state == "unauthorized":
@@ -121,6 +129,7 @@ class Device:
             # отключения — иначе метрики переживут перезапуск сервера.
             d["battery"] = None
             d["temperature"] = None
+            d["ram_free"] = d["rom_used"] = d["cpu"] = None
             d["charging"] = ""
         return d
 
@@ -132,6 +141,7 @@ class Registry:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_health: dict[str, float] = {}
+        self._cpu_prev: dict[str, tuple] = {}
         self._labels: dict[str, str] = self._load_labels()
         self._groups: dict[str, str] = self._load_json(GROUPS_FILE)
         self._tags: dict[str, list[str]] = self._load_json(TAGS_FILE)
@@ -337,6 +347,14 @@ class Registry:
             d.battery = b.get("level", d.battery)
             d.temperature = b.get("temperature", d.temperature)
             d.charging = b.get("plugged", "")
+            try:
+                metrics, sample = health.read(adb.health_snapshot(d.serial),
+                                              self._cpu_prev.get(d.serial))
+                d.ram_free, d.rom_used, d.cpu = (metrics["ram_free"], metrics["rom_used"], metrics["cpu"])
+                if sample:
+                    self._cpu_prev[d.serial] = sample
+            except Exception:  # noqa: BLE001 — память не повод помечать телефон ошибкой
+                d.ram_free = d.rom_used = d.cpu = None
             d.error = ""
         except Exception as e:  # noqa: BLE001
             d.error = str(e)[:200]

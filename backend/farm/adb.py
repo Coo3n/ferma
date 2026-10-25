@@ -467,3 +467,9 @@ def visible_packages(serial: str) -> list[str]:
 
 def screencap_png(serial: str, timeout: float = 15) -> bytes | str:
     return exec_out(serial, ["screencap", "-p"], timeout=timeout)
+
+
+def health_snapshot(serial: str) -> str:
+    """Сырой вывод health.HEALTH_CMD — разбирает farm/health.py."""
+    from . import health   # health чистый; импорт по месту, чтобы adb оставался листом
+    return shell(serial, health.HEALTH_CMD, timeout=10)
