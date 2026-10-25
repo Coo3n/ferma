@@ -220,6 +220,10 @@ function paramField(name, spec, value) {
             + (spec.max != null ? ` max="${esc(spec.max)}"` : '');
         return `<input type="number" id="p_${name}" value="${esc(value)}" step="any"${lim}>`;
     }
+    if (spec.type === 'textarea') {
+        return `<textarea id="p_${name}" rows="4"
+                 placeholder="${esc(spec.placeholder || '')}">${esc(value)}</textarea>`;
+    }
     return `<input type="text" id="p_${name}" value="${esc(value)}"
                  placeholder="${esc(spec.placeholder || '')}">`;
 }
