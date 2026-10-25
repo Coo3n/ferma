@@ -727,6 +727,27 @@ async function uploadFiles(serials, files) {
 
    Хранятся в браузере: это личные заготовки оператора, а не данные фермы. */
 
+/* горячие клавиши фраз: начало */
+/* F1–F9 вводят первую–девятую быструю фразу на выбранных телефонах, пока
+   открыта панель «Ввести текст». С модификаторами не срабатывают: Ctrl+F5
+   браузера не должен печатать фразу. */
+function phraseForHotkey(ev, list) {
+    if (ev.ctrlKey || ev.altKey || ev.metaKey || ev.shiftKey) return null;
+    const m = /^F([1-9])$/.exec(ev.key || '');
+    return m ? (list[Number(m[1]) - 1] || null) : null;
+}
+/* горячие клавиши фраз: конец */
+
+document.addEventListener('keydown', ev => {
+    const box = document.getElementById('bulkPhrases');
+    if (!box || box.offsetParent === null) return;                 // панели с фразами не видно
+    if (ev.target.closest && ev.target.closest('input, textarea, select, [contenteditable]')) return;
+    const text = phraseForHotkey(ev, phrases());
+    if (!text) return;
+    ev.preventDefault();
+    bulkAction({type: 'text', value: text}, 'Фраза');
+});
+
 function phrases() {
     return store.get(PHRASES_KEY, []);
 }
@@ -734,7 +755,7 @@ function phrases() {
 function phrasesHtml() {
     return phrases().map((p, i) => `<span class="phrase">
       <button class="sm" onclick="bulkAction({type:'text',value:phrases()[${i}]},'Фраза')"
-              title="Ввести на всех выбранных">${esc(p)}</button>
+              title="${i < 9 ? `F${i + 1} — ` : ''}Ввести на всех выбранных">${i < 9 ? `<kbd>F${i + 1}</kbd> ` : ''}${esc(p)}</button>
       <button class="sm x" onclick="phraseDrop(${i})" aria-label="Удалить фразу">×</button></span>`).join('');
 }
 
