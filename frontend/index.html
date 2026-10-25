@@ -104,6 +104,15 @@
             </svg>
             Запуски
             <span class="badge" id="navJobs" hidden title="Сколько запусков идёт сейчас" data-t-title="nav.skolko_zapuskov_idet_seychas"></span>
+        </button>
+        <!-- «Проблемы» — не вид журнала запусков, а очередь решений: что ферма не
+             смогла и ждёт человека. Это первое, что нужно увидеть с любой
+             страницы, поэтому свой раздел со значком, а не вкладка в «Запусках». -->
+        <button class="navbtn" data-view="deviations" onclick="showView('deviations')">
+            <svg class="ic" aria-hidden="true">
+                <use href="#i-alert"/>
+            </svg>
+            <span data-t="nav.problemy">Проблемы</span>
             <span class="badge b-failed" id="navDeviations" hidden
                   title="Новых проблем — ещё никто не смотрел" data-t-title="nav.novyh_problem_esche_nikto"></span>
         </button>
@@ -127,6 +136,7 @@
             <svg class="ic" aria-hidden="true">
                 <use href="#i-phone"/>
             </svg>
+            <span class="ctx-lbl" data-t="nav.ctx_label">Телефон:</span>
             <span id="navDeviceName" data-t="nav.telefon">Телефон</span>
         </button>
         <button class="ctx-x" onclick="closeDevice()"
@@ -769,6 +779,8 @@
                         onclick="showView('scen')"><span data-t="apk.tab_stsenarii">Сценарии</span><b class="tab-n" data-count="scen"></b></button>
                 <button class="sm" role="tab" aria-selected="false"
                         onclick="showView('apps')"><span data-t="apk.tab_prilozheniya">Приложения</span><b class="tab-n" data-count="apps"></b></button>
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('schedule')"><span data-t="apk.tab_raspisanie">Расписание</span></button>
             </div>
             <span class="sp"></span>
             <button class="sm ghost" onclick="recTipsOpen()" data-t="tips.link"><svg class="ic" aria-hidden="true"><use href="#i-lightbulb"/></svg>Советы</button>
@@ -799,6 +811,8 @@
                         onclick="showView('scen')"><span data-t="apk.tab_stsenarii">Сценарии</span><b class="tab-n" data-count="scen"></b></button>
                 <button class="sm on" role="tab" aria-selected="true"
                         onclick="showView('apps')"><span data-t="apk.tab_prilozheniya">Приложения</span><b class="tab-n" data-count="apps"></b></button>
+                <button class="sm" role="tab" aria-selected="false"
+                        onclick="showView('schedule')"><span data-t="apk.tab_raspisanie">Расписание</span></button>
             </div>
             <span class="sp"></span>
             <button class="sm" id="btnApkAdd" onclick="apkPick()" data-t="apk.dobavit">
@@ -816,16 +830,6 @@
     <!-- ========================================================== ЗАДАЧИ -->
     <section class="view" id="view-jobs" aria-label="Запуски" data-t-aria-label="jobs.zapuski">
         <div class="bar">
-            <!-- «Задачи» и «Проблемы» — один вопрос «что с запусками»: один
-                 раздел, два вида. Проблемы — это задачи, требующие внимания. -->
-            <div class="seg runs-seg" role="tablist" aria-label="Запуски" data-t-aria-label="jobs.zapuski">
-                <button class="sm on" role="tab" aria-selected="true"
-                        onclick="showView('jobs')" data-t="jobs.vse_zapuski">Все запуски</button>
-                <button class="sm" role="tab" aria-selected="false"
-                        onclick="showView('deviations')" data-t="jobs.problemy">Проблемы <span class="seg-n" data-dvn-count></span></button>
-                <button class="sm" role="tab" aria-selected="false"
-                        onclick="showView('schedule')" data-t="jobs.raspisanie">Расписание</button>
-            </div>
             <span class="sp"></span>
             <!-- Одна кнопка «Скачать» с выбором, что именно: две кнопки
                  «Скачать таблицу» и «Таблица по шагам» рядом читались как одно. -->
@@ -888,14 +892,6 @@
         <div class="bar">
             <!-- «Задачи» и «Проблемы» — один вопрос «что с запусками»: один
                  раздел, два вида. Проблемы — это задачи, требующие внимания. -->
-            <div class="seg runs-seg" role="tablist" aria-label="Запуски" data-t-aria-label="problems.zapuski">
-                <button class="sm" role="tab" aria-selected="false"
-                        onclick="showView('jobs')" data-t="problems.vse_zapuski">Все запуски</button>
-                <button class="sm on" role="tab" aria-selected="true"
-                        onclick="showView('deviations')" data-t="problems.problemy">Проблемы <span class="seg-n" data-dvn-count></span></button>
-                <button class="sm" role="tab" aria-selected="false"
-                        onclick="showView('schedule')" data-t="problems.raspisanie">Расписание</button>
-            </div>
             <div class="hs-legend" id="dvnKinds" role="group" aria-label="Тип проблемы" data-t-aria-label="problems.tip_problemy"></div>
             <span class="stat" id="dvnCount"></span>
             <span class="sp"></span>
@@ -925,17 +921,17 @@
          раздел: это тоже ответ на «что и когда запускается». -->
     <section class="view" id="view-schedule" aria-label="Расписание запусков" data-t-aria-label="schedule.raspisanie_zapuskov">
         <div class="bar">
-            <div class="seg runs-seg" role="tablist" aria-label="Запуски" data-t-aria-label="schedule.zapuski">
+            <div class="seg runs-seg" role="tablist" aria-label="Сценарии и приложения" data-t-aria-label="apk.stsenarii_tabs">
                 <button class="sm" role="tab" aria-selected="false"
-                        onclick="showView('jobs')" data-t="schedule.vse_zapuski">Все запуски</button>
+                        onclick="showView('scen')"><span data-t="apk.tab_stsenarii">Сценарии</span><b class="tab-n" data-count="scen"></b></button>
                 <button class="sm" role="tab" aria-selected="false"
-                        onclick="showView('deviations')" data-t="schedule.problemy">Проблемы <span class="seg-n" data-dvn-count></span></button>
+                        onclick="showView('apps')"><span data-t="apk.tab_prilozheniya">Приложения</span><b class="tab-n" data-count="apps"></b></button>
                 <button class="sm on" role="tab" aria-selected="true"
-                        onclick="showView('schedule')" data-t="schedule.raspisanie">Расписание</button>
+                        onclick="showView('schedule')"><span data-t="apk.tab_raspisanie">Расписание</span></button>
             </div>
             <span class="stat" id="schCount"></span>
             <span class="sp"></span>
-            <button class="sm primary" onclick="schEdit()" data-t="schedule.novaya_smena">
+            <button class="sm primary" id="btnSchNew" onclick="schEdit()" data-t="schedule.novaya_smena">
                 <svg class="ic" aria-hidden="true">
                     <use href="#i-plus"/>
                 </svg>

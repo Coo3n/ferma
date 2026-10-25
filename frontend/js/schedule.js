@@ -70,6 +70,9 @@ function schDaysText(days) {
 
 function renderSchedules() {
     const box = $('schList');
+    /* Пустой экран уже предлагает «Новая смена» по центру: вторая такая же
+       кнопка в углу — просто повтор. */
+    $('btnSchNew').hidden = !SCH.items.length;
     setText($('schCount'), SCH.items.length ? `${SCH.items.length} ${declOfNum(SCH.items.length, ['смена', 'смены', 'смен'])}` : '');
     if (!SCH.loaded) return;
     if (!SCH.items.length) {

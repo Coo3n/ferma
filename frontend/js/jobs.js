@@ -170,8 +170,12 @@ async function pollJobs() {
     /* Пустой журнал: справа нечего «выбирать слева», а кнопки чистки и
        отмены работать не с чем — объясняем, а не молчим. */
     $('view-jobs').classList.toggle('no-jobs', !list.length);
-    disableWithReason($('btnClearJobs'), !list.some(j => !isActive(j.status)), 'Завершённых запусков нет');
-    disableWithReason($('btnCancelAll'), !list.some(j => isActive(j.status)), 'Сейчас ничего не идёт');
+    /* Не серые, а скрытые: «Остановить всё» красное и всегда на виду рядом с
+       безобидными кнопками, а чистить и останавливать, когда нечего, незачем. */
+    $('btnClearJobs').hidden = !list.some(j => !isActive(j.status));
+    $('btnCancelAll').hidden = !list.some(j => isActive(j.status));
+    const dl = document.querySelector('#view-jobs .dl-menu');
+    if (dl) dl.hidden = !list.length;   // скачивать нечего, пока запусков не было
     renderBatchBar(shown);
     setHTML($('jobList'), shown.length
         ? (S.runBatch ? shown.map(jobCard).join('')

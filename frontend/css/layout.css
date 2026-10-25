@@ -727,3 +727,13 @@ body:has(#view-device.on) #stJobs {
 .dl-pop a .ic { flex: none; width: 18px; height: 18px; margin-top: 2px; color: var(--accent); }
 .dl-pop b { display: block; font-size: var(--fs-2); font-weight: 600; }
 .dl-pop small { display: block; color: var(--dim); font-size: var(--fs-1); line-height: 1.4; }
+
+/* Чип открытого телефона: подпись «Телефон:» объясняет, что это и зачем крестик. */
+.ctx-lbl { color: var(--text2); font-size: var(--fs-1); margin-right: 2px; }
+
+/* Карточка «ждёт решения» и плашка «Правка…» вместе — два сообщения подряд там,
+   где человеку нужно одно: пока задача ждёт, плашка режима уступает место. */
+body:has(#deviceHeldBar:not(:empty)) #recBanner { display: none; }
+
+/* Панель без единой видимой кнопки — пустая полоса: убираем её целиком. */
+#view-jobs > .bar:not(:has(> :not(.sp):not([hidden]))) { display: none; }

@@ -30,9 +30,8 @@ function showView(name) {
     S.view = name;
     document.querySelectorAll('.view').forEach(view =>
         view.classList.toggle('on', view.id === 'view-' + name));
-    /* «Проблемы» живут внутри «Запусков», «Приложения» — внутри «Сценариев». */
-    const navName = (name === 'deviations' || name === 'schedule') ? 'jobs'
-        : name === 'apps' ? 'scen' : name;
+    /* «Приложения» и «Расписание» — вкладки раздела «Сценарии». */
+    const navName = (name === 'apps' || name === 'schedule') ? 'scen' : name;
     document.querySelectorAll('.navbtn').forEach(button => {
         const on = button.dataset.view === navName;
         button.classList.toggle('on', on);

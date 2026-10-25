@@ -44,7 +44,6 @@ const COACH_TOURS = {
         {sel: '#scSteps', title: t('coach.scen_steps_t'), text: t('coach.scen_steps')},
     ],
     jobs: () => [
-        {sel: '#view-jobs .runs-seg', title: t('coach.jobs_tabs_t'), text: t('coach.jobs_tabs')},
         {sel: '#jobList .rgroup', title: t('coach.jobs_group_t'), text: t('coach.jobs_group')},
         {sel: '#jobList', part: true, title: t('coach.jobs_list_t'), text: t('coach.jobs_list')},
         {sel: '#btnCancelAll', title: t('coach.jobs_stop_t'), text: t('coach.jobs_stop')},
