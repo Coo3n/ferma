@@ -178,7 +178,7 @@ function accBudgetHtml(a) {
     const counters = (ACC.budget || {})['account:' + a.id] || {};
     const rows = Object.entries(counters);
     if (!rows.length) return '<span class="dim">—</span>';
-    return rows.map(([name, n]) => `<span class="acc-bud-i">${esc(name)} <b>${n}</b></span>`).join(' ');
+    return rows.map(([name, n]) => `<span class="acc-bud-i">${esc(name)} <b>${n}</b></span>`).join(' · ');
 }
 
 /* ------------------------------------------------------------ фильтры */

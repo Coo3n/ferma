@@ -498,7 +498,7 @@
   "rec.potolok_label": "Не больше {n} «{name}» за сутки",
   "rec.potolok_chto": "Что считаем",
   "rec.potolok_chto_primer": "подписки",
-  "rec.potolok_skolko": "Не больше, за сутки",
+  "rec.potolok_skolko": "Не больше",
   "rec.potolok_akkaunt": "Считать по аккаунту",
   "rec.potolok_lyuboy": "любому",
   "rec.potolok_podskazka": "Счёт идёт на аккаунт телефона: его и блокируют. Потолок исчерпан — сценарий заканчивается как успех, а не падает ошибкой.",
