@@ -488,7 +488,8 @@ function recSelMark(alt) {
     if (!alt || alt.matches == null) return '';
     const parts = [alt.nth ? t('rec.sel_nth', {k: alt.nth[0], n: alt.nth[1]})
         : alt.matches === 1 ? t('rec.sel_odin') : t('rec.sel_pohozhih', {n: alt.matches})];
-    if (alt.dynamic) parts.push(t('rec.sel_menyaetsya'));
+    if (alt.obfuscated) parts.push(t('rec.sel_obfusc'));
+    else if (alt.dynamic) parts.push(t('rec.sel_menyaetsya'));
     return parts.join(' · ');
 }
 
@@ -503,7 +504,8 @@ function recSelWarn(alt) {
         if (alt.matches !== 1) warns.push(t('rec.warn_mnogo', {n: alt.matches}));
         if (alt.fragile) warns.push(t('rec.warn_hrupkiy'));
     }
-    if (alt.dynamic) warns.push(t('rec.warn_menyaetsya'));
+    if (alt.obfuscated) warns.push(t('rec.warn_obfusc'));
+    else if (alt.dynamic) warns.push(t('rec.warn_menyaetsya'));
     return warns.join('; ');
 }
 

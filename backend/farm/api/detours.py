@@ -279,7 +279,12 @@ def ignore_obstacle(payload: dict = Body(...)):
     job, file = str(payload.get("job") or ""), str(payload.get("file") or "")
     if not job or not file:
         raise HTTPException(400, "не указано, какой экран убрать")
-    keys = _ignored() | {f"{job}/{file}"}
+    # Прячем не конкретный запуск, а сам экран (по его признаку): иначе после
+    # перезапуска сценария тот же экран приходит новым слепком и всплывает снова.
+    слепок = next((o for o in scan_obstacles("") if o.get("job") == job
+                   and o.get("file") == file), None)
+    sig = obstacle.signature(слепок) if слепок else ""
+    keys = _ignored() | {sig or f"{job}/{file}"}
     path = Path(config.GUARDS_DIR) / IGNORED_FILE
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(sorted(keys), ensure_ascii=False), "utf-8")
@@ -302,5 +307,7 @@ def detour_map(package: str = ""):
         for g in guards.load(package)
     ]
     ignored = _ignored()
-    found = [o for o in scan_obstacles(package) if f"{o.get('job')}/{o.get('file')}" not in ignored]
+    found = [o for o in scan_obstacles(package)
+             if f"{o.get('job')}/{o.get('file')}" not in ignored
+             and obstacle.signature(o) not in ignored]
     return {"rules": rules, "obstacles": obstacle.uncovered(found, rules)}

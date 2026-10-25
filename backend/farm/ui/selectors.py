@@ -131,6 +131,37 @@ def is_dynamic(value: str) -> bool:
     return letters < 2 or text_stem(value) != value
 
 
+# Короткие осмысленные имена, которые обфускатор не порождает: «ok» и «tab»
+# — настоящие id, а не «a»/«b2».
+_PLAIN_IDS = frozenset({"ok", "up", "tab", "fab", "bar", "nav", "img", "btn", "tv",
+                        "et", "iv", "rv", "vp", "cta", "menu", "list", "back",
+                        "next", "done", "skip", "close", "title", "icon", "text", "add", "buy", "pay", "map", "new",
+                        "cam", "mic", "pin", "key", "qr", "go", "no", "yes"})
+_OBF_ID_RE = re.compile(r"^(?:[a-z]{1,3}|[a-z]\d{1,3}|[a-z]{1,2}\d[a-z0-9]{0,2}|\d+)$")
+_SDK_CLASS = ("android.", "androidx.", "com.google.android.", "java.", "kotlin.")
+
+
+def is_obfuscated_id(resource_id: str) -> bool:
+    """id похож на результат обфускации ресурсов (R8, AndResGuard): «a», «b2».
+
+    Такое имя пересобирается с каждым релизом, так что селектор по нему жив
+    ровно до обновления приложения. Эвристика консервативна: настоящие
+    короткие имена из `_PLAIN_IDS` пропускаются. Чистая функция.
+    """
+    name = (resource_id or "").strip().rsplit("/", 1)[-1].lower()
+    if not name or name in _PLAIN_IDS:
+        return False
+    return bool(_OBF_ID_RE.match(name))
+
+
+def is_obfuscated_class(cls: str) -> bool:
+    """Свой класс приложения с обфусцированным коротким именем: «a.b.c»."""
+    cls = (cls or "").strip()
+    if not cls or cls.startswith(_SDK_CLASS):
+        return False
+    return len(cls.rsplit(".", 1)[-1]) <= 2
+
+
 def _single(nodes: list[Node], node: Node) -> list[dict]:
     out = []
     for key in PRIORITY:
@@ -142,7 +173,9 @@ def _single(nodes: list[Node], node: Node) -> list[dict]:
             "args": f"{key}={_literal(value)}",
             "matches": sum(1 for n in nodes if _attr(n, key) == value),
             "fragile": False,
-            "dynamic": key != "resourceId" and is_dynamic(value),
+            "dynamic": (key != "resourceId" and is_dynamic(value))
+            or (key == "resourceId" and is_obfuscated_id(value)),
+            "obfuscated": key == "resourceId" and is_obfuscated_id(value),
         })
     stem = text_stem(node.text)
     if len(stem) >= 2 and stem != node.text:
@@ -179,7 +212,8 @@ def _nth(nodes: list[Node], node: Node) -> list[dict]:
             "args": f"{key}={_literal(value)}, instance={k}",
             "matches": 1,
             "fragile": True,
-            "dynamic": False,
+            "dynamic": key == "resourceId" and is_obfuscated_id(value),
+            "obfuscated": key == "resourceId" and is_obfuscated_id(value),
             "nth": [k + 1, len(same)],
         })
     return out
@@ -201,7 +235,11 @@ def _combined(nodes: list[Node], node: Node) -> list[dict]:
             "args": f"{key}={_literal(value)}, className={_literal(node.cls)}",
             "matches": matches,
             "fragile": True,
-            "dynamic": key != "resourceId" and is_dynamic(value),
+            "dynamic": (key != "resourceId" and is_dynamic(value))
+            or (key == "resourceId" and is_obfuscated_id(value))
+            or is_obfuscated_class(node.cls),
+            "obfuscated": (key == "resourceId" and is_obfuscated_id(value))
+            or is_obfuscated_class(node.cls),
         })
     out.append(_instance(nodes, node))
     return out
@@ -214,7 +252,8 @@ def _instance(nodes: list[Node], node: Node) -> dict:
         "args": f"className={_literal(node.cls)}, instance={same_class.index(node.id)}",
         "matches": 1,
         "fragile": True,
-        "dynamic": False,
+        "dynamic": is_obfuscated_class(node.cls),
+        "obfuscated": is_obfuscated_class(node.cls),
     }
 
 
@@ -296,6 +335,7 @@ def to_payload(nodes: list[Node]) -> list[dict]:
             "focused": node.focused,
             "hint": node.hint,
             "package": node.package,
+            "idObfuscated": is_obfuscated_id(node.resource_id),
             "textDynamic": is_dynamic(node.text),
             "descriptionDynamic": is_dynamic(node.description),
             "target": target.id,

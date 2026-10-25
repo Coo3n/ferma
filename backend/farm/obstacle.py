@@ -11,7 +11,7 @@
 """
 from __future__ import annotations
 
-from .ui import tree
+from .ui import selectors as sel_utils, tree
 
 MAX_CANDIDATES = 5
 MAX_TEXTS = 8
@@ -59,6 +59,7 @@ def capture(xml: str, width: int, height: int, package: str = "") -> dict:
         nodes = []
 
     texts, by_id, by_text, by_desc, by_frame = [], [], [], [], []
+    by_obf = []   # обфусцированные id: меняются с релизом — после устойчивых текстов
     for node in nodes:
         rid = (node.resource_id or "").strip()
         text = (node.text or "").strip()
@@ -75,15 +76,21 @@ def capture(xml: str, width: int, height: int, package: str = "") -> dict:
         # на устройствах с разным языком
         if rid and not any(c.get("resourceId") == rid for c in by_id):
             # каркас не выбрасываем совсем — кладём в хвост, вдруг больше нечего
-            (by_frame if node.area > FRAME_AREA else by_id).append({"resourceId": rid})
-        if TEXT_MIN <= len(text) <= TEXT_MAX and not any(
+            if node.area > FRAME_AREA:
+                by_frame.append({"resourceId": rid})
+            elif sel_utils.is_obfuscated_id(rid):
+                by_obf.append({"resourceId": rid})
+            else:
+                by_id.append({"resourceId": rid})
+        # время, счётчик, ник живут один прогон — по ним преграду не опознать
+        if TEXT_MIN <= len(text) <= TEXT_MAX and not sel_utils.is_dynamic(text) and not any(
                 c.get("textContains") == text for c in by_text):
             by_text.append({"textContains": text})
-        if TEXT_MIN <= len(desc) <= TEXT_MAX and not any(
+        if TEXT_MIN <= len(desc) <= TEXT_MAX and not sel_utils.is_dynamic(desc) and not any(
                 c.get("descriptionContains") == desc for c in by_desc):
             by_desc.append({"descriptionContains": desc})
 
-    отобрано = (by_id + by_text + by_desc + by_frame)[:MAX_CANDIDATES]
+    отобрано = (by_id + by_text + by_desc + by_obf + by_frame)[:MAX_CANDIDATES]
     return {
         "package": package,
         "texts": texts[:MAX_TEXTS],
@@ -101,6 +108,12 @@ def _key(преграда: dict) -> str:
     return str(sorted(кандидаты[0]["selector"].items())) if кандидаты else ""
 
 
+def signature(преграда: dict) -> str:
+    """Подпись экрана для списка «это не помеха»: пакет + опознавательный ключ."""
+    ключ = _key(преграда)
+    return f"{преграда.get('package') or ''}|{ключ}" if ключ else ""
+
+
 def uncovered(преграды: list, rules: list) -> list:
     """Преграды, на которые ещё нет отвода — самое ценное, что знает ферма.
 
@@ -116,7 +129,12 @@ def uncovered(преграды: list, rules: list) -> list:
     собрано: dict[str, dict] = {}
     for преграда in преграды or []:
         ключ = _key(преграда)
-        if not ключ or ключ in закрыты:
+        if not ключ:
+            continue
+        # Правило могли написать не по первому кандидату, а по любому из
+        # слепка: преграда тогда уже обойдена.
+        if any(str(sorted(c["selector"].items())) in закрыты
+               for c in преграда.get("candidates") or []):
             continue
         обойдена = bool(преграда.get("escaped"))
         if ключ in собрано:

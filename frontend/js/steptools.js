@@ -758,6 +758,25 @@ function recRunOpen() {
     stRunBuild();
 }
 
+/* «Проверить» в тулбаре: идущую проверку просто показываем, а если панель
+   уже открыта — запускаем с её настроек. Иначе стартуем с начала сразу,
+   без отдельного шага «открыть меню». */
+function recRunQuick() {
+    if (REC.run && REC.run.active) {
+        recRunOpen();
+        return;
+    }
+    const wasOpen = REC.runOpen;
+    recRunOpen();
+    if (!REC.runOpen) return;
+    if (!wasOpen) {
+        if ($('runFrom')) $('runFrom').value = '0';
+        if ($('runOnly')) $('runOnly').checked = false;
+        stRunNote();
+    }
+    recRunGo();
+}
+
 function recRunClose() {
     REC.runOpen = false;
     const box = $('recRun');
@@ -1052,7 +1071,7 @@ function stRunReset() {
     recRunClose();
 }
 
-const ST_RUN_CLASSES = ['run-ok', 'run-now', 'run-fail', 'run-skip', 'run-retry', 'run-blind', 'has-issue', 'has-warn'];
+const ST_RUN_CLASSES = ['run-ok', 'run-now', 'run-fail', 'run-skip', 'run-retry', 'run-blind', 'run-todo', 'has-issue', 'has-warn'];
 
 function stRunPaint() {
     document.querySelectorAll('[data-id]').forEach(el => {
@@ -1080,11 +1099,16 @@ function stRunPaint() {
     });
     if (run.active && timeline.length) {
         const last = timeline[timeline.length - 1];
+        /* ещё не дошедшие шаги притушены: видно, где идёт проверка и сколько осталось */
+        for (let i = last.i + 1; i < REC.steps.length; i++) {
+            if (!run.only) mark(i, 'run-todo');
+        }
         if (last.i !== run.followed) {
             run.followed = last.i;
             const step = REC.steps[last.i];
-            const row = step && document.querySelector(`#recSteps .rs[data-id="${step.id}"]`);
-            if (row && REC.view === 'list') row.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+            const cur = step && document.querySelector(
+                REC.view === 'list' ? `#recSteps .rs[data-id="${step.id}"]` : `.gr-node[data-id="${step.id}"]`);
+            if (cur) cur.scrollIntoView({block: 'nearest', inline: 'nearest', behavior: 'smooth'});
         }
     }
 }

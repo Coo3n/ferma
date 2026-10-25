@@ -7,7 +7,10 @@
 """
 from __future__ import annotations
 
+import re
+
 from ..context import is_weak_anchor
+from ..ui.selectors import is_obfuscated_id
 from . import steps as schema
 
 LONG_SLEEP = 60
@@ -72,6 +75,12 @@ def validate(payload: dict, blocks: dict | None = None,
                 and not step["selector"]["fallbacks"]:
             add("warning", i, "у клика один селектор без запасных слоёв: "
                               "при малейшем изменении экрана шаг упадёт")
+        if kind == "click":
+            m = re.match(r"""resourceId=(['"])(.+?)\1""", step["selector"]["args"])
+            if m and is_obfuscated_id(m.group(2)):
+                add("warning", i, f"id «{m.group(2).rsplit('/', 1)[-1]}» похож на "
+                                  "обфусцированный: после обновления приложения он "
+                                  "изменится — выберите поиск по тексту или добавьте запасной")
         if kind == "expect" and is_weak_anchor(
                 [{"a": a} for a in step.get("any") or []]):
             add("warning", i, "якорь опирается только на системную панель: он "
