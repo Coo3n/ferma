@@ -10,7 +10,7 @@ from dataclasses import replace
 
 from fastapi import APIRouter, Body, HTTPException
 
-from ..vlm import client, settings, usage
+from ..vlm import client, plan as vlm_plan, settings, usage
 
 router = APIRouter(prefix="/api/vlm", tags=["vlm"])
 
@@ -101,3 +101,16 @@ def test_connection(payload: dict = Body(default={})):
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "error": f"не получилось: {e}"}
     return {"ok": True, "reply": reply.strip()[:120]}
+
+
+@router.post("/plan")
+def make_plan(payload: dict = Body(...)):
+    """Черновик сценария по описанию. Ничего не сохраняет и не запускает."""
+    serial, task = payload.get("serial"), payload.get("task")
+    if not serial:
+        raise HTTPException(400, "не выбран телефон для снимка экрана")
+    try:
+        steps = vlm_plan.plan(serial, task)
+    except vlm_plan.PlanError as e:
+        raise HTTPException(400, str(e))
+    return {"steps": steps, "recipe": vlm_plan.recipe_for(task, steps)}
