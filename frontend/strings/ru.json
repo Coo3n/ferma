@@ -1144,5 +1144,9 @@
   "gallery.pusto_d": "Положите файлы сюжетов в папку backend/scenarios/gallery",
   "gallery.razdel": "Готовые сюжеты",
   "gallery.tab": "Готовые",
-  "gallery.uzhe_v_moih": "Уже в моих"
+  "gallery.uzhe_v_moih": "Уже в моих",
+  "tools.nazad": "← К инструментам",
+  "tools.podskazka": "Здоровье телефонов, уведомления, резервная копия, API",
+  "tools.zagolovok": "Инструменты фермы",
+  "tools.zakryt": "Закрыть"
 }

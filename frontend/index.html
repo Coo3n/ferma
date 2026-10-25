@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="css/steps.css">
     <link rel="stylesheet" href="css/schedule.css">
     <link rel="stylesheet" href="css/vlm.css">
+    <link rel="stylesheet" href="css/tools.css">
     <link rel="stylesheet" href="css/files.css">
     <link rel="stylesheet" href="css/apklib.css">
     <link rel="stylesheet" href="css/gallery.css">
@@ -151,6 +152,12 @@
 
     <span class="stat" id="stStatus"></span>
     <span class="stat" id="stJobs"></span>
+    <button class="sm icon" onclick="toolsOpen()" aria-label="Инструменты фермы"
+            title="Здоровье телефонов, уведомления, резервная копия, API" data-t-title="tools.podskazka" data-t-aria-label="tools.zagolovok">
+        <svg class="ic" aria-hidden="true">
+            <use href="#i-sliders"/>
+        </svg>
+    </button>
     <button class="sm icon" onclick="restartAdb(event)" aria-label="Переподключить телефоны"
             title="Если телефон пропал или завис" data-t-title="nav.esli_telefon_propal_ili" data-t-aria-label="nav.perepodklyuchit_telefony">
         <svg class="ic" aria-hidden="true">
@@ -1078,6 +1085,7 @@
 <script src="js/notify.js"></script>
 <script src="js/inbox.js"></script>
 <script src="js/gallery.js"></script>
+<script src="js/tools.js"></script>
 <script src="js/app.js"></script>
 <script src="js/onboarding.js"></script>
 <script src="js/coach.js"></script>

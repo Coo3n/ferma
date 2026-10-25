@@ -1,0 +1,27 @@
+/* Окно «Инструменты фермы» (tools.js). Плитки берут вид у .bulk-grid. */
+.tool-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.tool-table th,
+.tool-table td {
+    padding: var(--s1) var(--s2);
+    text-align: left;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.tool-table td.bad {
+    color: var(--bad, #c0392b);
+    font-weight: 600;
+}
+
+.tool-note {
+    color: var(--dim);
+    margin: var(--s2) 0;
+}
+
+.tool-warn {
+    color: var(--bad, #c0392b);
+    margin: var(--s2) 0;
+}
