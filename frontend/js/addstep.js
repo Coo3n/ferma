@@ -18,7 +18,7 @@ function addStepPlan(c) {
     /* Разделы слева, карточки справа — порядок меню: сначала то, что
        добавляют чаще всего (действия и свои команды), потом логика. */
     const groups = [];
-    if (!wrap) groups.push({key: 'action', items: [item('presets')]});
+    if (!wrap) groups.push({key: 'action', items: [item('presets'), item('wait'), item('wait_gone')]});
     if (!wrap) groups.push({key: 'mine', items: [item('mine')]});
     const repeat = [item('loop', deep), item('until', deep)];
     if (!wrap && c.inLoop) repeat.push(item('break'));
@@ -55,6 +55,8 @@ function addStepItemText(key) {
         case 'anchor': return {icon: 'crosshair', title: t('device.proverka_ekrana'),
             desc: t('device.stsenariy_proverit_chto_doshel')};
         case 'chance': return {icon: 'dices', title: t('rec.dob_chance'), desc: t('rec.dob_chance_d')};
+        case 'wait': return {icon: 'eye', title: t('rec.dob_wait'), desc: t('rec.dob_wait_d')};
+        case 'wait_gone': return {icon: 'eye-off', title: t('rec.dob_wait_gone'), desc: t('rec.dob_wait_gone_d')};
         case 'call': return {icon: 'layers', title: t('rec.l_call'), desc: t('rec.l_call_d')};
         case 'phone_app': return {icon: 'phone', title: t('rec.dob_tel_app'), desc: t('rec.dob_tel_app_d')};
         case 'phone_no_app': return {icon: 'phone', title: t('rec.dob_tel_no_app'), desc: t('rec.dob_tel_no_app_d')};
@@ -77,28 +79,37 @@ function addStepOffText(off) {
 const ADD_STEP_PRESET_ICON = {
     launch_app: 'app', stop_app: 'app-close', shell: 'terminal', open_url: 'external', unlock: 'unlock',
     key: 'home', sleep: 'timer', screenshot: 'camera', swipe: 'swipe', type: 'text-input', ensure_app: 'check-square',
+    double_tap: 'pointer', wait: 'eye', wait_gone: 'eye-off', proxy: 'wifi',
 };
 
 /* compact — готовые действия: название без пояснения (оно в подсказке).
    Пятнадцать карточек с абзацем текста под каждой читались как статья. */
-function addStepCard(onclick, icon, title, desc, off, compact) {
+function addStepCard(onclick, icon, title, desc, off, compact, sec) {
     const note = off ? addStepOffText(off) : desc;
     /* Подсказка — только когда пояснение спрятано (компактная карточка):
        иначе серый тултип повторял текст карточки слово в слово. */
     const tip = compact && !off ? ` title="${esc(note)}"` : '';
     return `<button type="button" class="addpick-card ${compact ? 'compact' : ''}" onclick="${onclick}"${off ? ' disabled' : ''}${tip}>
         <span class="addpick-ic">${recIcon(icon)}</span>
-        <span class="addpick-tx"><b>${esc(title)}</b>${compact && !off ? '' : `<span>${esc(note)}</span>`}</span>
+        <span class="addpick-tx"><b>${esc(title)}</b>${compact && !off ? '' : `<span>${esc(note)}</span>`}${sec ? `<span class="addpick-sec">${esc(sec)}</span>` : ''}</span>
       </button>`;
 }
 
 /* «Мои»: свои команды и сценарии — вставить шагом «Запустить сценарий»
    (call). Раньше это пряталось в «Другое → Запустить сценарий» вторым окном. */
-function addStepMineHtml() {
-    const own = (S.scenarios || []).filter(x => /^[a-z][a-z0-9_]{0,47}$/.test(x.key)
+function addStepOwn() {
+    return (S.scenarios || []).filter(x => /^[a-z][a-z0-9_]{0,47}$/.test(x.key)
         && x.key !== (REC.edit ? REC.edit.key : null) && !x.error && !x.template);
-    const card = x => addStepCard(`recLogicCall('${esc(x.key)}')`, x.command ? 'zap' : 'layers',
-        x.name || x.key, x.command ? t('rec.dob_komanda') : t('rec.dob_stsenariy'), null, true);
+}
+
+function addStepMineCard(x, sec) {
+    return addStepCard(`recLogicCall('${esc(x.key)}')`, x.command ? 'zap' : 'layers',
+        x.name || x.key, x.command ? t('rec.dob_komanda') : t('rec.dob_stsenariy'), null, true, sec);
+}
+
+function addStepMineHtml() {
+    const own = addStepOwn();
+    const card = x => addStepMineCard(x);
     const cmds = own.filter(x => x.command), rest = own.filter(x => !x.command);
     if (!own.length) return `<p class="addpick-empty">${esc(t('rec.dob_moi_pusto'))}</p>`;
     return (cmds.length ? '' : `<p class="addpick-hint">${esc(t('rec.dob_komand_net'))}</p>`) + (cmds.length ? `<h5 class="addpick-sub">${esc(t('cmd.komandy'))}</h5><div class="addpick-grid">${cmds.map(card).join('')}</div>` : '')
@@ -106,6 +117,126 @@ function addStepMineHtml() {
 }
 
 const ADD_STEP_TAB_KEY = 'farm.addstep.tab';
+const ADD_STEP_RECENT_KEY = 'farm.addstep.recent';
+const ADD_STEP_RECENT_MAX = 4;
+
+/* Разделы вкладки «Действие» — в этом порядке; старый ответ сервера без
+   поля group целиком попадает в «Система». */
+const ADD_STEP_SECTIONS = ['apps', 'gestures', 'feed', 'input', 'network', 'wait', 'system'];
+
+function addStepSectionName(key) {
+    switch (key) {
+        case 'apps': return t('rec.grp_apps');
+        case 'gestures': return t('rec.grp_gestures');
+        case 'feed': return t('rec.grp_feed');
+        case 'input': return t('rec.grp_input');
+        case 'network': return t('rec.grp_network');
+        case 'wait': return t('rec.grp_wait');
+        default: return t('rec.grp_system');
+    }
+}
+
+/* Слова для поиска: названия в интерфейсе одни, а ищут по-разному. */
+const ADD_STEP_KEYWORDS = {
+    loop: 'повторять повтор цикл круг раз минут снова по кругу',
+    until: 'повторять пока не найдёшь цикл искать ждать появится крутить',
+    break: 'выйти из повтора прервать остановить цикл хватит',
+    if_seen: 'если есть видно виден на экране кнопка надпись условие',
+    if_not: 'если нет не видно пропало отсутствует на экране условие',
+    anchor: 'проверка экрана убедиться тот экран якорь',
+    chance: 'иногда шанс вероятность случайно процент не каждый раз',
+    phone_app: 'если приложение есть установлено телефон',
+    phone_no_app: 'если приложения нет не установлено телефон',
+    phone_older: 'версия ниже старое обновить приложение телефон',
+    phone_battery: 'заряд батарея аккумулятор мало телефон',
+    phone_offline: 'интернет сеть нет связи вайфай телефон',
+    phone_space: 'место память мало свободно телефон',
+    phone_account: 'аккаунт не привязан вк инстаграм тикток телеграм телефон',
+    budget: 'потолок лимит сутки не больше ограничение',
+    finish: 'закончить завершить остановить стоп ошибка успех конец',
+    wait: 'ждать ожидание появится дождаться пока',
+    wait_gone: 'ждать ожидание исчезнет пропадёт убрать дождаться пока',
+};
+
+/* ё и е считаем одной буквой, регистр не важен. */
+function addStepNorm(text) {
+    return String(text == null ? '' : text).toLowerCase().replace(/ё/g, 'е');
+}
+
+/* Чистая: cards [{key, group, title, desc, words}] → те, где нашлись ВСЕ слова
+   запроса (подстрокой в названии, пояснении или ключевых словах; короткие — по началу слова), в исходном
+   порядке. Пустой запрос — пустой список: вкладки показывает вызывающий. */
+function addStepSearch(query, cards) {
+    const words = addStepNorm(query).split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    return (cards || []).filter(c => {
+        const hay = addStepNorm([c.title, c.desc, c.words].filter(Boolean).join(' '));
+        const hayWords = hay.split(/[^a-zа-я0-9]+/).filter(Boolean);
+        /* Короткое слово ищем по началу слова: «ip» — подстрока в «swipe», и
+           «Свайп вверх» выскакивал бы на запрос про IP. От четырёх букв
+           подстрока безопасна и ловит формы слова («лайк» в «лайкнуть»). */
+        return words.every(w => hayWords.some(h => h.startsWith(w)) || (w.length >= 4 && hay.includes(w)));
+    });
+}
+
+/* Все карточки окна — одним списком: из него и вкладки, и поиск. */
+let ADD_STEP_CARDS = [];
+
+function addStepRecentKeys() {
+    const list = window.store ? store.get(ADD_STEP_RECENT_KEY, []) : [];
+    return Array.isArray(list) ? list.filter(k => typeof k === 'string') : [];
+}
+
+function addStepRecentPush(key) {
+    if (!window.store || !key) return;
+    try {
+        store.set(ADD_STEP_RECENT_KEY, [key, ...addStepRecentKeys().filter(k => k !== key)].slice(0, ADD_STEP_RECENT_MAX));
+    } catch (e) { /* без памяти обходимся */ }
+}
+
+function addStepBuildCards(plan, presets) {
+    const out = [];
+    for (const group of plan.groups) {
+        for (const it of group.items) {
+            if (it.key === 'presets') {
+                (presets || []).forEach((preset, index) => {
+                    const first = (preset.steps || [])[0];
+                    const icon = (first && ADD_STEP_PRESET_ICON[first.kind]) || 'plus';
+                    const sect = ADD_STEP_SECTIONS.includes(preset.group) ? preset.group : 'system';
+                    out.push({key: 'p:' + preset.key, preset: preset.key, group: sect, tab: 'action', title: preset.title, desc: preset.desc,
+                        words: (preset.keywords || []).join(' '), sec: addStepSectionName(sect),
+                        html: sec => addStepCard(`recLibPick(${index})`, icon, preset.title, preset.desc, null, true, sec)});
+                });
+            } else if (it.key === 'mine') {
+                addStepOwn().forEach(x => out.push({key: 'm:' + x.key, group: 'mine', tab: 'mine', title: x.name || x.key,
+                    desc: x.command ? t('rec.dob_komanda') : t('rec.dob_stsenariy'), words: x.key,
+                    sec: addStepGroupName('mine'), html: sec => addStepMineCard(x, sec)}));
+            } else {
+                const text = addStepItemText(it.key);
+                const inWait = it.key === 'wait' || it.key === 'wait_gone';
+                out.push({key: it.key, group: inWait ? 'wait' : group.key, tab: group.key, title: text.title, desc: text.desc,
+                    words: ADD_STEP_KEYWORDS[it.key] || '', off: it.off,
+                    sec: inWait ? addStepSectionName('wait') : addStepGroupName(group.key),
+                    html: sec => addStepCard(`recAddPick('${it.key}')`, text.icon, text.title, text.desc, it.off, false, sec)});
+            }
+        }
+    }
+    return out;
+}
+
+function addStepActionPane(cards) {
+    const mine = cards.filter(c => c.tab === 'action');
+    const recent = addStepRecentKeys().map(k => mine.find(c => c.preset === k)).filter(Boolean).slice(0, ADD_STEP_RECENT_MAX);
+    let html = recent.length ? `<h5 class="addpick-sub">${esc(t('rec.dob_recent'))}</h5>
+        <div class="addpick-grid">${recent.map(c => c.html()).join('')}</div>` : '';
+    for (const sect of ADD_STEP_SECTIONS) {
+        const list = mine.filter(c => c.group === sect);
+        if (!list.length) continue;
+        html += `<h5 class="addpick-sub">${esc(addStepSectionName(sect))}</h5>
+            <div class="addpick-grid">${list.map(c => c.html()).join('')}</div>`;
+    }
+    return html;
+}
 
 function addStepHtml(plan, presets) {
     const head = plan.wrap
@@ -113,33 +244,69 @@ function addStepHtml(plan, presets) {
     const keys = plan.groups.map(g => g.key);
     const saved = window.store ? store.get(ADD_STEP_TAB_KEY, '') : '';
     const active = keys.includes(saved) ? saved : keys[0];
+    ADD_STEP_CARDS = addStepBuildCards(plan, presets);
     const nav = plan.groups.map(g => `<button type="button" role="tab" data-tab="${g.key}"
         aria-selected="${g.key === active}" onclick="addStepTab('${g.key}')">${recIcon(ADD_STEP_GROUP_ICON[g.key])}
         <span>${esc(addStepGroupName(g.key))}</span></button>`).join('');
     const panes = plan.groups.map(group => {
-        const cards = group.items.map(it => {
-            if (it.key === 'presets') {
-                return (presets || []).map((preset, index) => {
-                    const first = (preset.steps || [])[0];
-                    const icon = (first && ADD_STEP_PRESET_ICON[first.kind]) || 'plus';
-                    return addStepCard(`recLibPick(${index})`, icon, preset.title, preset.desc, null, true);
-                }).join('');
-            }
-            if (it.key === 'mine') return '';
-            const text = addStepItemText(it.key);
-            return addStepCard(`recAddPick('${it.key}')`, text.icon, text.title, text.desc, it.off);
-        }).join('');
+        const cards = ADD_STEP_CARDS.filter(c => c.tab === group.key);
         const hint = group.key === 'action' ? `<p class="addpick-hint">${esc(t('rec.dob_deystvie_d'))}</p>` : '';
-        const body = group.key === 'mine' ? addStepMineHtml() : `<div class="addpick-grid">${cards}</div>`;
+        const body = group.key === 'mine' ? addStepMineHtml()
+            : group.key === 'action' ? addStepActionPane(ADD_STEP_CARDS)
+            : `<div class="addpick-grid">${cards.map(c => c.html()).join('')}</div>`;
         return `<section class="addpick-g" data-pane="${group.key}"${group.key === active ? '' : ' hidden'}>
         <h4>${esc(addStepGroupName(group.key))}</h4>${hint}${body}</section>`;
     }).join('');
-    return `${head}<div class="addpick"><nav class="addpick-nav" role="tablist">${nav}</nav>
-      <div class="addpick-pane">${panes}</div></div>`;
+    const search = `<div class="addpick-search">${recIcon('search')}
+        <input type="search" id="addSearch" autocomplete="off" spellcheck="false"
+               placeholder="${esc(t('rec.dob_poisk_ph'))}" aria-label="${esc(t('rec.dob_poisk_aria'))}"
+               oninput="addStepFind(this.value)" onkeydown="addStepSearchKey(event)">
+        <button type="button" class="addpick-clear" id="addSearchClear" hidden
+                aria-label="${esc(t('rec.dob_poisk_clear'))}" onclick="addStepSearchReset()">${recIcon('x')}</button></div>`;
+    return `${head}${search}<div class="addpick" id="addMain"><nav class="addpick-nav" role="tablist">${nav}</nav>
+      <div class="addpick-pane">${panes}</div></div><div class="addpick-found" id="addFound" hidden></div>`;
 }
 
 function addStepTab(key) {
     document.querySelectorAll('.addpick-nav [data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === key)));
     document.querySelectorAll('.addpick-g[data-pane]').forEach(p => { p.hidden = p.dataset.pane !== key; });
     if (window.store) store.set(ADD_STEP_TAB_KEY, key);
+}
+
+/* Пока в поле есть текст — вместо вкладок один плоский список. */
+function addStepFind(value) {
+    const main = document.getElementById('addMain'), found = document.getElementById('addFound');
+    const clear = document.getElementById('addSearchClear');
+    if (!main || !found) return;
+    const on = String(value || '').trim() !== '';
+    if (clear) clear.hidden = !String(value || '');
+    main.hidden = on;
+    found.hidden = !on;
+    if (!on) { found.innerHTML = ''; return; }
+    const list = addStepSearch(value, ADD_STEP_CARDS);
+    found.innerHTML = list.length
+        ? `<h4>${esc(t('rec.dob_najdeno', {n: list.length}))}</h4>
+           <div class="addpick-grid">${list.map(c => c.html(c.sec)).join('')}</div>`
+        : `<p class="addpick-empty">${esc(t('rec.dob_nichego'))}</p>
+           <button type="button" class="sm" onclick="addStepSearchReset()">${esc(t('rec.dob_sbrosit'))}</button>`;
+}
+
+function addStepSearchReset() {
+    const input = document.getElementById('addSearch');
+    if (!input) return;
+    input.value = '';
+    addStepFind('');
+    input.focus();
+}
+
+function addStepSearchKey(ev) {
+    if (ev.key === 'Escape' && ev.target.value) {
+        /* Первый Esc очищает поле, диалог остаётся. */
+        ev.preventDefault();
+        ev.stopPropagation();
+        addStepSearchReset();
+    } else if (ev.key === 'Enter') {
+        const first = document.querySelector('#addFound .addpick-card:not(:disabled)');
+        if (first) { ev.preventDefault(); first.click(); }
+    }
 }

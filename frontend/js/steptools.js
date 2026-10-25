@@ -554,7 +554,7 @@ function stGestureSvg(step, width, height) {
       <text class="g-txt" x="${((x1 + x2) / 2 + 12).toFixed(1)}" y="${((y1 + y2) / 2).toFixed(1)}">${secs} с</text></svg>`;
     }
     let point = null, long = false;
-    if (step.kind === 'tap' || step.kind === 'long_tap') {
+    if (step.kind === 'tap' || step.kind === 'long_tap' || step.kind === 'double_tap') {
         const x = num(a.x), y = num(a.y);
         if (x !== null && y !== null) point = px(x, y);
         long = step.kind === 'long_tap';
@@ -1291,3 +1291,82 @@ function jobStepListHtml(job) {
 
 window.jobStepsHtml = jobStepsHtml;
 window.jobProgressHtml = jobProgressHtml;
+
+
+/* ------------------------------------------------- новые виды шагов */
+
+/* «Пауза»: от и до. Пустое «до» — ровно столько секунд, как раньше. */
+function recSleepEditor(step) {
+    const a = step.args;
+    return `<div class="blk-ed-row">
+        <span class="blk-ed-k">${esc(t('rec.sleep_ot'))}</span>
+        <input type="number" class="blk-ed-n" min="0" step="any" value="${esc(a.seconds ?? '')}"
+               aria-label="${esc(t('rec.sleep_ot'))}" oninput="recEditValue(${step.id}, this.value)">
+        <span>${esc(t('rec.do'))}</span>
+        <input type="number" class="blk-ed-n" min="0" step="any" value="${esc(a.seconds_max ?? '')}"
+               aria-label="${esc(t('rec.do'))}" oninput="recSleepMax(${step.id}, this.value)">
+        <span class="dim">${esc(t('rec.sleep_sek'))}</span>
+        <button class="sm" title="Вынести в параметры" onclick="recParam(${step.id})">{}</button>
+      </div>
+      <p class="blk-ed-hint">${esc(t('rec.sleep_do_hint'))}</p>`;
+}
+
+function recSleepMax(id, value) {
+    const step = recFind(id);
+    if (!step || step.kind !== 'sleep') return;
+    const n = Number(value);
+    if (value === '' || !(n > 0)) delete step.args.seconds_max;
+    else step.args.seconds_max = n;
+    recSave();
+}
+
+/* «Ждать, пока появится / исчезнет»: цель выбирают на экране тем же
+   «Указать на экране», что и в «Если на экране». */
+function recWaitNew(kind) {
+    const step = recPush({kind, args: {timeout: 10, on_fail: 'fail'}});
+    step.any = [];
+    REC.open = step.id;
+    closeModal();
+    recRender();
+    recSave();
+    if (S.active) recBlockPickToggle(step.id);
+}
+
+function recNewSet(id, field, value) {
+    const step = recFind(id);
+    if (!step) return;
+    if (field === 'timeout') step.args.timeout = Math.max(1, Number(value) || 10);
+    else if (field === 'on_fail') step.args.on_fail = ['skip', 'ask'].includes(value) ? value : 'fail';
+    else if (field === 'proxy') step.args = value === 'off' ? {off: true} : {account: value};
+    recRender();
+    recSave();
+}
+
+function recNewKindEditor(step) {
+    const a = step.args || {};
+    if (step.kind === 'wait' || step.kind === 'wait_gone') {
+        const onFail = [['fail', t('rec.wait_fail_stop')], ['skip', t('rec.wait_fail_skip')], ['ask', t('rec.wait_fail_ask')]]
+            .map(([v, label]) => `<option value="${v}" ${(a.on_fail || 'fail') === v ? 'selected' : ''}>${esc(label)}</option>`).join('');
+        return `<div class="blk-ed">${blockFeatsEditor(step, null)}
+          <div class="blk-ed-row">
+            <span class="blk-ed-k">${esc(t('rec.wait_timeout'))}</span>
+            <input type="number" class="blk-ed-n" min="1" step="1" value="${recNum(a.timeout ?? 10)}"
+                   aria-label="${esc(t('rec.wait_timeout'))}" onchange="recNewSet(${step.id}, 'timeout', this.value)">
+          </div>
+          <div class="blk-ed-row">
+            <span class="blk-ed-k">${esc(t('rec.wait_onfail'))}</span>
+            <select aria-label="${esc(t('rec.wait_onfail'))}" onchange="recNewSet(${step.id}, 'on_fail', this.value)">${onFail}</select>
+          </div></div>`;
+    }
+    if (step.kind === 'proxy') {
+        const cur = a.off ? 'off' : (a.account || '');
+        const opts = Object.entries(PLATFORM_NAMES).map(([k, name]) =>
+            `<option value="${k}" ${cur === k ? 'selected' : ''}>${esc(name)}</option>`).join('')
+            + `<option value="off" ${cur === 'off' ? 'selected' : ''}>${esc(t('rec.proxy_snyat'))}</option>`;
+        return `<div class="blk-ed"><div class="blk-ed-row">
+            <span class="blk-ed-k">${esc(t('rec.proxy_net'))}</span>
+            <select aria-label="${esc(t('rec.proxy_net'))}" onchange="recNewSet(${step.id}, 'proxy', this.value)">${opts}</select>
+          </div></div>`;
+    }
+    return '';
+}

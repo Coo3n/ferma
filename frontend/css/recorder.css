@@ -1467,3 +1467,32 @@ img.pop-thumb { width: 64px; object-fit: cover; }
 img.pop-thumb.shot { width: 40px; height: 52px; object-fit: cover; object-position: top; }
 .pop-way.quiet { background: transparent; }
 .pop-way.quiet .ic { color: var(--dim); }
+
+/* «Добавить шаг»: поиск над разделами; результаты — плоский список той же
+   высоты, что и разделы, чтобы окно не прыгало. */
+.addpick-search {
+    position: relative; display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3);
+    padding: 0 var(--s2) 0 var(--s3); min-height: 40px; border: 1px solid var(--line-soft);
+    border-radius: var(--r1); background: var(--panel2);
+}
+.addpick-search:focus-within { border-color: var(--accent-line); }
+.addpick-search > .ic { flex: none; width: 18px; height: 18px; color: var(--dim); }
+.addpick-search input[type=search] {
+    flex: 1; min-width: 0; min-height: 36px; border: 0; background: transparent;
+    font-size: var(--fs-3); box-shadow: none; outline: 0;
+}
+.addpick-clear {
+    display: inline-grid; place-items: center; min-width: 32px; min-height: 32px; padding: 0;
+    border: 0; border-radius: var(--r1); background: transparent; color: var(--dim);
+}
+.addpick-clear[hidden] { display: none; }
+.addpick-clear:hover { background: var(--panel3); color: var(--text); }
+.addpick-clear .ic { width: 16px; height: 16px; }
+.addpick-found { height: min(520px, 64vh); overflow: auto; padding-right: var(--s1); }
+.addpick-found[hidden], .addpick[hidden] { display: none; }
+.addpick-found h4 { margin: 0 0 var(--s3); font-size: var(--fs-3); }
+.addpick-found .addpick-empty { margin-bottom: var(--s3); }
+.addpick-tx .addpick-sec { color: var(--dim); font-size: var(--fs-1); }
+
+/* У поля поиска свой крестик «очистить»: родной у браузера давал второй. */
+.addpick-search input[type=search]::-webkit-search-cancel-button { display: none; -webkit-appearance: none; }

@@ -402,6 +402,15 @@ function recLabel(step) {
             return 'Нажать ' + recWhere(a);
         case 'long_tap':
             return 'Долгое нажатие ' + recWhere(a);
+        case 'double_tap':
+            return t('rec.double_tap_label', {where: recWhere(a) || t('rec.po_ekranu')});
+        case 'wait':
+            return t('rec.wait_label', {chto: blockTarget(step)});
+        case 'wait_gone':
+            return t('rec.wait_gone_label', {chto: blockTarget(step)});
+        case 'proxy':
+            return a.off ? t('rec.proxy_off_label')
+                : t('rec.proxy_on_label', {name: PLATFORM_NAMES[a.account] || a.account});
         case 'swipe': {
             const dy = a.y2 - a.y1, dx = a.x2 - a.x1;
             const dir = Math.abs(dy) >= Math.abs(dx) ? (dy < 0 ? 'вверх' : 'вниз') : (dx < 0 ? 'влево' : 'вправо');
@@ -431,7 +440,8 @@ function recLabel(step) {
             return clear ? `Очистить данные ${recApp(clear[1])}` : `Команда: ${a.cmd}`;
         }
         case 'sleep':
-            return `Подождать ${a.seconds} с`;
+            return a.seconds_max != null && Number(a.seconds_max) > Number(a.seconds)
+                ? t('rec.pauza_ot_do', {a: recNum(a.seconds), b: recNum(a.seconds_max)}) : `Подождать ${a.seconds} с`;
         case 'screenshot':
             return 'Снимок экрана' + (a.name ? ` «${a.name}»` : '');
         case 'loop':
@@ -1730,6 +1740,10 @@ const SCH_ICONS = {
     unlock: ['', 'unlock'],
     swipe: ['', 'swipe'],
     long_tap: ['', 'hand'],
+    double_tap: ['', 'pointer'],
+    wait: ['until', 'eye'],
+    wait_gone: ['until', 'eye-off'],
+    proxy: ['block', 'wifi'],
 };
 
 function schIcon(step) {
@@ -2470,6 +2484,10 @@ function recAddPick(key) {
         recAnchorHere();
         return;
     }
+    if (key === 'wait' || key === 'wait_gone') {
+        recWaitNew(key);
+        return;
+    }
     if (PHONE_CARD_ARGS[key]) {
         const before = REC.open;
         if (REC.sel && REC.sel.size) recSelBlock('if_phone');
@@ -2648,6 +2666,7 @@ function recFill(preset, values) {
 
 function recLibAdd(preset, values) {
     recFill(preset, values).forEach(step => recPush(step));
+    addStepRecentPush(preset.key);
     closeModal();
     toast(`добавлено: ${preset.title}`, 'ok');
 }
@@ -2754,6 +2773,19 @@ function recCode(step, index) {
         return `ctx.ensure_app(${parts.join(', ')})`;
     }
 
+    if (step.kind === 'double_tap') return `ctx.double_tap(${recNum(a.x)}, ${recNum(a.y)})`;
+    if (step.kind === 'wait' || step.kind === 'wait_gone') {
+        const цель = (step.any || []).map(x => `dict(${x})`).join(', ');
+        /* Те же имена и значения по умолчанию, что у farm/recorder/codegen.py:
+           предпросмотр не должен показывать код, которого сервер не напишет. */
+        const метод = step.kind === 'wait' ? 'wait_for' : 'wait_for_gone';
+        const тут = a.on_fail && a.on_fail !== 'fail' ? `, on_fail=${JSON.stringify(a.on_fail)}` : '';
+        return `ctx.${метод}([${цель}], timeout=${recNum(a.timeout ?? 20)}${тут})`;
+    }
+    if (step.kind === 'proxy') return a.off ? 'ctx.proxy_off()' : `ctx.use_proxy(${JSON.stringify(a.account || '')})`;
+    if (step.kind === 'sleep' && !step.param && a.seconds_max != null && Number(a.seconds_max) > Number(a.seconds)) {
+        return `ctx.sleep_between(${recNum(a.seconds)}, ${recNum(a.seconds_max)})`;
+    }
     const key = REC_VALUE_KEY[step.kind];
     if (key) {
         const value = step.param
@@ -2990,6 +3022,7 @@ function recSetTypeSource(id, value) {
 function recValueEditor(step) {
     const key = REC_VALUE_KEY[step.kind];
     if (!key) return '';
+    if (step.kind === 'sleep' && !step.param) return recSleepEditor(step);
     if (step.kind === 'type') {
         if (step.args.account) return recTypeSource(step);
         return recTypeSource(step) + recValueEditorPlain(step, key) + recSpinHint(step);
@@ -3169,7 +3202,7 @@ function recRow(step, index) {
 function recStepBody(step, index) {
     const main = recThumb(step) + recHowHtml(step) + recAnchorEditor(step) + recBranchEditor(step)
         + recValueEditor(step) + recEnsureEditor(step) + recBudgetEditor(step) + recBlockEditor(step) + recScrollEditor(step, index)
-        + recFlexEditor(step);
+        + recFlexEditor(step) + recNewKindEditor(step);
     /* «Дополнительно» закрыто всегда: запасные способы — для того, кто их
        ищет, остальным в раскрытом шаге нужны только его настройки. Что внутри
        уже задано — видно по числу в заголовке. Код строки — последним и
@@ -3798,6 +3831,7 @@ function recPayload(meta) {
         if (step.kind === 'expect') out.any = step.any || [];
         if (blockIsHead(step)) out.args = blockPayloadArgs(step);
         if (step.kind === 'until' || step.kind === 'if_seen') out.any = step.any || [];
+        if (step.kind === 'wait' || step.kind === 'wait_gone') out.any = step.any || [];
         if (step.kind === 'branch') {
             out.arms = (step.arms || []).map(arm => ({
                 name: arm.name, any: arm.any || [], run: arm.run || '',

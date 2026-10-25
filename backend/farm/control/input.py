@@ -40,6 +40,18 @@ def tap(serial: str, x: float, y: float) -> None:
     adb.shell(serial, ["input", "tap", str(ax), str(ay)])
 
 
+def double_tap(serial: str, x: float, y: float) -> None:
+    """Двойной тап. u2 делает его одним жестом с родным интервалом; запасной
+    путь — два тапа через adb с паузой 80 мс (короче порога двойного нажатия
+    Android, длиннее — приложение прочло бы два одиночных)."""
+    ax, ay = to_pixels(serial, x, y)
+    if via_u2(serial, lambda d: d.double_click(ax, ay)):
+        return
+    adb.shell(serial, ["input", "tap", str(ax), str(ay)])
+    time.sleep(0.08)
+    adb.shell(serial, ["input", "tap", str(ax), str(ay)])
+
+
 def long_tap(serial: str, x: float, y: float, duration: float = 0.8) -> None:
     ax, ay = to_pixels(serial, x, y)
     if via_u2(serial, lambda d: d.long_click(ax, ay, duration)):

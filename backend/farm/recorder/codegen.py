@@ -206,6 +206,18 @@ def _call(step: dict):
         if len(chain) > 1:
             return "ctx.click_any(" + ", ".join([f"dict({a})" for a in chain] + место) + ")"
         return f"ctx.click({', '.join([chain[0]] + место)})"
+    if kind in ("wait", "wait_gone"):
+        цель = ", ".join(f"dict({a})" for a in step["any"])
+        parts = [f"[{цель}]", f'timeout={_num(args.get("timeout", 20))}']
+        if args.get("on_fail", "fail") != "fail":
+            parts.append(f'on_fail={literal(args["on_fail"])}')
+        return f'ctx.{"wait_for" if kind == "wait" else "wait_for_gone"}({", ".join(parts)})'
+    if kind == "proxy":
+        if args.get("off"):
+            return "ctx.proxy_off()"
+        return f'ctx.use_proxy({literal(args["account"])})'
+    if kind == "double_tap":
+        return f'ctx.double_tap({_num(args["x"])}, {_num(args["y"])})'
     if kind == "expect":
         chain = ", ".join(f"dict({a})" for a in step["any"])
         return f'ctx.expect_screen({literal(args["name"])}, any=[{chain}])'
@@ -246,6 +258,8 @@ def _call(step: dict):
     if kind == "shell":
         return f'ctx.shell({_value(step, literal(args["cmd"]))})'
     if kind == "sleep":
+        if args.get("seconds_max") is not None:
+            return f'ctx.sleep_between({_num(args["seconds"])}, {_num(args["seconds_max"])})'
         return f'ctx.sleep({_value(step, _num(args["seconds"]))})'
     if kind == "screenshot":
         name = args.get("name", "")

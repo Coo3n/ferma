@@ -9,7 +9,7 @@ from .apps import (
 from .capture import is_blank, is_secure, save_screenshot, screenshot
 from .diagnostics import bind_cancel, bind_log, clear_logcat, dump_hierarchy, logcat_tail, recoveries
 from .geometry import forget_size, size, to_pixels
-from .input import KEYCODES, key, long_tap, swipe, tap, text, unlock, wake
+from .input import KEYCODES, double_tap, key, long_tap, swipe, tap, text, unlock, wake
 from . import humanize
 from .provisioning import (
     FARM_SETTINGS, is_prepared, pending_settings, prepare_for_farm,

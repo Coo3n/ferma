@@ -65,8 +65,10 @@ def validate(payload: dict, blocks: dict | None = None,
         name = step.get("param")
         if name and name not in params:
             add("error", i, f"параметр «{name}» не описан")
-        if kind == "sleep" and step["args"].get("seconds", 0) > LONG_SLEEP:
-            add("warning", i, f"пауза {step['args']['seconds']:g} с — очень долго")
+        if kind == "sleep":
+            longest = max(step["args"].get("seconds", 0), step["args"].get("seconds_max") or 0)
+            if longest > LONG_SLEEP:
+                add("warning", i, f"пауза {longest:g} с — очень долго")
         if kind == "click" and step.get("crop") is not None and assets is not None \
                 and step["crop"] not in assets:
             add("error", i, f"кроп «{step['crop']}» не приложен — слой поиска "

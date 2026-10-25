@@ -18,6 +18,8 @@ PARAM_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 ARGS = {
     "click": ((), ()),
     "tap": (("x", "y"), ()),
+    # Двойной тап (лайк по двойному касанию): точка в долях экрана, как у tap.
+    "double_tap": (("x", "y"), ()),
     "long_tap": (("x", "y"), ("duration",)),
     "swipe": (("x1", "y1", "x2", "y2"), ("duration",)),
     "type": (("value",), ("clear", "account", "field")),
@@ -27,7 +29,17 @@ ARGS = {
     "open_url": (("url",), ()),
     "stop_app": (("package",), ()),
     "shell": (("cmd",), ()),
-    "sleep": (("seconds",), ()),
+    # seconds_max: пауза случайная от seconds до seconds_max — ровная пауза
+    # на сорока телефонах одинаковая до сотой секунды, это «ботовой» почерк.
+    "sleep": (("seconds",), ("seconds_max",)),
+    # «Ждать, пока появится / исчезнет цель» (any — признаки, «любой из»), без
+    # нажатия. on_fail — что делать по истечении timeout: fail (упасть с
+    # причиной), skip (идти дальше), ask (спросить человека).
+    "wait": ((), ("timeout", "on_fail")),
+    "wait_gone": ((), ("timeout", "on_fail")),
+    # «Прокси аккаунта»: прописать системный прокси телефона из аккаунта
+    # платформы account — или снять его (off).
+    "proxy": ((), ("account", "off")),
     "screenshot": ((), ("name",)),
     "expect": (("name",), ()),
     "branch": (("name",), ("timeout",)),
@@ -75,6 +87,9 @@ IF_SEEN_TIMEOUT_MAX = 60
 BLOCK_DEPTH_MAX = 3
 UNTIL_TRIES_MAX = 200
 UNTIL_ON_FAIL = ("skip", "fail", "ask")
+WAIT_ON_FAIL = ("fail", "skip", "ask")
+WAIT_TIMEOUT_DEFAULT = 20
+WAIT_TIMEOUT_MAX = 300
 
 # Проверки блока «Если на телефоне» и поля, которые каждой нужны.
 PHONE_CHECKS = {
@@ -96,10 +111,10 @@ VERSION_RE = re.compile(r"^\d+(\.\d+){0,4}\Z")
 BUDGET_NAME_MAX = 32
 BUDGET_LIMIT_MAX = 10000
 
-NUMERIC = {"x", "y", "x1", "y1", "x2", "y2", "duration", "seconds", "timeout",
+NUMERIC = {"x", "y", "x1", "y1", "x2", "y2", "duration", "seconds", "seconds_max", "timeout",
            "span", "times", "minutes", "pause_min", "pause_max", "percent", "tries", "gb",
            "limit"}
-BOOLEAN = {"clear", "watch", "negate", "install"}
+BOOLEAN = {"clear", "watch", "negate", "install", "off"}
 
 # Потолки повтора: сутки и десять тысяч кругов — дальше это уже не сценарий,
 # а забытый на ночь цикл, который держит телефон.
@@ -115,12 +130,14 @@ PARAMETRIZABLE = {"type", "launch_app", "open_url", "stop_app", "shell", "sleep"
 
 # Шаги, которым допустимы «пропустить при неудаче» и «повторить». Проверки
 # экрана (expect/branch) и sleep сюда не входят: у них своя логика ожидания.
-FLEXIBLE = {"click", "tap", "long_tap", "swipe", "type", "key", "launch_app",
+FLEXIBLE = {"click", "tap", "double_tap", "long_tap", "swipe", "type", "key", "launch_app",
             "open_url", "stop_app", "shell", "screenshot", "unlock", "ensure_app"}
 RETRIES_MAX = 5
 
 _LABELS = {
-    "click": "Нажать", "tap": "Нажать в точку", "long_tap": "Долгое нажатие",
+    "click": "Нажать", "tap": "Нажать в точку", "double_tap": "Двойной тап",
+    "wait": "Ждать, пока появится", "wait_gone": "Ждать, пока исчезнет",
+    "proxy": "Прокси аккаунта", "long_tap": "Долгое нажатие",
     "swipe": "Свайп", "type": "Ввод текста", "key": "Клавиша",
     "unlock": "Разблокировать", "launch_app": "Запуск приложения",
     "stop_app": "Остановка приложения", "open_url": "Открыть ссылку",
@@ -151,6 +168,16 @@ def label_of(step: dict) -> str:
             вариантов = phrases.count(tail)
             if вариантов > 1:
                 tail = f"один из {вариантов} вариантов"
+    elif kind == "sleep" and args.get("seconds_max") is not None:
+        tail = f'{_minutes_text(args.get("seconds"))}–{_minutes_text(args["seconds_max"])} с'
+    elif kind in ("wait", "wait_gone"):
+        m = re.search(r'="([^"]{1,40})"', ((step.get("any") or [""])[0]))
+        tail = m.group(1) if m else ""
+    elif kind == "proxy":
+        if args.get("off"):
+            base, tail = "Снять прокси", ""
+        else:
+            tail = args.get("account", "")
     elif kind == "budget":
         tail = f'{args.get("name", "")} — не больше {args.get("limit", "")} за сутки'
     elif kind == "key":
@@ -321,9 +348,12 @@ def _anchor(kind: str, raw):
             raise StepError("«пока не найдёшь»: укажите, что искать на экране")
         if kind == "if_seen":
             raise StepError("«если на экране»: укажите, что искать")
+        if kind in ("wait", "wait_gone"):
+            raise StepError("«ждать»: укажите, чего ждать на экране")
         return None
-    if kind not in ("expect", "until", "if_seen"):
-        raise StepError(f"поле any допустимо только у expect, until и if_seen, не у {kind}")
+    if kind not in ("expect", "until", "if_seen", "wait", "wait_gone"):
+        raise StepError(f"поле any допустимо только у expect, until, if_seen, wait и "
+                        f"wait_gone, не у {kind}")
     return _features(raw, "any")
 
 
@@ -568,6 +598,8 @@ ACCOUNT_FIELDS = {"login": "логин", "password": "пароль", "phone": "�
 
 
 def _check_account(kind: str, args: dict) -> None:
+    if kind == "proxy":
+        return   # у прокси account — платформа, проверяет _check_proxy
     if kind != "type" or not (args.get("account") or args.get("field")):
         args.pop("account", None)
         args.pop("field", None)
@@ -640,6 +672,12 @@ def normalize_step(raw) -> dict:
         _check_if_seen(step["args"])
     elif kind == "if_phone":
         _check_if_phone(step["args"])
+    elif kind in ("wait", "wait_gone"):
+        _check_wait(step["args"])
+    elif kind == "sleep":
+        _check_sleep(step["args"], step["param"])
+    elif kind == "proxy":
+        _check_proxy(step["args"])
     elif kind == "ensure_app":
         _check_ensure_app(step["args"])
     elif kind == "budget":
@@ -726,6 +764,46 @@ def _check_if_seen(args: dict) -> None:
         raise StepError(f"«если на экране»: ждать от 0 до {IF_SEEN_TIMEOUT_MAX} с")
     args["timeout"] = timeout
     args["negate"] = bool(args.get("negate"))
+
+
+def _check_wait(args: dict) -> None:
+    timeout = args.get("timeout", WAIT_TIMEOUT_DEFAULT)
+    if not 1 <= timeout <= WAIT_TIMEOUT_MAX:
+        raise StepError(f"«ждать»: от 1 до {WAIT_TIMEOUT_MAX} секунд")
+    args["timeout"] = timeout
+    on_fail = args.get("on_fail") or "fail"
+    if on_fail not in WAIT_ON_FAIL:
+        raise StepError("«ждать»: если не дождались — fail, skip или ask")
+    args["on_fail"] = on_fail
+
+
+def _check_sleep(args: dict, param) -> None:
+    """Случайная пауза: «до» не меньше «от». Вместе с параметром нельзя: что
+    придёт в параметре, отсюда не видно, и «до» могло бы оказаться меньше."""
+    if args["seconds"] < 0:
+        raise StepError("пауза не может быть отрицательной")
+    top = args.get("seconds_max")
+    if top is None:
+        return
+    if param:
+        raise StepError("случайная пауза «от–до» нельзя вынести в параметр")
+    if top < args["seconds"]:
+        raise StepError("случайная пауза: «до» не может быть меньше «от»")
+
+
+def _check_proxy(args: dict) -> None:
+    """Прокси аккаунта: либо платформа, либо «снять» — ровно одно из двух."""
+    account = (args.pop("account", "") or "").strip()
+    off = bool(args.pop("off", False))
+    if off == bool(account):
+        raise StepError("«прокси»: укажите либо аккаунт соцсети, либо «снять прокси»")
+    if off:
+        args["off"] = True
+        return
+    from ..accounts import PLATFORMS
+    if account not in PLATFORMS:
+        raise StepError(f"«прокси»: платформа одна из {', '.join(PLATFORMS)}")
+    args["account"] = account
 
 
 def _check_if_phone(args: dict) -> None:
@@ -915,6 +993,7 @@ def schema() -> dict:
                          "about": "не видно на экране — листать в эту сторону и искать "
                                   "снова, не больше max раз; без поля не листает"},
         "until_on_fail": list(UNTIL_ON_FAIL),
+        "wait_on_fail": list(WAIT_ON_FAIL),
         "finish_results": list(FINISH_RESULTS),
         "phone_checks": {k: list(v) for k, v in PHONE_CHECKS.items()},
         "limits": {
@@ -923,5 +1002,6 @@ def schema() -> dict:
             "loop_pause": LOOP_PAUSE_MAX, "fallbacks": MAX_FALLBACKS,
             "features": ANY_MAX, "arms": ARMS_MAX, "retries": RETRIES_MAX,
             "texts": TEXTS_MAX, "if_seen_timeout": IF_SEEN_TIMEOUT_MAX,
+            "wait_timeout": WAIT_TIMEOUT_MAX,
         },
     }

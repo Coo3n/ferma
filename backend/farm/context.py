@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from . import (accounts, adb, apklib, budget as budget_store, config, control,
-               deviations as dv, guards, obstacle, phrases, resolve)
+               deviations as dv, guards, netproxy, obstacle, phrases, resolve)
 from .adb import AdbError
 from .control import facts as phone_facts
 from .devices import pool as u2pool
@@ -402,6 +402,16 @@ class DeviceContext:
                 self.check_cancel()
                 time.sleep(min(0.2, end - time.time()))
 
+    def sleep_between(self, lo: float, hi: float) -> None:
+        """Случайная пауза от lo до hi секунд (равномерно). Ровная пауза на
+        сорока телефонах — «ботовой» почерк; отмена и speed — как у sleep."""
+        lo, hi = float(lo), float(hi)
+        if hi < lo:
+            lo, hi = hi, lo
+        seconds = random.uniform(lo, hi)
+        self.log(f"пауза {seconds:.1f} с (от {lo:g} до {hi:g})")
+        self.sleep(seconds)
+
     @contextlib.contextmanager
     def spend(self, reason: str):
         """Записать время блока на причину. Вложенное время вычитается из
@@ -585,6 +595,19 @@ class DeviceContext:
             control.humanize.tap(self.serial, x, y)
         else:
             control.tap(self.serial, x, y)
+
+    def double_tap(self, x: float, y: float) -> None:
+        """Двойной тап (лайк по двойному касанию). В человечном режиме точка
+        слегка разбросана: два касания в один и тот же пиксель — машинный
+        почерк."""
+        self.check_cancel()
+        self._pre_action()
+        self.recent_scroll = False
+        if self.human:
+            x = min(1.0, max(0.0, x + random.uniform(-0.008, 0.008)))
+            y = min(1.0, max(0.0, y + random.uniform(-0.008, 0.008)))
+        self.last_tap = (x, y)
+        control.double_tap(self.serial, x, y)
 
     def long_tap(self, x: float, y: float, duration: float = 0.8) -> None:
         self.check_cancel()
@@ -1823,6 +1846,63 @@ class DeviceContext:
     def finish(self, reason: str = "") -> None:
         """Закончить сценарий успехом раньше конца (шаг «закончить сценарий»)."""
         raise Finished(reason or "закончено шагом сценария")
+
+    def _wait_target(self, features: list, timeout: float, on_fail: str, gone: bool) -> None:
+        """Общее для «ждать, пока появится / исчезнет»: без нажатия."""
+        features = list(features or [])
+        if not features:
+            raise ValueError("ctx.wait_for: не задано, чего ждать")
+        что = ", ".join(str(next(iter(f.values()), "?")) for f in features)
+        глагол = "исчезнет" if gone else "появится"
+        end = time.time() + float(timeout)
+        while True:
+            self.log(f"жду, пока {глагол} «{что}»: до {timeout:g} с")
+            while True:
+                self.check_cancel()
+                есть = self._wait_features(features, 0.5)
+                if есть != gone:
+                    return
+                if time.time() >= end:
+                    break
+            беда = f"не дождался: «{что}» не {глагол} за {timeout:g} с"
+            if on_fail == "skip":
+                self.log(f"{беда} — иду дальше")
+                return
+            if on_fail == "ask":
+                решение = self._stuck(беда)
+                if решение == HOLD_RETRY:
+                    end = time.time() + float(timeout)
+                    continue
+                if решение in (HOLD_SKIP, HOLD_GO):
+                    return
+            self.fail(беда)
+
+    def wait_for(self, features: list, timeout: float = 20, on_fail: str = "fail") -> None:
+        """«Ждать, пока появится»: `ctx.wait_for([dict(text="Лента")], timeout=20)`."""
+        self._wait_target(features, timeout, on_fail, gone=False)
+
+    def wait_for_gone(self, features: list, timeout: float = 20, on_fail: str = "fail") -> None:
+        """«Ждать, пока исчезнет» — все признаки пропали с экрана."""
+        self._wait_target(features, timeout, on_fail, gone=True)
+
+    def use_proxy(self, platform: str) -> None:
+        """Системный прокси телефона из аккаунта платформы (`host:port`).
+
+        Прокси с логином системный прокси Android не умеет — падаем с
+        понятной причиной. Исходную строку не логируем: в ней пароль.
+        """
+        acc = self.account(platform)
+        try:
+            hp = netproxy.system_proxy(acc.get("proxy"))
+        except netproxy.ProxyError as e:
+            raise StepFailed(f"аккаунт {platform}: {e}") from None
+        self.shell(f"settings put global http_proxy {hp}")
+        self.log(f"прокси аккаунта {platform}: {hp}")
+
+    def proxy_off(self) -> None:
+        """Снять системный прокси телефона."""
+        self.shell("settings put global http_proxy :0")
+        self.log("системный прокси снят")
 
     def until_found(self, features: list, tries: int = 20, on_fail: str = "skip"):
         """«Пока не найдёшь»: `for _ in ctx.until_found([dict(text="Подписаться")]):`.

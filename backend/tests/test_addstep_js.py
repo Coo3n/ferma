@@ -10,7 +10,7 @@ SCRIPT = r"""
 const fs = require('fs'), vm = require('vm'), assert = require('assert');
 const ctx = {};
 vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(process.argv[1], 'utf8') + ';this.plan=addStepPlan', ctx);
+vm.runInContext(fs.readFileSync(process.argv[1], 'utf8') + ';this.plan=addStepPlan;this.search=addStepSearch', ctx);
 const plan = c => JSON.parse(JSON.stringify(ctx.plan(Object.assign({depthMax: 3}, c))));
 const keys = p => p.groups.map(g => g.key);
 const items = (p, g) => p.groups.find(x => x.key === g).items;
@@ -26,6 +26,7 @@ assert.deepStrictEqual(items(p, 'repeat').map(i => i.key), ['loop', 'until']);
 assert.deepStrictEqual(items(p, 'seen').map(i => i.key), ['if_seen', 'if_not', 'anchor']);
 assert.deepStrictEqual(items(p, 'other').map(i => i.key), ['budget', 'finish']);
 assert.deepStrictEqual(items(p, 'mine').map(i => i.key), ['mine']);
+assert.deepStrictEqual(items(p, 'action').map(i => i.key), ['presets', 'wait', 'wait_gone']);
 assert.ok(p.groups.flatMap(g => g.items).every(i => i.off === null));
 
 // Внутри повтора — появляется «выйти из повтора».
@@ -51,6 +52,42 @@ assert.deepStrictEqual(p.groups.flatMap(g => g.items).map(i => i.key),
     ['loop', 'until', 'if_seen', 'if_not', 'phone_app', 'phone_no_app', 'phone_older', 'phone_battery',
      'phone_offline', 'phone_space', 'phone_account', 'chance']);
 assert.ok(p.groups.flatMap(g => g.items).every(i => i.off === null));
+
+// Поиск: все слова (AND), подстрока, регистр и ё/е не важны, порядок исходный.
+const cards = [
+    {key: 'a', title: 'Двойной тап', desc: 'два быстрых нажатия', words: 'дабл'},
+    {key: 'b', title: 'Пауза', desc: 'подождать', words: 'случайная пауза ёлка'},
+    {key: 'c', title: 'Включить прокси', desc: 'для аккаунта', words: ''},
+    {key: 'd', title: 'Пауза перед прокси', desc: '', words: ''},
+];
+const find2 = () => JSON.parse(JSON.stringify(ctx.search('x', null)));
+const find = q => JSON.parse(JSON.stringify(ctx.search(q, cards).map(c => c.key)));
+assert.deepStrictEqual(find('пауза'), ['b', 'd']);
+assert.deepStrictEqual(find('ПАУЗ'), ['b', 'd']);
+assert.deepStrictEqual(find('пауза прокси'), ['d']);
+assert.deepStrictEqual(find('  прокси   пауза '), ['d']);
+assert.deepStrictEqual(find('елка'), ['b']);
+assert.deepStrictEqual(find('ЁЛКА'), ['b']);
+assert.deepStrictEqual(find('дабл'), ['a']);
+assert.deepStrictEqual(find('аккаунт'), ['c']);
+assert.deepStrictEqual(find(''), []);
+assert.deepStrictEqual(find('   '), []);
+assert.deepStrictEqual(find('зебра'), []);
+assert.deepStrictEqual(find('пауза зебра'), []);
+assert.deepStrictEqual(find2(), []);
+
+// Короткое слово — по началу слова: «ip» не должно находить «swipe».
+const net = [
+    {key: 's', title: 'Свайп вверх', desc: '', words: 'swipe свайп'},
+    {key: 'n', title: 'Сменить IP', desc: '', words: 'ip айпи'},
+    {key: 'c', title: 'Скрыть клавиатуру', desc: '', words: 'clip'},
+];
+const findNet = q => JSON.parse(JSON.stringify(ctx.search(q, net).map(c => c.key)));
+assert.deepStrictEqual(findNet('ip'), ['n']);
+assert.deepStrictEqual(findNet('swi'), ['s']);
+assert.deepStrictEqual(findNet('свайп'), ['s']);
+// От четырёх букв — подстрока: ловит формы слова.
+assert.deepStrictEqual(findNet('вайп'), ['s']);
 """
 
 
