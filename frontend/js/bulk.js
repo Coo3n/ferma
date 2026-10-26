@@ -425,7 +425,14 @@ function bulkContactsGenerate() {
         prefix, length: Number($('bulkCtLen').value), count: Number($('bulkCtCount').value)}}, 'Контакты');
 }
 
+/* Файл только читается и считается; добавление — по кнопке, чтобы случайно
+   выбранный файл не ушёл сразу на все телефоны. */
+let BULK_CT_ITEMS = [];
+
 async function bulkContactsFile(file) {
+    BULK_CT_ITEMS = [];
+    const btn = $('bulkCtAddBtn');
+    if (btn) btn.style.display = 'none';
     if (!file) return;
     const buf = await file.arrayBuffer();
     let text;
@@ -436,7 +443,15 @@ async function bulkContactsFile(file) {
     }
     const items = bulkContactsParse(text);
     $('bulkCtInfo').textContent = items.length ? `Из файла: ${items.length} контактов` : 'В файле нет номеров';
-    if (items.length) bulkAction({type: 'contacts_add', items}, 'Контакты');
+    if (items.length && btn) {
+        BULK_CT_ITEMS = items;
+        btn.textContent = `Добавить ${items.length} ${declOfNum(items.length, ['контакт', 'контакта', 'контактов'])}`;
+        btn.style.display = '';
+    }
+}
+
+function bulkContactsAddFromFile() {
+    if (BULK_CT_ITEMS.length) bulkAction({type: 'contacts_add', items: BULK_CT_ITEMS}, 'Контакты');
 }
 
 function bulkContactsParse(text) {
@@ -600,6 +615,7 @@ function bulkPanel(kind) {
             <button class="sm primary" onclick="bulkContactsGenerate()">Случайные, у каждого свои</button></div>
           <div class="bp-row">
             <input type="file" accept=".txt,.csv" aria-label="Файл" onchange="bulkContactsFile(this.files[0])">
+            <button class="sm primary" id="bulkCtAddBtn" style="display:none" onclick="bulkContactsAddFromFile()"></button>
             <button class="sm danger" onclick="bulkContactsClear(event)"><span>Очистить все контакты</span></button></div>
           <small class="dim" id="bulkCtInfo">Файл: «номер» или «имя;номер» по строке. Проверьте на одном телефоне: не все прошивки дают писать контакты.</small>`,
     }[kind];
@@ -789,6 +805,7 @@ function phraseForHotkey(ev, list) {
 
 document.addEventListener('keydown', ev => {
     const box = document.getElementById('bulkPhrases');
+    if (ev.repeat) return;                                         // зажатая клавиша не шлёт фразу снова и снова
     if (!box || box.offsetParent === null) return;                 // панели с фразами не видно
     if (ev.target.closest && ev.target.closest('input, textarea, select, [contenteditable]')) return;
     const text = phraseForHotkey(ev, phrases());

@@ -25,7 +25,7 @@ function healthOpen() {
         `<td${row.bad.includes(key) ? ' class="bad"' : ''}>${value == null ? '—' : esc(value) + suffix}</td>`;
     $('mTitle').textContent = 'Здоровье телефонов';
     $('mBody').innerHTML = rows.length ? `
-      <p class="tool-note">Красным — то, что пора починить: заряд, перегрев, мало места или памяти. Обновляется само.</p>
+      <p class="tool-note">Красным — то, что пора починить: заряд, перегрев, мало места или памяти.</p>
       <table class="tool-table">
         <thead><tr><th>Телефон</th><th>Заряд</th><th>Температура</th><th>Место занято</th><th>ОЗУ свободно</th><th>Процессор</th></tr></thead>
         <tbody>${rows.map(r => `<tr><td>${esc(r.name)}</td>
