@@ -80,9 +80,13 @@ def ready(monkeypatch):
     monkeypatch.setattr(plan.control, "screenshot", lambda serial, quality=85: b"img")
     monkeypatch.setattr(plan.loc, "screen_gate", lambda c, image: False)
     monkeypatch.setattr(plan.loc.safety, "secret_goal", lambda text: False)
+    monkeypatch.setattr(plan.control, "size", lambda serial: (1080, 2400))
+    monkeypatch.setattr(plan.control, "dump_hierarchy", lambda serial: "<hierarchy/>")
+    monkeypatch.setattr(plan.tree, "parse", lambda xml, w, h: [])
+    monkeypatch.setattr(plan.loc.safety, "secret_screen", lambda nodes: False)
     monkeypatch.setattr(plan.usage, "reserve", lambda job, a, b: (True, ""))
     monkeypatch.setattr(plan.usage, "refund", lambda job: None)
-    monkeypatch.setattr(plan.client, "ask", lambda image, prompt, cfg=None: GOOD)
+    monkeypatch.setattr(plan.client, "ask", lambda image, prompt, cfg=None, max_tokens=300: GOOD)
     return cfg
 
 
@@ -117,7 +121,7 @@ def test_plan_refunds_quota_when_model_fails(ready, monkeypatch):
     refunded = []
     monkeypatch.setattr(plan.usage, "refund", lambda job: refunded.append(job))
 
-    def boom(image, prompt, cfg=None):
+    def boom(image, prompt, cfg=None, max_tokens=300):
         raise RuntimeError("нет связи")
     monkeypatch.setattr(plan.client, "ask", boom)
     with pytest.raises(plan.PlanError):
@@ -128,3 +132,91 @@ def test_plan_refunds_quota_when_model_fails(ready, monkeypatch):
 def test_plan_rejects_empty_task(ready):
     with pytest.raises(plan.PlanError):
         plan.plan("S1", "   ")
+
+
+def test_five_plans_pass_quota_with_real_usage(ready, monkeypatch, tmp_path):
+    from farm import config
+    from farm.vlm import usage
+    monkeypatch.setattr(plan.usage, "reserve", usage.reserve)       # настоящий reserve
+    monkeypatch.setattr(plan.usage, "refund", usage.refund)
+    monkeypatch.setattr(config, "VLM_USAGE_FILE", tmp_path / "vlm_usage.json")
+    usage.reset_jobs()
+    ready.max_per_job = 3
+    ready.max_per_day = 200
+    for _ in range(5):
+        assert plan.plan("S1", "открой Telegram")
+    usage.reset_jobs()
+
+
+def test_plan_asks_with_big_token_budget(ready, monkeypatch):
+    seen = {}
+
+    def ask(image, prompt, cfg=None, max_tokens=300):
+        seen["t"] = max_tokens
+        return GOOD
+    monkeypatch.setattr(plan.client, "ask", ask)
+    plan.plan("S1", "x")
+    assert seen["t"] == 1800
+
+
+def test_client_ask_sends_max_tokens(monkeypatch):
+    import json as _json
+    from types import SimpleNamespace as NS
+    from farm.vlm import client
+    sent = {}
+
+    class Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return b'{"choices":[{"message":{"content":"ok"}}]}'
+
+    def fake_open(req, timeout=None):
+        sent["body"] = _json.loads(req.data)
+        return Resp()
+    monkeypatch.setattr(client.urllib.request, "urlopen", fake_open)
+    monkeypatch.setattr(client, "shrink", lambda b, w: b)
+    cfg = NS(url="http://x/v1", model="m", key="", max_width=100, timeout=5)
+    client.ask(b"i", "p", cfg)
+    assert sent["body"]["max_tokens"] == 300
+    client.ask(b"i", "p", cfg, max_tokens=1800)
+    assert sent["body"]["max_tokens"] == 1800
+
+
+def test_plan_refunds_when_reply_truncated(ready, monkeypatch):
+    refunded = []
+    monkeypatch.setattr(plan.usage, "refund", lambda job: refunded.append(job))
+    monkeypatch.setattr(plan.client, "ask", lambda *a, **k: '[{"kind": "sleep", "args": {"sec')
+    with pytest.raises(plan.PlanError):
+        plan.plan("S1", "x")
+    assert refunded
+
+
+def test_plan_no_refund_when_reply_readable_but_empty(ready, monkeypatch):
+    refunded = []
+    monkeypatch.setattr(plan.usage, "refund", lambda job: refunded.append(job))
+    monkeypatch.setattr(plan.client, "ask", lambda *a, **k: '[{"kind": "shell", "args": {}}]')
+    with pytest.raises(plan.PlanError):
+        plan.plan("S1", "x")
+    assert not refunded
+
+
+def test_plan_refuses_secret_screen(ready, monkeypatch):
+    monkeypatch.setattr(plan.tree, "parse", lambda xml, w, h: ["node"])
+    monkeypatch.setattr(plan.loc.safety, "secret_screen", lambda nodes: True)
+    asked = []
+    monkeypatch.setattr(plan.client, "ask", lambda *a, **k: asked.append(1) or GOOD)
+    with pytest.raises(plan.PlanError) as e:
+        plan.plan("S1", "x")
+    assert "пароля" in str(e.value) and not asked
+
+
+def test_plan_wraps_screenshot_and_dump_failures(ready, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("device offline")
+    monkeypatch.setattr(plan.control, "screenshot", boom)
+    with pytest.raises(plan.PlanError):
+        plan.plan("S1", "x")
+    monkeypatch.setattr(plan.control, "screenshot", lambda serial, quality=85: b"img")
+    monkeypatch.setattr(plan.control, "dump_hierarchy", boom)
+    with pytest.raises(plan.PlanError):
+        plan.plan("S1", "x")

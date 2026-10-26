@@ -69,14 +69,15 @@ def _text_of(reply: dict) -> str:
     return str(content or "")
 
 
-def ask(image_bytes: bytes, prompt: str, cfg: "settings.Settings | None" = None) -> str:
+def ask(image_bytes: bytes, prompt: str, cfg: "settings.Settings | None" = None,
+        max_tokens: int = 300) -> str:
     cfg = cfg or settings.get()
     url = endpoint(cfg.url)
     jpeg = shrink(image_bytes, cfg.max_width)
     body = {
         "model": cfg.model,
         "temperature": 0,
-        "max_tokens": 300,
+        "max_tokens": int(max_tokens),
         "messages": [{"role": "user", "content": [
             {"type": "image_url", "image_url": {
                 "url": "data:image/jpeg;base64," + base64.b64encode(jpeg).decode("ascii")}},

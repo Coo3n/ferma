@@ -18,11 +18,13 @@ import time
 
 from .. import control
 from ..recorder import steps as schema
+from ..ui import tree
 from . import client, locate as loc, settings, usage
 
 MAX_STEPS = 30
 MAX_SLEEP = 60
-JOB_KEY = "plan"
+# Черновик на 30 шагов не помещается в 300 токенов обычной подсказки.
+PLAN_MAX_TOKENS = 1800
 # Вид шага → обязательные поля. Числа 0..1 для координат; ограничения ниже.
 ALLOWED = {
     "launch_app": ("package",),
@@ -47,6 +49,10 @@ PROMPT = (
 
 class PlanError(Exception):
     """Понятная причина, по которой черновика нет."""
+
+
+class UnreadableReply(PlanError):
+    """Ответ модели обрезан или не JSON: запрос зря, квоту возвращаем."""
 
 
 def build_prompt(task: str) -> str:
@@ -94,11 +100,11 @@ def parse_steps(text: str) -> list:
     body = fenced.group(1) if fenced else raw
     start, end = body.find("["), body.rfind("]")
     if start < 0 or end <= start:
-        raise PlanError("модель не вернула список шагов")
+        raise UnreadableReply("модель не вернула список шагов (ответ мог оборваться)")
     try:
         items = json.loads(body[start:end + 1])
     except ValueError:
-        raise PlanError("ответ модели не удалось прочитать")
+        raise UnreadableReply("ответ модели не удалось прочитать")
     steps = [s for s in (_clean(i) for i in items) if s][:MAX_STEPS]
     if not steps:
         raise PlanError("в ответе модели нет подходящих шагов")
@@ -114,7 +120,18 @@ def plan(serial: str, task: str) -> list:
         raise PlanError("нейросеть-помощник выключен — включите его в настройках (значок в шапке)")
     if loc.safety.secret_goal(task):
         raise PlanError("в описании пароль или платёжные данные — такое нейросети не отправляем")
-    image = control.screenshot(serial, quality=85)
+    try:
+        image = control.screenshot(serial, quality=85)
+    except Exception as e:  # noqa: BLE001 — офлайн или неизвестный телефон
+        raise PlanError(f"не удалось снять экран телефона: {e}")
+    # Как в locate: на экране с полем пароля или кода кадр наружу не уходит.
+    try:
+        w, h = control.size(serial)
+        nodes = tree.parse(control.dump_hierarchy(serial), w, h)
+    except Exception as e:  # noqa: BLE001
+        raise PlanError(f"не удалось прочитать экран телефона: {e}")
+    if nodes and loc.safety.secret_screen(nodes):
+        raise PlanError("на экране поле пароля или кода — такой кадр нейросети не отправляем")
 
     class _C:       # screen_gate смотрит только на serial
         pass
@@ -122,15 +139,21 @@ def plan(serial: str, task: str) -> list:
     c.serial = serial
     if loc.screen_gate(c, image):
         raise PlanError("экран защищён от снимков — нейросети его не показываем")
-    ok, why = usage.reserve(JOB_KEY, cfg.max_per_job, cfg.max_per_day)
+    # Пустой ключ: потолок «на задачу» не применяется (каждый черновик — своя
+    # задача), действует только суточный лимит.
+    ok, why = usage.reserve("", cfg.max_per_job, cfg.max_per_day)
     if not ok:
         raise PlanError(why or "лимит запросов к нейросети на сегодня исчерпан")
     try:
-        reply = client.ask(image, build_prompt(task))
+        reply = client.ask(image, build_prompt(task), max_tokens=PLAN_MAX_TOKENS)
     except Exception as e:  # noqa: BLE001
-        usage.refund(JOB_KEY)           # ответа не было — квоту не тратим
+        usage.refund("")                # ответа не было — квоту не тратим
         raise PlanError(f"нейросеть не ответила: {e}")
-    return parse_steps(reply)
+    try:
+        return parse_steps(reply)
+    except UnreadableReply:
+        usage.refund("")                # обрыв или мусор вместо JSON — тоже не в счёт
+        raise
 
 
 def recipe_for(task: str, steps: list) -> dict:
