@@ -13,7 +13,7 @@ PACKAGE = "com.google.android.youtube"
 GALLERY = {"platform": "YouTube", "verified": False, "package": PACKAGE}
 ALLOWED = ("like",)
 PARAMS = {k: v for k, v in feed.feed_params(views=40).items()
-          if k in ("profile", "views", "dwell_lo", "dwell_hi", "like", "cap_like", "words")}
+          if k in ("profile", "views", "dwell_lo", "dwell_hi", "like", "cap_like")}
 LIKE_DESC = "(?i).*(like this video|нравится|лайк).*"
 
 

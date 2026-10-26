@@ -48,6 +48,13 @@ class TikTokUI(feed.FeedUI):
         self._scan()
         return len(self.column) >= 5
 
+    def can(self, action):
+        if action == "favorite":
+            return len(self.column) > 5
+        if action == "follow":
+            return structure.follow_plus(self.nodes, self.column) is not None
+        return True
+
     def perform(self, action, text=""):
         col = self.column
         if action == "like":

@@ -218,3 +218,50 @@ def test_swipe_up_uses_fractions_and_goes_up():
     assert 0.4 <= x1 <= 0.8 and 0.4 <= x2 <= 0.8
     assert 0.55 <= y1 <= 0.72 and 0.12 <= y2 <= 0.24 and y2 < y1
     assert 0.3 <= d <= 0.6
+
+
+def test_can_false_skips_action_before_budget():
+    ctx = FakeCtx()
+
+    class UI(FakeUI):
+        def can(self, action):
+            return action != "favorite"
+    ui = UI(ctx)
+    run(ctx, ui, fp(like=100, favorite=100, views=2))
+    assert "favorite" not in ui.performed and "like" in ui.performed
+    assert not any("избранное" in k for k in ctx.budgets)        # потолок не тратился
+    assert any(ctx.budgets.values())
+
+
+def test_default_can_is_true():
+    assert feed.FeedUI().can("like") is True
+
+
+def _tiktok_ui(column_len, plus):
+    import importlib
+    tt = importlib.import_module("scenarios.gallery.tiktok_feed")
+    ui = tt.TikTokUI(FakeCtx(), random.Random(1))
+    ui.column = list(range(column_len))
+    ui.nodes = []
+    return tt, ui
+
+
+def test_tiktok_can_favorite_needs_more_than_five(monkeypatch):
+    tt, ui = _tiktok_ui(5, None)
+    assert ui.can("favorite") is False and ui.can("like") is True
+    ui.column = list(range(6))
+    assert ui.can("favorite") is True
+
+
+def test_tiktok_can_follow_needs_clickable_plus(monkeypatch):
+    tt, ui = _tiktok_ui(6, None)
+    monkeypatch.setattr(tt.structure, "follow_plus", lambda nodes, col: None)
+    assert ui.can("follow") is False
+    monkeypatch.setattr(tt.structure, "follow_plus", lambda nodes, col: object())
+    assert ui.can("follow") is True
+
+
+def test_youtube_shorts_has_no_words_param():
+    import importlib
+    ys = importlib.import_module("scenarios.gallery.youtube_shorts")
+    assert "words" not in ys.PARAMS

@@ -101,6 +101,11 @@ class FeedUI:
         """На этом видео есть панель действий (не реклама, не подборка)."""
         return True
 
+    def can(self, action: str) -> bool:
+        """Действие возможно на этом видео (есть нужный значок). Проверяется ДО
+        списания суточного потолка: он тратится только на выполнимое."""
+        return True
+
     def perform(self, action: str, text: str = "") -> bool:
         """Сделать действие из story.ACTIONS; True — получилось."""
         raise NotImplementedError
@@ -152,6 +157,8 @@ def run_feed(ctx, ui: FeedUI, fp: FeedParams, rng=None, clock=time.monotonic) ->
             if action not in chosen or fp.caps[action] <= 0:
                 continue
             if action == "comment" and not fp.comments:
+                continue
+            if not ui.can(action):
                 continue
             # Потолок берём ДО действия: исчерпан — сюжет заканчивается успехом
             # (BudgetReached), а пятьдесят первая подписка не случается.
