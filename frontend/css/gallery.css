@@ -1,53 +1,360 @@
-/* Галерея готовых сюжетов (gallery.js). */
+/* Галерея готовых сюжетов (gallery.js).
+   Шапка вне прокрутки: поиск и чипы всегда на виду. Только токены; тихие
+   заливки, один основной ярлык на карточку. */
+
+.gal-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s2) var(--s3);
+    padding: var(--s2) var(--s4);
+    background: var(--bg);
+    border-bottom: 1px solid var(--line-soft);
+    flex: 0 0 auto;
+}
+
+.gal-find {
+    flex: 0 1 280px;
+    min-width: 200px;
+}
+
+.gal-find input {
+    flex: 1;
+    min-width: 0;
+}
+
+.gal-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s1);
+    min-width: 0;
+}
+
+.gal-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s2);
+    padding: 4px var(--s3);
+    border: 0;
+    border-radius: var(--pill);
+    background: transparent;
+    color: var(--text2);
+    font-size: var(--fs-2);
+    white-space: nowrap;
+    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.gal-pill b {
+    min-width: 1.4em;
+    font-weight: 500;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+}
+
+.gal-pill:hover {
+    background: var(--panel2);
+}
+
+.gal-pill.on {
+    background: var(--panel3);
+    color: var(--text);
+}
+
+.gal-pill.on b {
+    color: var(--text2);
+}
+
+/* Платформа без совпадений по поиску: остаётся на месте (чипы не прыгают),
+   но тише. */
+.gal-pill[data-n="0"]:not(.on) {
+    opacity: .5;
+}
+
+.gal-bar .sect-n {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Подсказка клавиш — отдельной строкой на всю ширину: на 1280 в одну линию с
+   поиском и чипами не помещается. */
+.gal-hint {
+    flex: 1 0 100%;
+    font-size: var(--fs-1);
+    color: var(--dim);
+}
+
+/* ------------------------------------------------------------------- сетка */
+
 .gal-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: var(--s3);
-    padding: var(--s3) var(--s4);
+    align-items: start;
+    padding: var(--s4);
 }
 
 .gal-card {
     display: flex;
     flex-direction: column;
     gap: var(--s2);
-    padding: var(--s3);
+    min-width: 0;
+    padding: var(--s3) var(--s4);
     border: 1px solid var(--line-soft);
-    border-radius: var(--r2);
+    border-radius: var(--r3);
     background: var(--panel);
+    transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+
+.gal-card:hover {
+    border-color: var(--line-hover);
+}
+
+.gal-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
 .gal-card header {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--s2);
+    align-items: center;
+    gap: var(--s3);
+    min-width: 0;
+}
+
+.gal-tile {
+    --tone: var(--accent);
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--r2);
+    background: color-mix(in srgb, var(--tone) 16%, transparent);
+    color: var(--tone);
+    font-size: var(--fs-4);
+    font-weight: 650;
+}
+
+.gal-tile[data-tone="busy"] { --tone: var(--busy); }
+.gal-tile[data-tone="warn"] { --tone: var(--warn); }
+.gal-tile[data-tone="bad"] { --tone: var(--bad); }
+.gal-tile[data-tone="text2"] { --tone: var(--text2); }
+
+.gal-head {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.gal-head b {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-4);
+    font-weight: 600;
+}
+
+.gal-plat {
+    color: var(--dim);
+    font-size: var(--fs-2);
 }
 
 .gal-card p {
     margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text2);
+    font-size: var(--fs-3);
+}
+
+/* --------------------------------------------------------------- бейджи */
+
+.gal-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s1) var(--s2);
+}
+
+.gal-badge {
+    padding: 2px var(--s2);
+    border-radius: var(--pill);
+    background: var(--panel2);
+    color: var(--text2);
+    font-size: var(--fs-1);
+    white-space: nowrap;
+    cursor: help;
+}
+
+.gal-badge.ok {
+    background: var(--accent-dim);
+    color: var(--accent);
+}
+
+.gal-badge.warn {
+    background: var(--warn-dim);
+    color: var(--warn);
+}
+
+/* ---------------------------------------------------------- «Что делает» */
+
+.gal-what {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    width: 100%;
+    padding: var(--s1) 0;
+    border: 0;
+    background: transparent;
+    color: var(--text2);
+    font-size: var(--fs-2);
+    text-align: left;
+}
+
+.gal-what:hover {
+    color: var(--text);
+    background: transparent;
+}
+
+.gal-what b {
+    padding: 0 var(--s2);
+    border-radius: var(--pill);
+    background: var(--panel2);
     color: var(--dim);
+    font-size: var(--fs-1);
+    font-weight: 500;
+}
+
+.gal-what .chev {
+    width: var(--icon-sm);
+    height: var(--icon-sm);
+    transform: rotate(-90deg);
+    transition: transform var(--mid) var(--ease-out);
+}
+
+.gal-what[aria-expanded="true"] .chev {
+    transform: none;
+}
+
+/* Высота раскрывается через grid-template-rows 0fr → 1fr: без измерений в JS
+   и без «прыжка» на авто-высоту. Закрытый список скрыт и от Tab. */
+.gal-steps {
+    display: grid;
+    grid-template-rows: 0fr;
+    visibility: hidden;
+    transition: grid-template-rows var(--mid) var(--ease-out), visibility 0s var(--mid);
+}
+
+.gal-card[data-open="1"] .gal-steps {
+    grid-template-rows: 1fr;
+    visibility: visible;
+    transition: grid-template-rows var(--mid) var(--ease-out), visibility 0s;
+}
+
+.gal-steps > div {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.gal-steps ol {
+    list-style: none;
+    counter-reset: gal-step;
+    margin: 0;
+    padding: var(--s1) 0 var(--s2);
+    border-top: 1px solid var(--line-soft);
+}
+
+.gal-steps li {
+    counter-increment: gal-step;
+    display: flex;
+    gap: var(--s2);
+    padding: 3px 0 3px calc(var(--d, 0) * var(--s4));
+    color: var(--text2);
+    font-size: var(--fs-2);
+    line-height: var(--lh);
+}
+
+.gal-steps li::before {
+    content: counter(gal-step);
+    flex: none;
+    min-width: 1.8em;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.gal-steps li span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* ----------------------------------------------------- поля формы, подвал */
+
+.gal-params {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s1) var(--s2);
+}
+
+.gal-chip {
+    padding: 1px var(--s2);
+    border-radius: var(--r1);
+    background: var(--well);
+    color: var(--dim);
+    font-size: var(--fs-1);
 }
 
 .gal-card footer {
     display: flex;
     align-items: center;
     gap: var(--s2);
-    margin-top: auto;
+    margin-top: var(--s1);
 }
 
-.gal-plat {
-    color: var(--dim);
-    font-size: 0.85em;
+.gal-open {
+    color: var(--text2);
 }
 
-.gal-badge {
-    padding: 2px var(--s2);
+.gal-open .ic {
+    color: var(--accent);
+}
+
+/* ---------------------------------------------------------------- скелетон */
+
+.gal-skel {
+    min-height: 168px;
+    pointer-events: none;
+}
+
+.gal-skel-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+}
+
+.gal-skel-head .sk-line {
+    flex: 1;
+    max-width: var(--w, 100%);
+}
+
+.gal-skel-tile {
+    flex: none;
+    width: 40px;
+    height: 40px;
     border-radius: var(--r2);
-    background: var(--panel2);
-    color: var(--dim);
-    font-size: 0.85em;
 }
 
-.gal-done {
-    color: var(--dim);
+/* Скелетон показываем, только если ждать заметно: быстрый ответ не мигает. */
+.gal-grid[aria-busy="true"] {
+    animation: sk-late 0s 450ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gal-steps,
+    .gal-card[data-open="1"] .gal-steps,
+    .gal-what .chev,
+    .gal-card,
+    .gal-pill {
+        transition: none;
+    }
 }

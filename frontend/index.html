@@ -855,6 +855,18 @@
                         onclick="showView('gallery')"><span data-t="gallery.tab">Готовые</span></button>
             </div>
         </div>
+        <div class="gal-bar">
+            <div class="find gal-find">
+                <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
+                <input type="text" id="galSearch" placeholder="название, платформа, шаг"
+                       aria-label="Поиск по готовым сюжетам" oninput="gallerySearch(this.value)"
+                       data-t-placeholder="gallery.poisk_ph" data-t-aria-label="gallery.poisk_aria">
+            </div>
+            <div class="gal-chips" id="galChips" role="group" aria-label="Платформа" data-t-aria-label="gallery.platforma"></div>
+            <span class="sp"></span>
+            <span class="sect-n" id="galCount" aria-live="polite"></span>
+            <span class="gal-hint" data-t="gallery.klavishi">← ↑ ↓ → между карточками · Enter — что делает · A — добавить</span>
+        </div>
         <div class="scroll" id="galList"></div>
     </section>
 
