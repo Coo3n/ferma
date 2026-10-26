@@ -223,6 +223,8 @@ def test_secret_files_private_modes(farm):
 def test_extra_data_has_learned_and_watch(farm):
     (config.DATA_DIR / "vlm_learned.json").write_text("{}", "utf-8")
     (config.DATA_DIR / "notify_watch.json").write_text("{}", "utf-8")
+    (config.DATA_DIR / "phrases.json").write_text("{}", "utf-8")
     got = names(backup.build())
     assert "data/vlm_learned.json" in got and "data/notify_watch.json" in got
+    assert "data/phrases.json" in got
     assert "data/vlm.json" not in got

@@ -145,6 +145,7 @@ VLM_FILE = Path(os.getenv("FARM_VLM_FILE", DATA_DIR / "vlm.json"))
 VLM_USAGE_FILE = Path(os.getenv("FARM_VLM_USAGE_FILE", DATA_DIR / "vlm_usage.json"))
 VLM_LEARNED_FILE = Path(os.getenv("FARM_VLM_LEARNED_FILE", DATA_DIR / "vlm_learned.json"))
 NOTIFY_WATCH_FILE = Path(os.getenv("FARM_NOTIFY_WATCH_FILE", DATA_DIR / "notify_watch.json"))
+PHRASES_FILE = Path(os.getenv("FARM_PHRASES_FILE", DATA_DIR / "phrases.json"))
 
 # Тревоги
 TEMP_ALERT_C = float(os.getenv("FARM_TEMP_ALERT_C", "42"))

@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from . import backup, schedule
 from . import vlm as vlm_api
 from . import (accounts, apks, budget, bulk, detours, deviations, devices, files, gallery, jobs, network, recorder,
-               notifications, scenarios, screen, system)
+               notifications, phrases, scenarios, screen, system)
 
 router = APIRouter()
 router.include_router(system.router)
@@ -29,5 +29,6 @@ router.include_router(schedule.router)
 router.include_router(gallery.router)
 router.include_router(backup.router)
 router.include_router(notifications.router)
+router.include_router(phrases.router)
 
 __all__ = ["router"]

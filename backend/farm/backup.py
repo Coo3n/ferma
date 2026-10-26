@@ -24,7 +24,7 @@ from . import config
 
 ADB_DIR = Path.home() / ".android"
 ADB_KEYS = ("adbkey", "adbkey.pub")
-EXTRA_DATA = ("apks.json", "budget.json", "vlm_learned.json", "notify_watch.json")
+EXTRA_DATA = ("apks.json", "budget.json", "vlm_learned.json", "notify_watch.json", "phrases.json")
 MAX_TOTAL = 64 * 1024 * 1024
 MAX_FILES = 2000
 _PY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\-]*\.py$")
