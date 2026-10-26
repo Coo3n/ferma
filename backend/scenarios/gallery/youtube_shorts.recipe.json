@@ -1,0 +1,88 @@
+{
+ "gallery": {
+  "platform": "YouTube",
+  "verified": false,
+  "package": "com.google.android.youtube"
+ },
+ "key": "youtube_shorts",
+ "meta": {
+  "name": "YouTube Shorts: просмотр с лайками",
+  "description": "Открывает Shorts, смотрит ролики с паузой и ставит лайки по шансу.",
+  "watch_popups": true,
+  "human": true
+ },
+ "params": {},
+ "steps": [
+  {
+   "kind": "launch_app",
+   "args": {
+    "package": "com.google.android.youtube"
+   }
+  },
+  {
+   "kind": "click",
+   "selector": {
+    "call": "click",
+    "args": "descriptionMatches=\"(?i)shorts\"",
+    "fallbacks": []
+   },
+   "optional": true,
+   "note": "Открыть вкладку Shorts"
+  },
+  {
+   "kind": "loop",
+   "args": {
+    "span": 5,
+    "times": 40,
+    "pause_min": 1,
+    "pause_max": 3
+   }
+  },
+  {
+   "kind": "swipe",
+   "args": {
+    "x1": 0.5,
+    "y1": 0.8,
+    "x2": 0.5,
+    "y2": 0.3,
+    "duration": 0.25
+   },
+   "note": "Следующий ролик"
+  },
+  {
+   "kind": "sleep",
+   "args": {
+    "seconds": 6,
+    "seconds_max": 14
+   },
+   "note": "Смотрим ролик"
+  },
+  {
+   "kind": "chance",
+   "args": {
+    "span": 2,
+    "percent": 20
+   }
+  },
+  {
+   "kind": "budget",
+   "args": {
+    "name": "YouTube: лайки",
+    "limit": 200
+   }
+  },
+  {
+   "kind": "click",
+   "selector": {
+    "call": "click",
+    "args": "descriptionMatches=\"(?i).*(like this video|нравится|лайк).*\"",
+    "fallbacks": []
+   },
+   "point": [
+    0.93,
+    0.55
+   ],
+   "note": "Поставить лайк"
+  }
+ ]
+}

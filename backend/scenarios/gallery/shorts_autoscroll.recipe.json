@@ -1,0 +1,57 @@
+{
+ "gallery": {
+  "platform": "Любая лента",
+  "verified": false,
+  "package": "com.zhiliaoapp.musically"
+ },
+ "key": "shorts_autoscroll",
+ "meta": {
+  "name": "Автолистание шортсов",
+  "description": "Листает вертикальную ленту (TikTok, YouTube Shorts, Reels) со случайной паузой на ролик.",
+  "watch_popups": true,
+  "human": true
+ },
+ "params": {
+  "package": {
+   "label": "Приложение (пакет)",
+   "default": "com.zhiliaoapp.musically"
+  }
+ },
+ "steps": [
+  {
+   "kind": "launch_app",
+   "args": {
+    "package": "com.zhiliaoapp.musically"
+   },
+   "param": "package"
+  },
+  {
+   "kind": "loop",
+   "args": {
+    "span": 2,
+    "times": 50,
+    "pause_min": 1,
+    "pause_max": 3
+   }
+  },
+  {
+   "kind": "swipe",
+   "args": {
+    "x1": 0.5,
+    "y1": 0.8,
+    "x2": 0.5,
+    "y2": 0.3,
+    "duration": 0.25
+   },
+   "note": "Следующий ролик"
+  },
+  {
+   "kind": "sleep",
+   "args": {
+    "seconds": 7,
+    "seconds_max": 20
+   },
+   "note": "Смотрим ролик"
+  }
+ ]
+}

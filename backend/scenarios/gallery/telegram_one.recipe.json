@@ -1,0 +1,125 @@
+{
+ "gallery": {
+  "platform": "Telegram",
+  "verified": false,
+  "package": "org.telegram.messenger"
+ },
+ "key": "telegram_one",
+ "meta": {
+  "name": "Telegram: чтение канала",
+  "description": "Открывает один канал по названию, листает посты вверх и возвращается. Ничего не пишет.",
+  "watch_popups": true,
+  "human": true
+ },
+ "params": {
+  "channel": {
+   "label": "Название или @имя канала",
+   "default": ""
+  }
+ },
+ "steps": [
+  {
+   "kind": "launch_app",
+   "args": {
+    "package": "org.telegram.messenger"
+   }
+  },
+  {
+   "kind": "click",
+   "selector": {
+    "call": "click",
+    "args": "descriptionMatches=\"(?i)(search|поиск)\"",
+    "fallbacks": []
+   },
+   "point": [
+    0.88,
+    0.07
+   ],
+   "note": "Открыть поиск"
+  },
+  {
+   "kind": "sleep",
+   "args": {
+    "seconds": 1,
+    "seconds_max": 1
+   }
+  },
+  {
+   "kind": "type",
+   "args": {
+    "value": "",
+    "clear": true
+   },
+   "param": "channel",
+   "note": "Ввести название канала"
+  },
+  {
+   "kind": "sleep",
+   "args": {
+    "seconds": 2,
+    "seconds_max": 2
+   }
+  },
+  {
+   "kind": "tap",
+   "args": {
+    "x": 0.5,
+    "y": 0.2
+   },
+   "note": "Открыть первый найденный канал"
+  },
+  {
+   "kind": "sleep",
+   "args": {
+    "seconds": 2,
+    "seconds_max": 2
+   }
+  },
+  {
+   "kind": "loop",
+   "args": {
+    "span": 2,
+    "times": 8,
+    "pause_min": 1.5,
+    "pause_max": 4
+   }
+  },
+  {
+   "kind": "swipe",
+   "args": {
+    "x1": 0.5,
+    "y1": 0.35,
+    "x2": 0.5,
+    "y2": 0.75,
+    "duration": 0.4
+   },
+   "note": "К старым постам"
+  },
+  {
+   "kind": "sleep",
+   "args": {
+    "seconds": 1,
+    "seconds_max": 3
+   },
+   "note": "Читаем"
+  },
+  {
+   "kind": "key",
+   "args": {
+    "name": "back"
+   }
+  },
+  {
+   "kind": "key",
+   "args": {
+    "name": "back"
+   }
+  },
+  {
+   "kind": "key",
+   "args": {
+    "name": "back"
+   }
+  }
+ ]
+}

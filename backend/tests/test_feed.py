@@ -262,6 +262,9 @@ def test_tiktok_can_follow_needs_clickable_plus(monkeypatch):
 
 
 def test_youtube_shorts_has_no_words_param():
-    import importlib
-    ys = importlib.import_module("scenarios.gallery.youtube_shorts")
-    assert "words" not in ys.PARAMS
+    import json
+    from pathlib import Path
+    from farm import config
+    data = json.loads((Path(config.ROOT) / "scenarios" / "gallery" / "youtube_shorts.recipe.json")
+                      .read_text("utf-8"))
+    assert "words" not in data["params"]

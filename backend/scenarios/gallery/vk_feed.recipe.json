@@ -1,0 +1,79 @@
+{
+ "gallery": {
+  "platform": "VK",
+  "verified": false,
+  "package": "com.vkontakte.android"
+ },
+ "key": "vk_feed",
+ "meta": {
+  "name": "VK: лента с лайками",
+  "description": "Листает ленту VK с паузой, ставит лайки по шансу, соблюдая потолок за сутки.",
+  "watch_popups": true,
+  "human": true
+ },
+ "params": {},
+ "steps": [
+  {
+   "kind": "launch_app",
+   "args": {
+    "package": "com.vkontakte.android"
+   }
+  },
+  {
+   "kind": "loop",
+   "args": {
+    "span": 5,
+    "times": 40,
+    "pause_min": 1,
+    "pause_max": 3
+   }
+  },
+  {
+   "kind": "swipe",
+   "args": {
+    "x1": 0.5,
+    "y1": 0.8,
+    "x2": 0.5,
+    "y2": 0.3,
+    "duration": 0.25
+   },
+   "note": "Следующий пост"
+  },
+  {
+   "kind": "sleep",
+   "args": {
+    "seconds": 3,
+    "seconds_max": 8
+   },
+   "note": "Читаем пост"
+  },
+  {
+   "kind": "chance",
+   "args": {
+    "span": 2,
+    "percent": 20
+   }
+  },
+  {
+   "kind": "budget",
+   "args": {
+    "name": "VK: лайки",
+    "limit": 200,
+    "platform": "vk"
+   }
+  },
+  {
+   "kind": "click",
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"com.vkontakte.android:id/iv_likes\"",
+    "fallbacks": []
+   },
+   "point": [
+    0.064,
+    0.718
+   ],
+   "note": "Поставить лайк"
+  }
+ ]
+}

@@ -1,0 +1,127 @@
+{
+ "gallery": {
+  "platform": "Spotify",
+  "verified": false,
+  "package": "com.spotify.music"
+ },
+ "key": "spotify_one",
+ "meta": {
+  "name": "Spotify: одно слово",
+  "description": "Ищет слово, запускает первый трек, слушает полминуты-полторы, лайкает по шансу.",
+  "watch_popups": true,
+  "human": true
+ },
+ "params": {
+  "word": {
+   "label": "Слово поиска",
+   "default": "lofi"
+  }
+ },
+ "steps": [
+  {
+   "kind": "launch_app",
+   "args": {
+    "package": "com.spotify.music"
+   }
+  },
+  {
+   "kind": "click",
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"com.spotify.music:id/search_tab\"",
+    "fallbacks": [
+     "descriptionMatches=\"(?i)(search|поиск)\""
+    ]
+   },
+   "note": "Открыть поиск"
+  },
+  {
+   "kind": "click",
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"com.spotify.music:id/find_search_field\"",
+    "fallbacks": [
+     "textMatches=\"(?i)(search|поиск).*\""
+    ]
+   },
+   "note": "Нажать на строку поиска"
+  },
+  {
+   "kind": "type",
+   "args": {
+    "value": "lofi",
+    "clear": true
+   },
+   "param": "word",
+   "note": "Ввести слово"
+  },
+  {
+   "kind": "sleep",
+   "args": {
+    "seconds": 2,
+    "seconds_max": 5
+   },
+   "note": "Ждём результаты"
+  },
+  {
+   "kind": "click",
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"com.spotify.music:id/row_root\"",
+    "fallbacks": []
+   },
+   "point": [
+    0.35,
+    0.3
+   ],
+   "note": "Открыть первый результат"
+  },
+  {
+   "kind": "sleep",
+   "args": {
+    "seconds": 1,
+    "seconds_max": 3
+   }
+  },
+  {
+   "kind": "chance",
+   "args": {
+    "span": 3,
+    "percent": 20
+   }
+  },
+  {
+   "kind": "budget",
+   "args": {
+    "name": "Spotify: лайки",
+    "limit": 100
+   }
+  },
+  {
+   "kind": "click",
+   "selector": {
+    "call": "click",
+    "args": "resourceId=\"com.spotify.music:id/add_to_button\"",
+    "fallbacks": [
+     "descriptionMatches=\"(?i)(add to|добавить).*\""
+    ]
+   },
+   "optional": true,
+   "note": "Поставить лайк"
+  },
+  {
+   "kind": "sleep",
+   "args": {
+    "seconds": 1
+   }
+  },
+  {
+   "kind": "sleep",
+   "args": {
+    "seconds": 30,
+    "seconds_max": 90
+   },
+   "note": "Слушаем трек"
+  }
+ ]
+}
