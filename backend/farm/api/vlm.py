@@ -10,7 +10,8 @@ from dataclasses import replace
 
 from fastapi import APIRouter, Body, HTTPException
 
-from ..vlm import client, plan as vlm_plan, settings, usage
+from .. import config
+from ..vlm import agent as vlm_agent, client, plan as vlm_plan, settings, usage
 
 router = APIRouter(prefix="/api/vlm", tags=["vlm"])
 
@@ -114,3 +115,32 @@ def make_plan(payload: dict = Body(...)):
     except vlm_plan.PlanError as e:
         raise HTTPException(400, str(e))
     return {"steps": steps, "recipe": vlm_plan.recipe_for(task, steps)}
+
+
+@router.post("/agent/step")
+def agent_step(payload: dict = Body(...)):
+    """Одно предложенное действие. Телефон не меняет."""
+    history = payload.get("history") or []
+    try:
+        out = vlm_agent.step(payload.get("serial"), payload.get("task"), history)
+    except vlm_agent.AgentError as e:
+        raise HTTPException(400, str(e))
+    n = len(history) + 1
+    return {**out, "step_no": n, "left": max(0, config.AGENT_MAX_STEPS - n)}
+
+
+@router.post("/agent/do")
+def agent_do(payload: dict = Body(...)):
+    """Выполнить действие: сервер проверяет его заново."""
+    try:
+        return vlm_agent.do(payload.get("serial"), payload.get("action"))
+    except vlm_agent.AgentError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/agent/recipe")
+def agent_recipe(payload: dict = Body(...)):
+    try:
+        return vlm_agent.recipe(payload.get("task"), payload.get("history"))
+    except vlm_agent.AgentError as e:
+        raise HTTPException(400, str(e))

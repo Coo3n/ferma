@@ -143,6 +143,8 @@ VLM_MAX_PER_DAY = int(os.getenv("FARM_VLM_MAX_PER_DAY", "200"))
 VLM_MAX_WIDTH = int(os.getenv("FARM_VLM_MAX_WIDTH", "720"))
 VLM_FILE = Path(os.getenv("FARM_VLM_FILE", DATA_DIR / "vlm.json"))
 VLM_USAGE_FILE = Path(os.getenv("FARM_VLM_USAGE_FILE", DATA_DIR / "vlm_usage.json"))
+# Потолок шагов одного сеанса ИИ-агента (farm/vlm/agent.py).
+AGENT_MAX_STEPS = int(os.getenv("FARM_AGENT_MAX_STEPS", "30"))
 VLM_LEARNED_FILE = Path(os.getenv("FARM_VLM_LEARNED_FILE", DATA_DIR / "vlm_learned.json"))
 NOTIFY_WATCH_FILE = Path(os.getenv("FARM_NOTIFY_WATCH_FILE", DATA_DIR / "notify_watch.json"))
 PHRASES_FILE = Path(os.getenv("FARM_PHRASES_FILE", DATA_DIR / "phrases.json"))
