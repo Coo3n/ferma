@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from .. import gallery
+from ..recorder import save as saver
 
 router = APIRouter()
 
@@ -19,3 +20,7 @@ def add_to_mine(key: str):
         return {"key": gallery.add(key)}
     except KeyError:
         raise HTTPException(404, "такого сюжета в галерее нет")
+    except saver.SaveIOError:
+        raise HTTPException(500, "не удалось записать сюжет на диск")
+    except saver.SaveError as e:
+        raise HTTPException(400, str(e))
