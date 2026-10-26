@@ -251,6 +251,7 @@ class Registry:
         if d is None:
             return False
         self._last_health.pop(serial, None)
+        self._cpu_prev.pop(serial, None)
         pool.drop(serial)
         return True
 
@@ -293,6 +294,7 @@ class Registry:
                 if not was_online and d.online:
                     d.error = ""
                     self._last_health.pop(a.serial, None)
+                    self._cpu_prev.pop(a.serial, None)
                 elif was_online and not d.online:
                     d.forget_health()
 

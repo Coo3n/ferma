@@ -117,3 +117,16 @@ def test_action_add_stops_on_denial(monkeypatch):
 def test_action_clear(shell):
     assert screen.ACTIONS["contacts_clear"]("S1", {"type": "contacts_clear"}) == {"ok": True}
     assert "content delete" in shell[0][1]
+
+
+def test_arabic_indic_digits_are_not_numbers():
+    assert contacts._clean_number("+٧٩٩٩١٢٣٤٥٦٧") is None
+    assert contacts._clean_number("+79991234567") == "+79991234567"
+
+
+def test_contacts_add_enforces_max_items(monkeypatch):
+    monkeypatch.setattr(screen.adb, "shell", lambda *a, **k: "")
+    items = [{"name": "a", "number": "+79991234567"}] * (contacts.MAX_ITEMS + 1)
+    with pytest.raises(ValueError) as e:
+        screen.ACTIONS["contacts_add"]("S1", {"items": items})
+    assert str(contacts.MAX_ITEMS) in str(e.value)

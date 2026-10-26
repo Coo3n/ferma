@@ -29,3 +29,22 @@ def test_пропавший_телефон_не_освобождается_до_
     assert not reg.acquire("s1", "job2"), "занят первой задачей"
     reg.release("s1", "job1")
     assert reg.acquire("s1", "job2")
+
+
+def test_cpu_prev_cleared_with_last_health(monkeypatch):
+    reg = registry_mod.Registry()
+    monkeypatch.setattr(reg, "_read_health", lambda d: None)
+    monkeypatch.setattr(pool, "drop", lambda serial: None)
+    monkeypatch.setattr(registry_mod.net, "all", lambda: [])
+    found = [adb.AdbDevice(serial="s1", state="device")]
+    monkeypatch.setattr(adb, "list_devices", lambda: list(found))
+    reg.refresh_once()
+    reg._cpu_prev["s1"] = (1, 2)
+    found.clear()
+    reg.refresh_once()                  # ушёл
+    found.append(adb.AdbDevice(serial="s1", state="device"))
+    reg.refresh_once()                  # вернулся: не online -> online
+    assert "s1" not in reg._cpu_prev
+    reg._cpu_prev["s1"] = (1, 2)
+    assert reg.forget("s1")
+    assert "s1" not in reg._cpu_prev

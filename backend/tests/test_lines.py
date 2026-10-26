@@ -90,3 +90,10 @@ def test_endpoint_rejects_empty_file(sent):
         bulk.text_lines(serials=["A"], lines=["", "  "], mode="order",
                         separator="", template="", clear=False)
     assert e.value.status_code == 400
+
+
+def test_endpoint_empty_rendered_text_is_failure_and_not_sent(sent):
+    res = bulk.text_lines(serials=["A", "B"], lines=["one;x", "two"], mode="order",
+                          separator=";", template="{2}", clear=True)
+    assert sent == [("A", "x", True)]              # у B части {2} нет: пустое не отправлено
+    assert res["failed"] == 1 and res["results"]["B"]["error"] == "пустой текст"

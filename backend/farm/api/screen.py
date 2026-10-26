@@ -133,6 +133,14 @@ def _rotate(serial, p):
     return {"ok": True, "landscape": nxt == "1"}
 
 
+def _forget_display(serial):
+    """Размер экрана сменился: кэш в реестре (плитка, карточка) обновится при ближайшем опросе."""
+    control.forget_size(serial)   # кэш размера устарел: тапы по нему попадали бы мимо
+    d = registry.get(serial)
+    if d is not None:
+        d.width = d.height = 0
+
+
 def _resolution_set(serial, p):
     """Размер (и плотность) экрана одинаковые на всех телефонах — чтобы
     записанные клики попадали в те же места. Сначала проверка чисел, потом
@@ -142,14 +150,14 @@ def _resolution_set(serial, p):
         commands.append(display.density_command(p.get("density")))
     for cmd in commands:
         adb.shell(serial, cmd, timeout=SHELL_TIMEOUT)
-    control.forget_size(serial)   # кэш размера устарел: тапы по нему попадали бы мимо
+    _forget_display(serial)
     return {"ok": True}
 
 
 def _resolution_reset(serial, p):
     for cmd in display.RESET_COMMANDS:
         adb.shell(serial, cmd, timeout=SHELL_TIMEOUT)
-    control.forget_size(serial)
+    _forget_display(serial)
     return {"ok": True}
 
 
@@ -159,6 +167,8 @@ def _contacts_add(serial, p):
     аккаунтов выглядят подозрительно)."""
     if p.get("items"):
         items = p["items"]
+        if not isinstance(items, list) or len(items) > contacts.MAX_ITEMS:
+            raise ValueError(f"в списке не больше {contacts.MAX_ITEMS} контактов")
     elif p.get("generate"):
         g = p["generate"]
         numbers = contacts.generate(g.get("prefix"), g.get("length"), g.get("count"))

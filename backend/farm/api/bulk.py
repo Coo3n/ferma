@@ -295,10 +295,15 @@ def text_lines(serials: list[str] = Body(...), lines: list[str] = Body(...),
     def send(serial):
         ACTIONS["text"](serial, {"type": "text", "value": texts[serial], "clear": clear})
 
+    empty = [s for s, t in texts.items() if not t.strip()]
+    for s in empty:
+        del texts[s]                    # пустое не отправляем: с clear=True оно молча стёрло бы поле
     results = _each(list(texts), send)["results"] if texts else {}
     results.update(_skipped(serials, targets))
+    for s in empty:
+        results[s] = failure("пустой текст")
     for s in plan:
-        if s not in texts:
+        if plan[s] is None:
             results[s] = failure("не хватило строк в файле")
     return _summary(results)
 

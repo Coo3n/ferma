@@ -71,3 +71,18 @@ def test_bulk_display_endpoint_summarises_each_phone(monkeypatch):
     monkeypatch.setattr(bulk, "_display_info", lambda s: {"size": [1080, 2400]})
     got = bulk.bulk_display(serials=["A", "B"])
     assert got["done"] == 2 and got["results"]["A"]["size"] == [1080, 2400]
+
+
+class _Dev:
+    def __init__(self):
+        self.width, self.height = 1080, 2400
+
+
+@pytest.mark.parametrize("action,params", [
+    ("resolution_set", {"width": 720, "height": 1600}), ("resolution_reset", {})])
+def test_resolution_change_resets_cached_registry_size(shell, monkeypatch, action, params):
+    dev = _Dev()
+    monkeypatch.setattr(screen.registry, "get", lambda serial: dev if serial == "S1" else None)
+    screen.ACTIONS[action]("S1", params)
+    assert (dev.width, dev.height) == (0, 0)
+    screen.ACTIONS[action]("OTHER", params)          # неизвестный телефон — не падаем

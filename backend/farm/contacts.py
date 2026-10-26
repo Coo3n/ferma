@@ -13,9 +13,9 @@ import re
 
 MAX_ITEMS = 2000
 MAX_GENERATE = 1000
-_DIGITS = re.compile(r"[^\d+]")
-_NAME_BAD = re.compile(r"[^\w .\-]", re.U)
-_NUMBER = re.compile(r"^\+?\d{7,15}$")
+_DIGITS = re.compile(r"[^\d+]", re.A)
+_NAME_BAD = re.compile(r"[^\w .\-]", re.U)   # имена могут быть кириллицей: без ASCII
+_NUMBER = re.compile(r"^\+?\d{7,15}$", re.A)
 RAW = "content://com.android.contacts/raw_contacts"
 DATA = "content://com.android.contacts/data"
 CLEAR_SCRIPT = f"content delete --uri {DATA}; content delete --uri {RAW}"
