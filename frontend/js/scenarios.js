@@ -301,8 +301,46 @@ function renderParams() {
         return;
     }
 
-    setHTML(box, `<h3>${esc(scenario.name)}</h3>${scMeta(scenario)}${scRunBarHtml(scenario.key)}${scTemplateInfo(scenario)}`);
+    setHTML(box, `<h3>${esc(scenario.name)}</h3>${scMeta(scenario)}${scRunBarHtml(scenario.key)}${scWhatHtml(scenario)}${scTemplateInfo(scenario)}`);
     renderScenarioSteps(scenario);
+}
+
+/* Нумерованный список «Что делает»: отступ — по depth, номера рисует CSS.
+   Чистая функция: items = [{text, depth}] от сервера. */
+function scStepsListHtml(items) {
+    if (!Array.isArray(items) || !items.length) return '';
+    return '<ol class="sc-what-list">' + items.map(it => {
+        const d = Math.max(0, Math.min(8, Math.floor(Number(it && it.depth)) || 0));
+        return `<li style="--d:${d}">${esc(it && it.text != null ? it.text : '')}</li>`;
+    }).join('') + '</ol>';
+}
+
+const SC_WHAT_KEY = 'sc_what_open';
+
+/* Сворачиваемый блок «Что делает». Раскрытие помним на все сценарии сразу. */
+function scWhatHtml(sc) {
+    const items = sc.steps_text || [];
+    if (!items.length) return '';
+    const open = !!store.get(SC_WHAT_KEY, false);
+    const foot = sc.editable
+        ? `<button class="sm" onclick="editScenario('${esc(sc.key)}')">
+             <svg class="ic"><use href="#i-pencil"/></svg>${esc(t('scen.what_open'))}</button>`
+        : `<p class="sc-what-note">${esc(t('scen.what_code_note'))}</p>`;
+    return `<div class="sc-what${open ? ' open' : ''}">
+      <button class="sc-what-head" aria-expanded="${open}" onclick="scWhatToggle(this)">
+        <svg class="ic" aria-hidden="true"><use href="#i-right"/></svg>
+        ${esc(t('scen.what_title'))} · ${items.length}</button>
+      <div class="sc-what-body"${open ? '' : ' hidden'}>${scStepsListHtml(items)}${foot}</div>
+    </div>`;
+}
+
+function scWhatToggle(btn) {
+    const wrap = btn.closest('.sc-what');
+    const open = !wrap.classList.contains('open');
+    wrap.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', String(open));
+    wrap.querySelector('.sc-what-body').hidden = !open;
+    store.set(SC_WHAT_KEY, open);
 }
 
 /* Шаблон не из конструктора — шагов у него нет, и правая панель пустовала.

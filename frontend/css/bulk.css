@@ -1341,3 +1341,57 @@ button.rd-ph.on {
 .tiles[data-density="s"] .tile .flag.held { background: var(--warn); }
 .tiles[data-density="s"] .tile .alert { display: none; }
 .tiles[data-density="s"] .tile .pick { top: 4px; right: 4px; width: 20px; height: 20px; }
+
+/* ----------------------------------- «Что делает» в панели сценария */
+
+.sc-what {
+    margin-top: var(--s3);
+    max-width: 720px;
+}
+
+.sc-what-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    background: none;
+    border: 0;
+    color: var(--text);
+    font-size: var(--fs-2);
+    padding: var(--s1) 0;
+    cursor: pointer;
+}
+
+.sc-what-head .ic { transition: transform 0.15s; }
+.sc-what.open .sc-what-head .ic { transform: rotate(90deg); }
+.sc-what-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.sc-what-body { margin-top: var(--s2); }
+
+.sc-what-list {
+    margin: 0 0 var(--s2);
+    padding: 0;
+    list-style: none;
+    counter-reset: scw;
+    font-size: var(--fs-2);
+    color: var(--text);
+}
+
+.sc-what-list li {
+    --d: 0;
+    counter-increment: scw;
+    padding: 2px var(--s2) 2px calc(var(--s2) + var(--d) * 24px);
+}
+
+.sc-what-list li::before {
+    content: counter(scw) ".";
+    display: inline-block;
+    min-width: 2ch;
+    margin-right: var(--s2);
+    color: var(--dim);
+}
+
+.sc-what-note {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--fs-1);
+}

@@ -53,6 +53,14 @@ class Scenario:
     # COMMAND = True: короткая команда (до COMMAND_MAX_STEPS шагов), не сценарий.
     command: bool = False
 
+    @property
+    def steps_text(self) -> list:
+        """STEPS модуля (список строк) -> [{"text", "depth": 0}], иначе []."""
+        raw = getattr(self.module, "STEPS", None)
+        if not isinstance(raw, (list, tuple)):
+            return []
+        return [{"text": x, "depth": 0} for x in raw if isinstance(x, str) and x.strip()]
+
     def to_dict(self) -> dict:
         return {
             "key": self.key,
@@ -65,6 +73,7 @@ class Scenario:
             "needs_accounts": self.needs_accounts,
             "template": self.template,
             "command": self.command,
+            "steps_text": self.steps_text,
         }
 
 

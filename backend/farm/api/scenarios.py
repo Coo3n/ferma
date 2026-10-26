@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
-from .. import guards, obstacle, scenarios
+from .. import guards, obstacle, scenarios, steps_text
 from ..devices.runner import runner
 from ..recorder import save as saver
 from .detours import scan_obstacles
@@ -82,6 +82,9 @@ def list_scenarios(reload: bool = Query(False)):
         item["editable"] = bool(s.recorded and saver.has_recipe(s.key))
         item["steps"], item["branches"] = (
             _structure(s.key) if item["editable"] else (None, None))
+        if item["editable"]:
+            рецепт = saver.load_recipe(s.key) or {}
+            item["steps_text"] = steps_text.describe(рецепт.get("steps") or [])
         stats = runner.scenario_stats(s.key)
         item["passed"], item["failed"] = stats["passed"], stats["failed"]
         item["uncovered"] = _uncovered(_package_of(s.params), scan_cache)

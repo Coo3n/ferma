@@ -117,3 +117,21 @@ def test_прогоны_считаются_по_ключу_сценария(пе
     item = next(i for i in api.list_scenarios() if i["key"] == "test_demo")
     assert item["passed"] == 2
     assert item["failed"] == 1
+
+
+def test_steps_text_кодового_сценария_из_STEPS(песочница):
+    scen, _, _ = песочница
+    (scen / "test_code.py").write_text(
+        "NAME = 'Код'\nSTEPS = ['Открыть', 'Листать', 5]\n\ndef run(ctx):\n    pass\n", "utf-8")
+    (scen / "test_nosteps.py").write_text("NAME = 'Без'\n\ndef run(ctx):\n    pass\n", "utf-8")
+    items = {i["key"]: i for i in api.list_scenarios()}
+    assert items["test_code"]["steps_text"] == [
+        {"text": "Открыть", "depth": 0}, {"text": "Листать", "depth": 0}]
+    assert items["test_nosteps"]["steps_text"] == []
+
+
+def test_steps_text_рецепта_из_describe(песочница):
+    _recorded("test_rec", {})
+    item = {i["key"]: i for i in api.list_scenarios()}["test_rec"]
+    assert item["steps_text"] and all(
+        set(x) == {"text", "depth"} for x in item["steps_text"])
