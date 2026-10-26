@@ -83,8 +83,47 @@ def test_scan_phone_shows_text_but_never_for_secret_apps(monkeypatch):
     by_pkg = {}
     for i in got["items"]:
         by_pkg.setdefault(i["pkg"], []).append(i)
-    assert by_pkg["com.whatsapp"][0]["title"] == "Иван"
+    assert "title" not in by_pkg["com.whatsapp"][0]          # мессенджер скрыт
     assert "title" not in by_pkg["ru.sberbankmobile"][0]
+
+
+def _dump(pkg, title, text):
+    return (f"    NotificationRecord(0x0a1b2c3d: pkg={pkg} user=UserHandle{{0}} id=1 tag=null "
+            f"importance=3 key=k: Notification(channel=c flags=0x10))\n"
+            f"      extras={{\n        android.title=String ({title})\n"
+            f"        android.text=String ({text})\n      }}\n")
+
+
+def test_scan_phone_shows_plain_text_of_ordinary_app(monkeypatch):
+    monkeypatch.setattr(notifications.adb, "shell",
+                        lambda s, c, timeout=None: _dump("com.example.news", "Новость", "Вышла версия"))
+    item = notifications.scan_phone("S1", [], show_text=True)["items"][0]
+    assert item["title"] == "Новость" and item["text"] == "Вышла версия"
+
+
+@pytest.mark.parametrize("pkg", [
+    "com.google.android.apps.messaging", "com.android.mms", "org.telegram.messenger",
+    "com.whatsapp", "com.viber.voip", "org.thoughtcrime.securesms.signal", "com.samsung.sms"])
+def test_messaging_apps_hide_text(monkeypatch, pkg):
+    monkeypatch.setattr(notifications.adb, "shell", lambda s, c, timeout=None: _dump(pkg, "Мама", "привет"))
+    assert set(notifications.scan_phone("S1", [], show_text=True)["items"][0]) == {"pkg"}
+
+
+@pytest.mark.parametrize("text", ["Ваш код 123456", "1234", "code: 12345678 ok"])
+def test_code_like_text_hidden_in_any_app(monkeypatch, text):
+    monkeypatch.setattr(notifications.adb, "shell", lambda s, c, timeout=None: _dump("com.example.app", "Тема", text))
+    assert set(notifications.scan_phone("S1", [], show_text=True)["items"][0]) == {"pkg"}
+
+
+def test_long_or_short_numbers_are_not_codes():
+    assert not notifications.looks_like_code("заказ 123", "12345678901")
+
+
+def test_pay_matches_whole_segment_only():
+    assert notifications.is_secret("com.google.android.apps.nbu.paisa.user") is False
+    assert notifications.is_secret("com.example.pay.app")
+    assert notifications.is_secret("ru.yoomoney.pay")
+    assert not notifications.is_secret("com.example.payroll")
 
 
 def test_scan_phone_empty_packages_means_all(monkeypatch):

@@ -41,8 +41,9 @@ async def inspect_backup(request: Request):
 
 
 @router.post("/restore")
-async def restore_backup(request: Request, adb_key: int = Query(0)):
+async def restore_backup(request: Request, adb_key: int = Query(0), scenarios: int = Query(0)):
     try:
-        return backup.restore(await _read(request), adb_key=bool(adb_key))
+        return backup.restore(await _read(request), adb_key=bool(adb_key),
+                              scenarios=bool(scenarios))
     except ValueError as e:
         raise HTTPException(400, str(e))

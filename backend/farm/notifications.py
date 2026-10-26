@@ -3,7 +3,7 @@
 Читается `dumpsys notification --noredact` — только шторка, содержимое
 приложений недоступно (и не должно быть). Формат вывода зависит от версии
 Android, поэтому разбор терпимый: нераспознанное пропускается, а не падает.
-Текст уведомлений по умолчанию скрыт, а у банков и приложений с кодами он не
+Текст уведомлений по умолчанию скрыт, а у банков, СМС, мессенджеров и всего, что похоже на код, он не
 показывается никогда: код подтверждения не должен светиться в списке.
 """
 from __future__ import annotations
@@ -19,7 +19,12 @@ _FLAGS = re.compile(r"flags=0x([0-9a-f]+)")
 _TITLE = re.compile(r"android\.title=(?:[A-Za-z]+ )?\((.*)\)\s*$", re.M)
 _TEXT = re.compile(r"android\.text=(?:[A-Za-z]+ )?\((.*)\)\s*$", re.M)
 _PKG = re.compile(r"^[A-Za-z][\w]*(\.[\w]+)+$")
-_SECRET = re.compile(r"(bank|sber|tinkoff|vtb|alfa|raiffeisen|gazprom|pay|wallet|authenticator|otp|2fa)", re.I)
+_SECRET = re.compile(r"(bank|sber|tinkoff|vtb|alfa|raiffeisen|gazprom|wallet|authenticator"
+                     r"|(?<![a-z])(?:pay|otp|2fa)(?![a-z]))", re.I)
+# Мессенджеры и СМС: коды подтверждения приходят именно туда.
+_MESSAGING = re.compile(r"(messaging|mms|sms|telegram|whatsapp|viber|signal)", re.I)
+# Отдельное число из 4-8 цифр похоже на код подтверждения.
+_CODE = re.compile(r"(?<!\d)\d{4,8}(?!\d)", re.A)
 # Постоянные уведомления (FLAG_ONGOING_EVENT, FLAG_FOREGROUND_SERVICE) — не
 # «новое сообщение», а работающая служба; в сводке они только мешают.
 _ONGOING = 0x2 | 0x40
@@ -52,6 +57,14 @@ def is_secret(pkg: str) -> bool:
     return bool(_SECRET.search(pkg or ""))
 
 
+def is_messaging(pkg: str) -> bool:
+    return bool(_MESSAGING.search(pkg or ""))
+
+
+def looks_like_code(*texts) -> bool:
+    return any(_CODE.search(t or "") for t in texts)
+
+
 def watched() -> list:
     try:
         data = json.loads(config.NOTIFY_WATCH_FILE.read_text("utf-8"))
@@ -77,7 +90,8 @@ def scan_phone(serial: str, packages, show_text: bool) -> dict:
     items = []
     for n in notes:
         item = {"pkg": n.pkg}
-        if show_text and not is_secret(n.pkg):
+        if (show_text and not is_secret(n.pkg) and not is_messaging(n.pkg)
+                and not looks_like_code(n.title, n.text)):
             item.update(title=n.title, text=n.text)
         items.append(item)
     return {"count": len(items), "items": items}

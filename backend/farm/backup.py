@@ -17,13 +17,14 @@ import os
 import re
 import time
 import zipfile
+import zlib
 from pathlib import Path
 
 from . import config
 
 ADB_DIR = Path.home() / ".android"
 ADB_KEYS = ("adbkey", "adbkey.pub")
-EXTRA_DATA = ("apks.json", "budget.json")
+EXTRA_DATA = ("apks.json", "budget.json", "vlm_learned.json", "notify_watch.json")
 MAX_TOTAL = 64 * 1024 * 1024
 MAX_FILES = 2000
 _PY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\-]*\.py$")
@@ -93,15 +94,43 @@ def _open(blob: bytes) -> zipfile.ZipFile:
 def inspect(blob: bytes) -> dict:
     z = _open(blob)
     files = [i.filename for i in z.infolist() if not i.is_dir()]
+    scenarios = sum(1 for f in files if re.fullmatch(r"scenarios/[^/]+\.py", f))
     return {"files": files, "has_adb_key": any(f.startswith("adb/") for f in files),
-            "bytes": len(blob)}
+            "scenarios": scenarios, "bytes": len(blob)}
 
 
-def restore(blob: bytes, adb_key: bool = False) -> dict:
+def _write_private(path: Path, data: bytes) -> None:
+    """Файл сразу с правами 600: секрет не лежит открытым ни мгновения."""
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+    fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(data)
+
+
+def _mkdir_private(path: Path) -> None:
+    """Папки копии создаём с 700 (mkdir(parents) дал бы права по umask)."""
+    if path.exists():
+        return
+    if not path.parent.exists():
+        _mkdir_private(path.parent)
+    try:
+        path.mkdir(mode=0o700)
+    except FileExistsError:
+        pass
+
+
+def _is_secret(name: str) -> bool:
+    return name == "data/accounts.json" or (name.startswith("adb/") and name.endswith("adbkey"))
+
+
+def restore(blob: bytes, adb_key: bool = False, scenarios: bool = False) -> dict:
     z = _open(blob)
-    restored, skipped = [], []
-    saved_root = Path(config.DATA_DIR) / ".restore-backup" / time.strftime("%Y%m%d-%H%M%S")
-    saved_any = False
+    restored, skipped, plan = [], [], []
+    # Сначала читаем и проверяем ВСЕ записи, и только потом пишем: битый архив
+    # не должен оставить половину данных новыми, а половину старыми.
     for info in z.infolist():
         if info.is_dir():
             continue
@@ -113,18 +142,43 @@ def restore(blob: bytes, adb_key: bool = False) -> dict:
         if name.startswith("adb/") and not adb_key:
             skipped.append({"name": name, "why": "ключ adb не разрешён галкой"})
             continue
-        data = z.read(info)
+        if name.startswith("scenarios/") and not scenarios:
+            skipped.append({"name": name, "why": "сценарии — программы, вернуть их можно только по галке"})
+            continue
+        try:
+            data = z.read(info)
+        except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OSError, EOFError, zlib.error):
+            raise ValueError(f"архив повреждён: не читается «{name}»")
+        plan.append((name, target, data))
+    saved_root = Path(config.DATA_DIR) / ".restore-backup" / time.strftime("%Y%m%d-%H%M%S")
+    saved_any = False
+    for name, target, data in plan:
         if target.exists():
             keep = saved_root / name
-            keep.parent.mkdir(parents=True, exist_ok=True)
-            keep.write_bytes(target.read_bytes())
+            _mkdir_private(keep.parent)
+            _write_private(keep, target.read_bytes())
             saved_any = True
         target.parent.mkdir(parents=True, exist_ok=True)
         tmp = target.with_name(target.name + ".tmp")
-        tmp.write_bytes(data)
-        if name.startswith("adb/") and name.endswith("adbkey"):
-            os.chmod(tmp, 0o600)          # приватный ключ не должен читаться чужими
+        if _is_secret(name):
+            _write_private(tmp, data)     # приватный ключ и пароли не должны читаться чужими
+        else:
+            tmp.write_bytes(data)
         os.replace(tmp, target)
         restored.append(name)
+    data_restored = any(n.startswith("data/") for n in restored)
+    if "data/accounts.json" in restored:
+        _drop_accounts_cache()
     return {"restored": restored, "skipped": skipped,
-            "saved_previous_to": str(saved_root) if saved_any else None}
+            "saved_previous_to": str(saved_root) if saved_any else None,
+            "restart_needed": data_restored}
+
+
+def _drop_accounts_cache() -> None:
+    """Аккаунты кэшируются в памяти: без сброса первое же сохранение затёрло бы восстановленное."""
+    try:
+        from . import accounts
+        with accounts._lock:
+            accounts._items = None
+    except Exception:  # noqa: BLE001
+        pass

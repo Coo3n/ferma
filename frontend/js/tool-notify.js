@@ -30,7 +30,7 @@ async function notifOpen() {
       <label>Приложения (по строке, пакет): <textarea id="notifPkgs" rows="3"
         placeholder="com.whatsapp">${esc(watch.packages.join('\n'))}</textarea></label>
       <div class="bp-row">
-        <label><input type="checkbox" id="notifText"> показать текст (кроме банков и кодов)</label>
+        <label><input type="checkbox" id="notifText"> показать текст (коды и банки скрываются)</label>
         <button class="sm primary" onclick="notifScan()">Проверить</button></div>
       <div id="notifOut"></div>`;
     $('mActs').innerHTML = `${toolsBackButton()}<span class="sp"></span><button onclick="closeModal()">Закрыть</button>`;

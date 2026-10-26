@@ -23,6 +23,7 @@ async function backupDownload() {
 }
 
 let BACKUP_FILE = null;
+let BACKUP_SCENARIOS = 0;
 
 async function backupPick(file) {
     BACKUP_FILE = file || null;
@@ -31,7 +32,9 @@ async function backupPick(file) {
     try {
         const info = await api('/api/backup/inspect', {method: 'POST', body: file});
         box.textContent = `В архиве файлов: ${info.files.length}`
-            + (info.has_adb_key ? ' · есть ключ adb' : '');
+            + (info.has_adb_key ? ' · есть ключ adb' : '')
+            + (info.scenarios ? ` · сценариев: ${info.scenarios}` : '');
+        BACKUP_SCENARIOS = info.scenarios || 0;
         $('backupRestoreBtn').disabled = false;
     } catch (e) {
         box.textContent = e.message;
@@ -41,11 +44,15 @@ async function backupPick(file) {
 
 async function backupRestore(ev) {
     if (!BACKUP_FILE) return;
-    if (!armConfirm(ev.currentTarget, 'Заменить текущие данные фермы данными из архива?')) return;
+    const withSc = $('backupRestoreSc').checked ? 1 : 0;
+    const ask = 'Заменить текущие данные фермы данными из архива?'
+        + (withSc ? ` Сценариев в архиве: ${BACKUP_SCENARIOS} — они будут выполняться на этом компьютере.` : '');
+    if (!armConfirm(ev.currentTarget, ask)) return;
     try {
-        const res = await api('/api/backup/restore?adb_key=' + ($('backupRestoreKey').checked ? 1 : 0),
-                              {method: 'POST', body: BACKUP_FILE});
+        const res = await api('/api/backup/restore?adb_key=' + ($('backupRestoreKey').checked ? 1 : 0)
+                              + '&scenarios=' + withSc, {method: 'POST', body: BACKUP_FILE});
         toast(`Восстановлено: ${res.restored.length}`
+            + (res.restart_needed ? '. Перезапустите ферму, чтобы восстановленные данные подхватились' : '')
             + (res.skipped.length ? `, пропущено: ${res.skipped.length}` : '')
             + (res.saved_previous_to ? '. Прежние файлы сохранены в data/.restore-backup' : ''), 'ok');
     } catch (e) {
@@ -65,7 +72,9 @@ function backupOpen() {
       <p class="tool-note">Восстановить из файла:</p>
       <div class="bp-row"><input type="file" accept=".zip" onchange="backupPick(this.files[0])" aria-label="Архив">
         <label><input type="checkbox" id="backupRestoreKey"> вернуть и ключ adb</label>
+        <label><input type="checkbox" id="backupRestoreSc"> вернуть и сценарии</label>
         <button class="sm danger" id="backupRestoreBtn" disabled onclick="backupRestore(event)"><span>Восстановить</span></button></div>
+      <p class="tool-warn">Сценарии — это программы, они выполняются на этом компьютере: берите архивы только свои.</p>
       <small class="dim" id="backupInfo"></small>`;
     $('mActs').innerHTML = `${toolsBackButton()}<span class="sp"></span><button onclick="closeModal()">Закрыть</button>`;
     modalSheet('wide');
