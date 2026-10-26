@@ -326,6 +326,219 @@ body.marqueeing {
     color: var(--dim);
 }
 
+/* Группы быстрых фраз: вкладки, плашки с клавишей, строка добавления. */
+.ph {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2);
+    margin-top: var(--s3);
+}
+
+.ph-tabs {
+    display: flex;
+    align-items: center;
+    gap: var(--s1);
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.ph-tab,
+.ph-plus {
+    position: relative;
+    height: 32px;
+    padding: 0 var(--s3);
+    border: 0;
+    border-radius: var(--r1) var(--r1) 0 0;
+    background: transparent;
+    color: var(--dim);
+    font-size: var(--fs-2);
+    cursor: pointer;
+    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.ph-tab small {
+    margin-left: var(--s2);
+    color: var(--dim);
+    font-size: var(--fs-1);
+}
+
+.ph-tab:hover,
+.ph-plus:hover:not(:disabled) {
+    background: var(--panel2);
+    color: var(--text);
+}
+
+.ph-tab.on {
+    color: var(--text);
+}
+
+.ph-tab.on::after {
+    content: "";
+    position: absolute;
+    left: var(--s2);
+    right: var(--s2);
+    bottom: -1px;
+    height: 2px;
+    border-radius: var(--pill);
+    background: var(--accent);
+}
+
+.ph-plus {
+    padding: 0 var(--s3);
+    font-size: var(--fs-4);
+    line-height: 1;
+}
+
+.ph-plus:disabled {
+    opacity: .4;
+    cursor: default;
+}
+
+.ph-tab:focus-visible,
+.ph-plus:focus-visible,
+.ph-say:focus-visible,
+.ph-x:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.ph-tabs input.ph-rename {
+    flex: 0 1 180px;
+    height: 28px;
+    margin-bottom: 2px;
+}
+
+.ph-hint {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    color: var(--dim);
+    font-size: var(--fs-1);
+}
+
+.ph-err {
+    color: var(--bad);
+}
+
+.ph-skel {
+    display: block;
+    width: 220px;
+    height: 16px;
+    overflow: hidden;
+    border-radius: var(--r1);
+    background: var(--well);
+    color: transparent;
+}
+
+.ph-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s2);
+}
+
+.ph-chip {
+    display: inline-flex;
+    max-width: 100%;
+    border-radius: var(--r2);
+    background: var(--panel2);
+    transition: background var(--fast) var(--ease);
+}
+
+.ph-chip:hover {
+    background: var(--panel3);
+}
+
+.ph-say,
+.ph-x {
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: var(--fs-2);
+    cursor: pointer;
+}
+
+.ph-say {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s2);
+    min-width: 0;
+    max-width: 280px;
+    height: 32px;
+    padding: 0 var(--s2) 0 var(--s2);
+    border-radius: var(--r2) 0 0 var(--r2);
+}
+
+.ph-say span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ph-say kbd {
+    flex: none;
+    min-width: 24px;
+    padding: 1px 5px;
+    border: 1px solid var(--line-hover);
+    border-bottom-width: 2px;
+    border-radius: var(--r1);
+    background: var(--panel);
+    color: var(--text2);
+    font-family: var(--sans);
+    font-size: var(--fs-1);
+    text-align: center;
+}
+
+.ph-x {
+    width: 28px;
+    border-radius: 0 var(--r2) var(--r2) 0;
+    color: var(--dim);
+    opacity: 0;
+    transition: opacity var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.ph-chip:hover .ph-x,
+.ph-chip:focus-within .ph-x {
+    opacity: 1;
+}
+
+.ph-x:hover {
+    color: var(--bad);
+}
+
+.ph-empty {
+    padding: var(--s2) 0;
+    color: var(--dim);
+    font-size: var(--fs-2);
+}
+
+.ph-add {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+}
+
+.ph-add input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 32px;
+}
+
+.ph-count {
+    flex: none;
+    color: var(--busy);
+}
+
+.ph-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s2);
+    padding-top: var(--s1);
+}
+
+.ph-foot[hidden] {
+    display: none;
+}
+
 .inline-check {
     display: flex;
     align-items: center;

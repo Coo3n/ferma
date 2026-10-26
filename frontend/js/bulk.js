@@ -572,11 +572,11 @@ function bulkPanel(kind) {
         url: `<div class="bp-row"><input id="bulkOpen" type="url" placeholder="https://…" aria-label="Ссылка"
               onkeydown="if(event.key==='Enter')bulkOpen()">
             <button class="sm primary" onclick="bulkOpen()">Открыть</button></div>`,
-        text: `<div class="bp-row"><input id="bulkText" placeholder="что напечатать" aria-label="Текст"
+        text: `<div class="bp-row"><input id="bulkText" placeholder="${esc(t('frazy.chto_pechatat'))}" aria-label="${esc(t('frazy.text_aria'))}"
               onkeydown="if(event.key==='Enter')bulkSendText()">
-            <button class="sm primary" onclick="bulkSendText()">Ввести</button>
-            <button class="sm" onclick="phraseSave()" title="Запомнить как быструю фразу">★ запомнить</button></div>
-          <div class="phrases" id="bulkPhrases">${phrasesHtml()}</div>`,
+            <button class="sm primary" onclick="bulkSendText()">${esc(t('frazy.vvesti'))}</button>
+            <button class="sm" onclick="phraseSave()" title="${esc(t('frazy.zapomnit_title'))}">${esc(t('frazy.zapomnit'))}</button></div>
+          <div class="ph" id="bulkPhrases">${phrasesHtml()}</div>`,
         tags: bulkTagsHtml(),
         group: `<div class="bp-row"><input id="bulkGroup" list="bulkGroups" aria-label="Группа"
               placeholder="имя группы, пусто — убрать" onkeydown="if(event.key==='Enter')bulkSetGroup()">
@@ -621,6 +621,7 @@ function bulkPanel(kind) {
     }[kind];
     const first = box.querySelector('input, select');
     if (first) first.focus();
+    if (kind === 'text') { phrasesRender(); phrasesLoad(); }
     if (kind === 'app') bulkLoadApps();
     if (kind === 'res') bulkResLoad();
     if (kind === 'lines') bulkLinesPreview();
@@ -790,12 +791,13 @@ async function uploadFiles(serials, files) {
 
 /* ------------------------------------------------------- быстрые фразы
 
-   Хранятся в браузере: это личные заготовки оператора, а не данные фермы. */
+   Группы фраз живут на ферме (GET/PUT /api/phrases): одни и те же заготовки
+   видны с любого компьютера. В браузере — только состояние в памяти. */
 
 /* горячие клавиши фраз: начало */
-/* F1–F9 вводят первую–девятую быструю фразу на выбранных телефонах, пока
-   открыта панель «Ввести текст». С модификаторами не срабатывают: Ctrl+F5
-   браузера не должен печатать фразу. */
+/* F1–F9 вводят первую–девятую быструю фразу активной группы на выбранных
+   телефонах, пока открыта панель «Ввести текст». С модификаторами не
+   срабатывают: Ctrl+F5 браузера не должен печатать фразу. */
 function phraseForHotkey(ev, list) {
     if (ev.ctrlKey || ev.altKey || ev.metaKey || ev.shiftKey) return null;
     const m = /^F([1-9])$/.exec(ev.key || '');
@@ -803,43 +805,452 @@ function phraseForHotkey(ev, list) {
 }
 /* горячие клавиши фраз: конец */
 
+/* группы фраз: начало */
+/* Чистые помощники: состояние {groups:[{id,name,items}], active} не меняют,
+   а возвращают новое. Лимиты те же, что на сервере (phrase_store.py). */
+const PHR_MAX_GROUPS = 30, PHR_MAX_ITEMS = 100, PHR_MAX_PHRASE = 500, PHR_MAX_NAME = 40;
+
+function phrClone(state) {
+    return JSON.parse(JSON.stringify(state));
+}
+
+function phrGroup(state, id) {
+    const groups = (state && state.groups) || [];
+    return groups.find(g => g.id === (id == null ? state.active : id)) || groups[0] || null;
+}
+
+function phrCountItems(state) {
+    return ((state && state.groups) || []).reduce((n, g) => n + g.items.length, 0);
+}
+
+/* {state, ok, reason}: reason — empty | dup | limit */
+function phrAddItem(state, text) {
+    const s = phrClone(state);
+    const g = phrGroup(s);
+    const v = String(text == null ? '' : text).trim().slice(0, PHR_MAX_PHRASE).trim();
+    if (!g || !v) return {state: s, ok: false, reason: 'empty'};
+    if (g.items.includes(v)) return {state: s, ok: false, reason: 'dup'};
+    if (g.items.length >= PHR_MAX_ITEMS) return {state: s, ok: false, reason: 'limit'};
+    g.items.push(v);
+    return {state: s, ok: true, reason: ''};
+}
+
+function phrRemoveItem(state, index) {
+    const s = phrClone(state);
+    const g = phrGroup(s);
+    if (g && index >= 0 && index < g.items.length) g.items.splice(index, 1);
+    return s;
+}
+
+/* Вставить фразу обратно на прежнее место (отмена удаления). */
+function phrInsertItem(state, index, text) {
+    const s = phrClone(state);
+    const g = phrGroup(s);
+    if (g && !g.items.includes(text) && g.items.length < PHR_MAX_ITEMS) {
+        g.items.splice(Math.max(0, Math.min(index, g.items.length)), 0, text);
+    }
+    return s;
+}
+
+/* Новая группа становится активной. id приходит снаружи (случайный). */
+function phrAddGroup(state, id, name) {
+    const s = phrClone(state);
+    if (s.groups.length >= PHR_MAX_GROUPS) return {state: s, ok: false, id: null};
+    s.groups.push({id, name: String(name || '').trim().slice(0, PHR_MAX_NAME) || 'Группа', items: []});
+    s.active = id;
+    return {state: s, ok: true, id};
+}
+
+function phrRenameGroup(state, id, name) {
+    const s = phrClone(state);
+    const g = phrGroup(s, id);
+    const v = String(name == null ? '' : name).trim().slice(0, PHR_MAX_NAME).trim();
+    if (g && v) g.name = v;
+    return s;
+}
+
+/* Последнюю группу не удаляем. Активной становится соседняя. */
+function phrDeleteGroup(state, id) {
+    const s = phrClone(state);
+    const i = s.groups.findIndex(g => g.id === id);
+    if (i < 0 || s.groups.length < 2) return s;
+    s.groups.splice(i, 1);
+    if (s.active === id) s.active = s.groups[Math.min(i, s.groups.length - 1)].id;
+    return s;
+}
+
+function phrSetActive(state, id) {
+    const s = phrClone(state);
+    if (s.groups.some(g => g.id === id)) s.active = id;
+    return s;
+}
+
+/* Соседняя вкладка по кругу: dir = -1 | 1. */
+function phrNeighbor(state, dir) {
+    const n = state.groups.length;
+    const i = state.groups.findIndex(g => g.id === state.active);
+    return n ? state.groups[(Math.max(i, 0) + dir + n) % n].id : null;
+}
+
+/* Имя для новой группы: «Группа N» с первым свободным номером. */
+function phrFreeName(state, pattern) {
+    const used = new Set(state.groups.map(g => g.name));
+    let n = state.groups.length + 1;
+    while (used.has(pattern.replace('{n}', n))) n++;
+    return pattern.replace('{n}', n);
+}
+
+/* Переезд из браузера: список из localStorage уходит в первую группу, если
+   на ферме фраз ещё нет. null — переезжать нечего. */
+function phrMigrate(server, localList) {
+    if (!server || !Array.isArray(server.groups) || !server.groups.length) return null;
+    if (phrCountItems(server) > 0) return null;
+    const seen = new Set(), items = [];
+    for (const x of Array.isArray(localList) ? localList : []) {
+        const v = typeof x === 'string' ? x.trim().slice(0, PHR_MAX_PHRASE).trim() : '';
+        if (v && !seen.has(v)) { seen.add(v); items.push(v); }
+    }
+    if (!items.length) return null;
+    const s = phrClone(server);
+    s.groups[0].items = items.slice(0, PHR_MAX_ITEMS);
+    return s;
+}
+/* группы фраз: конец */
+
+/* ---- состояние и сохранение ---- */
+
+const PH = {
+    state: null,         // то, что видит человек
+    saved: null,         // последнее подтверждённое фермой
+    error: '',
+    loading: false,
+    renaming: null,
+    ver: 0,              // растёт при каждой правке; ответ старого сохранения новее не затирает
+    timer: null,
+    inflight: null,
+};
+
+function phrasesActiveItems() {
+    const g = PH.state && phrGroup(PH.state);
+    return g ? g.items : [];
+}
+
+async function phrasesLoad() {
+    if (PH.loading) return;
+    PH.loading = true;
+    PH.error = '';
+    phrasesRender();
+    try {
+        const server = await api('/api/phrases');
+        let local = [];
+        try { local = JSON.parse(localStorage.getItem(PHRASES_KEY) || '[]'); } catch (e) { local = []; }
+        PH.saved = server;
+        PH.state = phrClone(server);
+        const moved = phrMigrate(server, local);
+        if (moved) {
+            PH.state = moved;
+            PH.ver++;
+            PH.loading = false;
+            if (await phrasesFlush()) {
+                try { localStorage.removeItem(PHRASES_KEY); } catch (e) { /* приватный режим */ }
+                toast(t('frazy.pereehali', {name: phrGroup(PH.saved).name}), 'ok');
+            }
+        } else if (Array.isArray(local) && !local.length) {
+            try { localStorage.removeItem(PHRASES_KEY); } catch (e) { /* нечего чистить */ }
+        }
+    } catch (e) {
+        if (!PH.state) PH.error = e.message;
+        else toast(t('frazy.ne_zagruzilis', {err: e.message}), 'bad');
+    }
+    PH.loading = false;
+    phrasesRender();
+}
+
+/* Правка: показываем сразу, на ферму уходит через паузу одним запросом. */
+function phrasesChange(next) {
+    PH.state = next;
+    PH.ver++;
+    clearTimeout(PH.timer);
+    PH.timer = setTimeout(phrasesFlush, 400);
+    phrasesRender();
+}
+
+/* true — на ферме лежит то же, что на экране; false — запись не прошла и
+   экран вернулся к последнему подтверждённому. */
+async function phrasesFlush() {
+    clearTimeout(PH.timer);
+    PH.timer = null;
+    if (PH.inflight) await PH.inflight;
+    if (!PH.state) return false;
+    const sent = PH.state, ver = PH.ver;
+    if (JSON.stringify(sent) === JSON.stringify(PH.saved)) return true;
+    let ok = true;
+    PH.inflight = api('/api/phrases', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(sent),
+    }).then(saved => {
+        PH.saved = saved;
+        if (PH.ver === ver) PH.state = phrClone(saved);
+    }).catch(e => {
+        ok = false;
+        PH.state = phrClone(PH.saved);
+        PH.ver++;
+        PH.renaming = null;
+        toast(t('frazy.ne_sohranilos', {err: e.message}), 'bad');
+    }).finally(() => { PH.inflight = null; });
+    await PH.inflight;
+    phrasesRender();
+    return ok;
+}
+
+/* ---- вид ---- */
+
+function phrasesHtml() {
+    return `<div class="ph-tabs" id="phTabs" role="tablist" aria-label="${esc(t('frazy.gruppy_aria'))}"></div>
+      <div class="ph-hint" id="phHint"></div>
+      <div class="ph-list" id="phList"></div>
+      <div class="ph-add">
+        <input id="phAdd" maxlength="${PHR_MAX_PHRASE}" placeholder="${esc(t('frazy.dobavit_placeholder'))}"
+               aria-label="${esc(t('frazy.dobavit_placeholder'))}" oninput="phrasesAddHint()"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();phrasesAdd()}">
+        <small class="dim ph-count" id="phCount"></small>
+        <button class="sm" id="phAddBtn" onclick="phrasesAdd()">${esc(t('frazy.dobavit'))}</button>
+      </div>
+      <div class="ph-foot" id="phFoot">
+        <button class="sm" id="phRename" onclick="phrasesRenameStart()">${esc(t('frazy.pereimenovat'))}</button>
+        <button class="sm" id="phLoad" title="${esc(t('frazy.zagruzit_title'))}"
+                onclick="$('phFile').click()">${esc(t('frazy.zagruzit'))}</button>
+        <button class="sm" id="phSave" onclick="phrasesExport()">${esc(t('frazy.skachat'))}</button>
+        <button class="sm danger" id="phDel" onclick="phrasesDeleteGroup(event)"><span>${esc(t('frazy.udalit_gruppu'))}</span></button>
+        <input type="file" id="phFile" accept=".txt,.csv" hidden aria-label="${esc(t('frazy.zagruzit'))}"
+               onchange="phrasesImport(this.files[0]); this.value=''">
+      </div>`;
+}
+
+function phrasesRender() {
+    const box = document.getElementById('bulkPhrases');
+    if (!box) return;
+    const tabs = $('phTabs'), list = $('phList'), hint = $('phHint'), foot = $('phFoot');
+    if (!PH.state) {
+        tabs.innerHTML = '';
+        foot.hidden = true;
+        $('phAdd').disabled = $('phAddBtn').disabled = true;
+        hint.innerHTML = PH.error
+            ? `<span class="ph-err">${esc(t('frazy.oshibka', {err: PH.error}))}</span>
+               <button class="sm" onclick="phrasesLoad()">${esc(t('frazy.povtorit'))}</button>`
+            : `<span class="ph-skel">${esc(t('frazy.zagruzka'))}</span>`;
+        list.innerHTML = '';
+        return;
+    }
+    const st = PH.state, active = phrGroup(st);
+    foot.hidden = false;
+    $('phAdd').disabled = $('phAddBtn').disabled = false;
+    tabs.innerHTML = st.groups.map(g => {
+        if (g.id === PH.renaming) {
+            return `<input class="ph-rename" id="phRenameInput" value="${esc(g.name)}" maxlength="${PHR_MAX_NAME}"
+                      aria-label="${esc(t('frazy.nazvanie_aria'))}" data-id="${esc(g.id)}">`;
+        }
+        const on = g.id === active.id;
+        return `<button class="ph-tab${on ? ' on' : ''}" role="tab" aria-selected="${on}" tabindex="${on ? 0 : -1}"
+                  data-id="${esc(g.id)}" title="${esc(t('frazy.pereimenovat_title'))}">${esc(g.name)}<small>${g.items.length}</small></button>`;
+    }).join('') + `<button class="ph-plus" id="phPlus" title="${esc(t('frazy.novaya_gruppa'))}"
+                     aria-label="${esc(t('frazy.novaya_gruppa'))}" ${st.groups.length >= PHR_MAX_GROUPS ? 'disabled' : ''}>+</button>`;
+    hint.textContent = t('frazy.podskazka', {name: active.name});
+    list.innerHTML = active.items.length
+        ? active.items.map((p, i) => `<span class="ph-chip">
+            <button class="ph-say" data-i="${i}" title="${esc(i < 9 ? t('frazy.vvesti_klavisha', {key: 'F' + (i + 1)}) : t('frazy.vvesti_title'))}">${i < 9 ? `<kbd>F${i + 1}</kbd>` : ''}<span>${esc(p)}</span></button>
+            <button class="ph-x" data-i="${i}" aria-label="${esc(t('frazy.udalit_frazu'))}" title="${esc(t('frazy.udalit_frazu'))}">×</button></span>`).join('')
+        : `<span class="ph-empty">${esc(t('frazy.pusto'))}</span>`;
+    disableWithReason($('phDel'), st.groups.length < 2, t('frazy.poslednyaya'));
+    disableWithReason($('phSave'), !active.items.length, t('frazy.v_gruppe_pusto'));
+    disableWithReason($('phAddBtn'), active.items.length >= PHR_MAX_ITEMS, t('frazy.limit_fraz'));
+    phrasesAddHint();
+    if (PH.renaming) {
+        const inp = $('phRenameInput');
+        if (inp) { inp.focus(); inp.select(); }
+    }
+}
+
+function phrasesAddHint() {
+    const el = $('phCount'), inp = $('phAdd');
+    if (!el || !inp) return;
+    const n = inp.value.trim() ? phrCount(inp.value) : 0;
+    el.textContent = n > 1 ? t('frazy.variantov', {n}) : '';
+}
+
+function phrasesFocusAdd() {
+    const inp = $('phAdd');
+    if (inp) inp.focus();
+}
+
+function phrasesAdd(text) {
+    const inp = $('phAdd');
+    const v = text != null ? text : (inp ? inp.value : '');
+    if (!PH.state) return;
+    const res = phrAddItem(PH.state, v);
+    if (!res.ok) {
+        toast(res.reason === 'empty' ? t('frazy.vpishite_frazu')
+            : res.reason === 'dup' ? t('frazy.uzhe_est') : t('frazy.limit_fraz'), 'bad');
+        return;
+    }
+    if (inp && text == null) inp.value = '';
+    phrasesChange(res.state);
+}
+
+/* «★ запомнить» у основного поля: текст уходит в активную группу. */
+function phraseSave() {
+    const v = $('bulkText').value.trim();
+    if (!v) return toast(t('frazy.vpishite'), 'bad');
+    phrasesAdd(v);
+}
+
+function phrasesSwitch(id, focusTab) {
+    if (!PH.state || id == null) return;
+    PH.renaming = null;
+    phrasesChange(phrSetActive(PH.state, id));
+    const g = phrGroup(PH.state);
+    if (focusTab) {
+        const tab = document.querySelector(`#phTabs .ph-tab[data-id="${CSS.escape(id)}"]`);
+        if (tab) tab.focus();
+    } else if (!g.items.length) {
+        phrasesFocusAdd();
+    }
+}
+
+function phrasesNewGroup() {
+    if (!PH.state) return;
+    const id = 'g' + Math.random().toString(16).slice(2, 10);
+    const res = phrAddGroup(PH.state, id, phrFreeName(PH.state, t('frazy.imya_gruppy', {n: '{n}'})));
+    if (!res.ok) return toast(t('frazy.limit_grupp'), 'bad');
+    PH.renaming = id;
+    phrasesChange(res.state);
+}
+
+function phrasesRenameStart() {
+    if (!PH.state) return;
+    PH.renaming = PH.state.active;
+    phrasesRender();
+}
+
+function phrasesRenameDone(id, value, commit) {
+    if (PH.renaming !== id) return;
+    PH.renaming = null;
+    if (commit) phrasesChange(phrRenameGroup(PH.state, id, value));
+    else phrasesRender();
+    const tab = document.querySelector(`#phTabs .ph-tab[data-id="${CSS.escape(id)}"]`);
+    if (tab && commit !== 'blur') tab.focus();
+}
+
+function phrasesDeleteGroup(ev) {
+    const btn = ev.currentTarget;
+    if (!PH.state || !armConfirm(btn, t('frazy.udalit_podtverdit'))) return;
+    const g = phrGroup(PH.state);
+    delete btn.dataset.armed;
+    btn.classList.remove('armed');
+    (btn.querySelector('span') || btn).textContent = btn.dataset.label;
+    phrasesChange(phrDeleteGroup(PH.state, g.id));
+    toast(t('frazy.gruppa_udalena', {name: g.name}), 'ok');
+}
+
+async function phrasesExport() {
+    if (!PH.state) return;
+    await phrasesFlush();
+    const a = document.createElement('a');
+    a.href = '/api/phrases/export?group=' + encodeURIComponent(PH.state.active);
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+async function phrasesImport(file) {
+    if (!file || !PH.state) return;
+    let text;
+    try {
+        const buf = await file.arrayBuffer();
+        try {
+            text = new TextDecoder('utf-8', {fatal: true}).decode(buf);
+        } catch (e) {
+            text = new TextDecoder('windows-1251').decode(buf);
+        }
+    } catch (e) {
+        return toast(t('frazy.ne_prochitan'), 'bad');
+    }
+    try {
+        await phrasesFlush();
+        const res = await post('/api/phrases/import', {group: PH.state.active, text, filename: file.name});
+        const {added, ...saved} = res;
+        PH.saved = saved;
+        PH.state = phrClone(saved);
+        PH.ver++;
+        phrasesRender();
+        toast(added > 0 ? t('frazy.dobavleno', {n: added}) : t('frazy.nichego_novogo'), added > 0 ? 'ok' : '');
+    } catch (e) {
+        toast(e.message, 'bad');
+    }
+}
+
+/* События вкладок и плашек — одним обработчиком на панель. */
+document.addEventListener('click', ev => {
+    const box = ev.target.closest && ev.target.closest('#bulkPhrases');
+    if (!box) return;
+    const tab = ev.target.closest('.ph-tab');
+    if (tab) return phrasesSwitch(tab.dataset.id);
+    if (ev.target.closest('#phPlus')) return phrasesNewGroup();
+    const x = ev.target.closest('.ph-x');
+    if (x) {
+        const i = Number(x.dataset.i), text = phrasesActiveItems()[i];
+        phrasesChange(phrRemoveItem(PH.state, i));
+        toast(t('frazy.fraza_udalena'), '', {label: t('frazy.vernut'),
+            onClick: () => phrasesChange(phrInsertItem(PH.state, i, text))});
+        return;
+    }
+    const say = ev.target.closest('.ph-say');
+    if (say) bulkAction({type: 'text', value: phrasesActiveItems()[Number(say.dataset.i)]}, t('frazy.fraza'));
+});
+
+document.addEventListener('dblclick', ev => {
+    const tab = ev.target.closest && ev.target.closest('#phTabs .ph-tab');
+    if (!tab || !PH.state) return;
+    phrasesSwitch(tab.dataset.id, true);
+    phrasesRenameStart();
+});
+
+document.addEventListener('keydown', ev => {
+    const inp = ev.target.closest && ev.target.closest('#phRenameInput');
+    if (inp) {
+        if (ev.key === 'Enter') { ev.preventDefault(); phrasesRenameDone(inp.dataset.id, inp.value, true); }
+        else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); phrasesRenameDone(inp.dataset.id, '', false); }
+        return;
+    }
+    const tab = ev.target.closest && ev.target.closest('#phTabs .ph-tab');
+    if (!tab || !PH.state) return;
+    if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') {
+        ev.preventDefault();
+        phrasesSwitch(phrNeighbor(PH.state, ev.key === 'ArrowRight' ? 1 : -1), true);
+    } else if (ev.key === 'F2') {
+        ev.preventDefault();
+        phrasesRenameStart();
+    }
+});
+
+document.addEventListener('focusout', ev => {
+    const inp = ev.target.closest && ev.target.closest('#phRenameInput');
+    if (inp) phrasesRenameDone(inp.dataset.id, inp.value, 'blur');
+});
+
 document.addEventListener('keydown', ev => {
     const box = document.getElementById('bulkPhrases');
     if (ev.repeat) return;                                         // зажатая клавиша не шлёт фразу снова и снова
     if (!box || box.offsetParent === null) return;                 // панели с фразами не видно
     if (ev.target.closest && ev.target.closest('input, textarea, select, [contenteditable]')) return;
-    const text = phraseForHotkey(ev, phrases());
+    if (ev.target.closest && ev.target.closest('#phTabs') && ev.key === 'F2') return;
+    const text = phraseForHotkey(ev, phrasesActiveItems());
     if (!text) return;
     ev.preventDefault();
-    bulkAction({type: 'text', value: text}, 'Фраза');
+    bulkAction({type: 'text', value: text}, t('frazy.fraza'));
 });
-
-function phrases() {
-    return store.get(PHRASES_KEY, []);
-}
-
-function phrasesHtml() {
-    return phrases().map((p, i) => `<span class="phrase">
-      <button class="sm" onclick="bulkAction({type:'text',value:phrases()[${i}]},'Фраза')"
-              title="${i < 9 ? `F${i + 1} — ` : ''}Ввести на всех выбранных">${i < 9 ? `<kbd>F${i + 1}</kbd> ` : ''}${esc(p)}</button>
-      <button class="sm x" onclick="phraseDrop(${i})" aria-label="Удалить фразу">×</button></span>`).join('');
-}
-
-function phraseSave() {
-    const v = $('bulkText').value.trim();
-    if (!v) return toast('впишите текст, потом ★', 'bad');
-    const list = phrases().filter(p => p !== v);
-    list.unshift(v);
-    store.set(PHRASES_KEY, list.slice(0, 30));
-    $('bulkPhrases').innerHTML = phrasesHtml();
-}
-
-function phraseDrop(i) {
-    const list = phrases();
-    list.splice(i, 1);
-    store.set(PHRASES_KEY, list);
-    $('bulkPhrases').innerHTML = phrasesHtml();
-}
 
 /* -------------------------------------------------------------- группы */
 
