@@ -71,7 +71,7 @@ def включить(**kw):
 def модель(monkeypatch, reply):
     calls = []
 
-    def ask(image, prompt, cfg=None):
+    def ask(image, prompt, cfg=None, max_tokens=300):
         calls.append(prompt)
         if isinstance(reply, Exception):
             raise reply
@@ -114,6 +114,62 @@ def test_окружение_важнее_файла(monkeypatch):
     включить()
     monkeypatch.setenv("FARM_VLM", "0")
     assert not settings.enabled()
+
+
+AUTOGLM = ('<think>вижу кнопку</think>\n<answer>do(action="Tap", element=[500,525])</answer>')
+
+
+@pytest.mark.parametrize("text,xy", [
+    (AUTOGLM, (0.5, 0.525)),
+    ('Рассуждаю, примерно (1, 2).\ndo(action="Tap", element=[925,69])', (0.925, 0.069)),
+    ('do(action="Tap", element=[1,1]) потом передумал do(action="Tap", element=[900, 960])', (0.9, 0.96)),
+])
+def test_разбор_autoglm(text, xy):
+    a = parse(text)
+    assert (a.x, a.y) == xy and a.confidence == 0.7
+
+
+@pytest.mark.parametrize("bad", [
+    '<answer>do(action="NotFound")</answer>',
+    'do(action="Tap", element=[1500,5])',
+    'do(action="Launch", app="TikTok")',
+    "Looking at the screenshot, I can see the button and I need to tap it, then",
+])
+def test_разбор_autoglm_отвергает(bad):
+    assert parse(bad) is None
+
+
+@pytest.mark.parametrize("text,xy", [
+    ('{"x": [233, 124], "y": 124, "confidence": 0.99, "why": "ok"}', (0.233, 0.124)),
+    ('{"x": 88, 550, "y": 550, "confidence": 0.9, "why": "ячейка"}', (0.088, 0.55)),
+])
+def test_разбор_ломаного_json(text, xy):
+    a = parse(text)
+    assert (a.x, a.y) == xy
+
+
+@pytest.mark.parametrize("bad", [
+    '{"x": [2000, 1], "y": 5, "confidence": 0.9}',
+    '{"x": [2, 1], "y": 5}',
+    '{"found": false, "x": [2, 1], "y": 5, "confidence": 0.9}',
+])
+def test_ломаный_json_границы_и_отказ_работают(bad):
+    assert parse(bad) is None
+
+
+def test_autoglm_свой_промпт_и_ответ(monkeypatch):
+    включить(model="AutoGLM-Phone-9B")
+    calls = модель(monkeypatch, AUTOGLM)
+    hit = locate.locate(Ctx(), WHAT)
+    assert hit.layer == "vlm" and (hit.x, hit.y) == (0.5, 0.525)
+    assert "do(action=" in calls[0] and "Reply with JSON" not in calls[0]
+
+
+def test_другая_модель_получает_json_промпт(monkeypatch):
+    включить(model="qwen3-vl")
+    calls = модель(monkeypatch, GO)
+    locate.locate(Ctx(), WHAT)
+    assert "Reply with JSON only" in calls[0]
 
 
 # ------------------------------------------------------------------ слой
@@ -329,7 +385,7 @@ def test_сетевая_ошибка_не_списывает_квоту(monkeypa
             raise RuntimeError("нет дерева")
 
     monkeypatch.setattr(locate.settings, "get", lambda: type("C", (), dict(
-        enabled=True, url="http://x", max_per_job=3, max_per_day=10, min_confidence=0.6))())
+        enabled=True, url="http://x", model="m", max_per_job=3, max_per_day=10, min_confidence=0.6))())
 
     def boom(*a, **k):
         raise client.VlmError("нейросеть недоступна")

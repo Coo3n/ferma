@@ -21,11 +21,12 @@ from ..recorder import steps as schema
 from ..ui import tree
 from . import client, locate as loc, settings, usage
 
+MODEL_SCALE = 1000.0     # шкала координат в ответе модели; в сценарии — доли 0..1
 MAX_STEPS = 30
 MAX_SLEEP = 60
 # Черновик на 30 шагов не помещается в 300 токенов обычной подсказки.
 PLAN_MAX_TOKENS = 1800
-# Вид шага → обязательные поля. Числа 0..1 для координат; ограничения ниже.
+# Вид шага → обязательные поля. В сценарии координаты — доли 0..1; ограничения ниже.
 ALLOWED = {
     "launch_app": ("package",),
     "open_url": ("url",),
@@ -40,10 +41,18 @@ _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.S)
 
 PROMPT = (
     "You help to draft an automation recipe for an Android phone. The user's task: {task}\n"
-    "Look at the screenshot (the current phone screen) and answer with ONLY a JSON array of steps, "
-    "no explanations. Allowed step kinds and their args: {kinds}. "
-    "Coordinates are fractions of the screen from 0 to 1. At most {limit} steps. "
-    "Never include passwords, payment or personal data."
+    "Look at the screenshot (the current phone screen) and answer with ONLY a JSON array of steps "
+    "(an array even for one step) that covers the WHOLE task, not only the first step, "
+    "no explanations. Every step has exactly this shape: "
+    '{{"kind": "<kind>", "args": {{...}}}}, for example '
+    '[{{"kind": "launch_app", "args": {{"package": "com.android.chrome"}}}}, '
+    '{{"kind": "tap", "args": {{"x": 500, "y": 300}}}}]. '
+    "Allowed step kinds and their args: {kinds}. "
+    "Coordinates are integers from 0 to 1000 (0,0 = top-left, 1000,1000 = bottom-right). "
+    "To open an app use launch_app with its Android package name (for example com.android.settings, "
+    "com.android.chrome, com.miui.calculator) instead of searching for its icon. "
+    "Never repeat the same step more than twice in a row. "
+    "At most {limit} steps. Never include passwords, payment or personal data."
 )
 
 
@@ -68,6 +77,17 @@ def _number(value, lo, hi):
     return max(lo, min(hi, n))
 
 
+def _from_model(value):
+    """Координата ответа модели 0..1000 → доля 0..1; вне шкалы или не число → None."""
+    if isinstance(value, bool):
+        return None
+    try:
+        n = float(value)
+    except (TypeError, ValueError):
+        return None
+    return n / MODEL_SCALE if 0 <= n <= MODEL_SCALE else None
+
+
 def _clean(step):
     if not isinstance(step, dict) or step.get("kind") not in ALLOWED:
         return None
@@ -80,7 +100,7 @@ def _clean(step):
             return None
         value = args[name]
         if name in _COORDS:
-            value = _number(value, 0.0, 1.0)
+            value = _from_model(value)
         elif name == "seconds":
             value = _number(value, 0.0, MAX_SLEEP)
         else:
@@ -100,12 +120,22 @@ def parse_steps(text: str) -> list:
     body = fenced.group(1) if fenced else raw
     start, end = body.find("["), body.rfind("]")
     if start < 0 or end <= start:
-        raise UnreadableReply("модель не вернула список шагов (ответ мог оборваться)")
+        a, b = body.find("{"), body.rfind("}")      # модель иногда шлёт один шаг без массива
+        if a < 0 or b <= a:
+            raise UnreadableReply("модель не вернула список шагов (ответ мог оборваться)")
+        body = "[" + body[a:b + 1] + "]"
+        start, end = 0, len(body) - 1
     try:
         items = json.loads(body[start:end + 1])
     except ValueError:
         raise UnreadableReply("ответ модели не удалось прочитать")
-    steps = [s for s in (_clean(i) for i in items) if s][:MAX_STEPS]
+    steps = []
+    for i in items:
+        step = _clean(i)
+        # Три одинаковых шага подряд — зацикливание модели, лишние не берём.
+        if step and not (len(steps) >= 2 and steps[-1] == step and steps[-2] == step):
+            steps.append(step)
+    steps = steps[:MAX_STEPS]
     if not steps:
         raise PlanError("в ответе модели нет подходящих шагов")
     return steps

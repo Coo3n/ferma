@@ -46,9 +46,9 @@ async function vlmOpen() {
         </label>
         <div class="vlm-group">
           <h4>${esc(t('vlm.gruppa_kuda'))}</h4>
-          <label>${esc(t('vlm.adres'))}<input id="vlmUrl" value="${esc(d.url)}" placeholder="http://192.168.1.50:8000/v1"></label>
+          <label>${esc(t('vlm.adres'))}<input id="vlmUrl" value="${esc(d.url)}" placeholder="http://127.0.0.1:1234/v1"></label>
           <div class="vlm-two">
-            <label>${esc(t('vlm.model'))}<input id="vlmModel" value="${esc(d.model)}" placeholder="AutoGLM-Phone-9B"></label>
+            <label>${esc(t('vlm.model'))}<input id="vlmModel" value="${esc(d.model)}" placeholder="qwen/qwen3-vl-30b"></label>
             <label>${esc(t('vlm.klyuch'))}<input id="vlmKey" type="password" value="${esc(d.key)}" autocomplete="off"></label>
           </div>
           <div class="vlm-status" id="vlmStatus" role="status" aria-live="polite"></div>

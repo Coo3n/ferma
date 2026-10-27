@@ -10,7 +10,7 @@ GOOD = """Вот шаги:
 [
   {"kind": "launch_app", "args": {"package": "org.telegram.messenger"}},
   {"kind": "sleep", "args": {"seconds": 2}},
-  {"kind": "swipe", "args": {"x1": 0.5, "y1": 0.8, "x2": 0.5, "y2": 0.3}},
+  {"kind": "swipe", "args": {"x1": 500, "y1": 800, "x2": 500, "y2": 300}},
   {"kind": "type", "args": {"value": "привет"}},
   {"kind": "key", "args": {"name": "back"}}
 ]
@@ -29,11 +29,23 @@ def test_parse_steps_plain_array_without_fences():
 
 def test_parse_steps_drops_unknown_kinds_and_missing_args():
     text = ('[{"kind": "shell", "args": {"cmd": "rm -rf /"}},'
-            ' {"kind": "swipe", "args": {"x1": 0.5}},'
-            ' {"kind": "tap", "args": {"x": 0.5, "y": 0.5}},'
+            ' {"kind": "swipe", "args": {"x1": 500}},'
+            ' {"kind": "tap", "args": {"x": 500, "y": 500}},'
             ' "junk", 5, {"kind": "sleep", "args": {"seconds": "abc"}}]')
     steps = plan.parse_steps(text)
     assert [s["kind"] for s in steps] == ["tap"]
+
+
+def test_parse_steps_single_object_without_array():
+    steps = plan.parse_steps('{"kind": "swipe", "args": {"x1": 500, "y1": 583, "x2": 500, "y2": 338}}')
+    assert [s["kind"] for s in steps] == ["swipe"] and steps[0]["args"]["y1"] == 0.583
+
+
+def test_parse_steps_drops_looping_repeats():
+    same = '{"kind": "swipe", "args": {"x1": 500, "y1": 600, "x2": 500, "y2": 300}}'
+    other = '{"kind": "key", "args": {"name": "back"}}'
+    steps = plan.parse_steps(f"[{same},{same},{same},{same},{other},{same}]")
+    assert [s["kind"] for s in steps] == ["swipe", "swipe", "key", "swipe"]
 
 
 def test_parse_steps_never_lets_shell_through():
@@ -42,10 +54,12 @@ def test_parse_steps_never_lets_shell_through():
 
 
 def test_parse_steps_clamps_numbers_and_caps_count():
-    many = ",".join('{"kind": "sleep", "args": {"seconds": 1}}' for _ in range(80))
+    many = ",".join('{"kind": "sleep", "args": {"seconds": %d}}' % (i + 1) for i in range(80))
     assert len(plan.parse_steps(f"[{many}]")) == plan.MAX_STEPS
-    s = plan.parse_steps('[{"kind": "tap", "args": {"x": 5, "y": -2}}]')[0]["args"]
-    assert 0 <= s["x"] <= 1 and 0 <= s["y"] <= 1
+    s = plan.parse_steps('[{"kind": "tap", "args": {"x": 250, "y": 750}}]')[0]["args"]
+    assert (s["x"], s["y"]) == (0.25, 0.75)
+    with pytest.raises(plan.PlanError):      # вне шкалы 0..1000 — шаг отброшен, а не прижат к углу
+        plan.parse_steps('[{"kind": "tap", "args": {"x": 617000, "y": -2}}]')
     sl = plan.parse_steps('[{"kind": "sleep", "args": {"seconds": 99999}}]')[0]["args"]
     assert sl["seconds"] <= plan.MAX_SLEEP
 

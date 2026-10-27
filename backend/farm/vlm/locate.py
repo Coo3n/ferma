@@ -35,6 +35,23 @@ PROMPT = (
     "Never guess."
 )
 
+# AutoGLM обучена отвечать <think>…</think><answer>do(…)</answer> и JSON не слушается:
+# рассуждает до обрыва. Этот промпт держит рассуждение коротким и ответ в её формате.
+AUTOGLM_PROMPT = (
+    "You are an Android operation agent. Goal: tap {goal}.\n"
+    "Visible texts on screen (may help): {summary}\n"
+    "Respond in this exact format, with a SHORT think (max 15 words):\n"
+    "<think>short reason</think>\n"
+    '<answer>do(action="Tap", element=[x,y])</answer>\n'
+    "x,y are relative coordinates 0-999 of the element center (0,0 = top-left).\n"
+    'If the element is not on the screen: <answer>do(action="NotFound")</answer>'
+)
+AUTOGLM_MAX_TOKENS = 400
+
+
+def is_autoglm(model: str) -> bool:
+    return "autoglm" in (model or "").lower()
+
 
 def goal_texts(what: dict) -> list:
     """Всё, что говорит, ЧТО просили нажать: тексты, значения селекторов, подпись шага."""
@@ -163,9 +180,12 @@ def locate(ctx, what: dict, tree_summary: str = ""):
             _log(ctx, f"нейросеть не зову: {reason}")
             return None
         goal = "; ".join(goals)
-        prompt = PROMPT.format(goal=goal, summary=tree_summary or summary_of(nodes) or "unknown")
+        auto = is_autoglm(cfg.model)
+        prompt = (AUTOGLM_PROMPT if auto else PROMPT).format(
+            goal=goal, summary=tree_summary or summary_of(nodes) or "unknown")
         try:
-            reply = client.ask(image, prompt)
+            reply = (client.ask(image, prompt, max_tokens=AUTOGLM_MAX_TOKENS) if auto
+                     else client.ask(image, prompt))
         except Exception as e:  # noqa: BLE001
             usage.refund(job_key(ctx))   # ответа не было — квоту не тратим
             _log(ctx, f"нейросеть не ответила: {e}")

@@ -10,7 +10,7 @@ from farm.api import vlm as api
 from farm.vlm import agent
 
 TAP = {"kind": "tap", "x": 0.5, "y": 0.5}
-REPLY = '```json\n{"action": {"kind": "tap", "x": 0.4, "y": 0.6}, "why": "кнопка"}\n```'
+REPLY = '```json\n{"action": {"kind": "tap", "x": 400, "y": 600}, "why": "кнопка"}\n```'
 
 
 @pytest.fixture
@@ -94,6 +94,17 @@ def test_secret_in_type_refused(ready, monkeypatch):
 def test_parse_fenced_action(ready):
     r = agent.parse_reply(REPLY)
     assert r["action"] == {"kind": "tap", "x": 0.4, "y": 0.6} and r["why"] == "кнопка"
+
+
+@pytest.mark.parametrize("bad", [617.5 * 2, -1, 1001])
+def test_координата_модели_вне_шкалы_отказ_а_не_угол(ready, bad):
+    with pytest.raises(agent.AgentError):
+        agent.parse_reply('{"action": {"kind": "tap", "x": %s, "y": 5}, "why": "x"}' % bad)
+
+
+def test_шкала_модели_0_1000_в_доли(ready):
+    r = agent.parse_reply('{"action": {"kind": "swipe", "x1": 500, "y1": 800, "x2": 500, "y2": 200}}')
+    assert r["action"] == {"kind": "swipe", "x1": 0.5, "y1": 0.8, "x2": 0.5, "y2": 0.2}
 
 
 def test_parse_done_and_ask(ready):

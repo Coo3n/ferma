@@ -1,6 +1,6 @@
 """Тонкий клиент к OpenAI-совместимому chat/completions с картинкой.
 
-Подходит и локальному vLLM/SGLang с AutoGLM-Phone-9B, и облачному API.
+Подходит локальному серверу (LM Studio, llama.cpp, vLLM) и облачному API.
 Зависимостей нет (urllib). Остальной код зовёт `client.ask(image, prompt)` —
 в тестах эту функцию подменяют, сеть не нужна.
 """

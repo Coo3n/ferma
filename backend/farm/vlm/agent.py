@@ -25,6 +25,7 @@ MAX_WAIT = 10.0
 HISTORY_IN_PROMPT = 8
 LOOP_REPEATS = 3            # столько одинаковых действий подряд — зацикливание
 AGENT_MAX_TOKENS = 700
+MODEL_SCALE = 1000.0       # шкала координат в ответе модели; внутри фермы — доли 0..1
 KEYS = ("back", "home", "enter", "recents", "delete")
 KINDS = ("tap", "swipe", "type", "key", "launch_app", "open_url", "wait")
 _COORDS = {"tap": ("x", "y"), "swipe": ("x1", "y1", "x2", "y2")}
@@ -41,7 +42,7 @@ PROMPT = (
     '{{"ask": true, "why": "..."}} - a human is needed.\n'
     "Allowed action kinds: tap(x,y); swipe(x1,y1,x2,y2); type(value); key(name: {keys}); "
     "launch_app(package); open_url(url, http or https only); wait(seconds, at most 10). "
-    "Coordinates are fractions of the screen from 0 to 1. "
+    "Coordinates are integers from 0 to 1000 (0,0 = top-left, 1000,1000 = bottom-right). "
     "Never type passwords, codes, card or personal data; ask for a human instead."
 )
 
@@ -126,6 +127,22 @@ def validate_action(action) -> dict:
     return out
 
 
+def _from_model(action):
+    """Координаты ответа модели (0..1000) → доли 0..1. Вне шкалы — отказ, не обрезка:
+    раньше «617» при ожидаемых долях молча становилось 1.0, то есть углом экрана."""
+    if not isinstance(action, dict):
+        return action
+    out = dict(action)
+    for name in _COORDS.get(action.get("kind"), ()):
+        v = out.get(name)
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            continue            # нечисло отклонит validate_action
+        if not 0 <= v <= MODEL_SCALE:
+            raise AgentError("координата вне экрана")
+        out[name] = v / MODEL_SCALE
+    return out
+
+
 def parse_reply(text: str) -> dict:
     """{"action","why"} | {"done":True,"why"} | {"ask":True,"why"}."""
     raw = text or ""
@@ -146,7 +163,7 @@ def parse_reply(text: str) -> dict:
     if data.get("ask") is True:
         return {"ask": True, "why": why}
     if "action" in data:
-        return {"action": validate_action(data["action"]), "why": why}
+        return {"action": validate_action(_from_model(data["action"])), "why": why}
     raise UnreadableReply("не удалось разобрать ответ нейросети")
 
 
