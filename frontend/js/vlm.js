@@ -16,6 +16,8 @@ function vlmPresets() {
             name: t('vlm.preset_qwen'), hint: t('vlm.preset_qwen_hint')},
         {id: 'autoglm', model: 'autoglm-phone-9b',
             name: t('vlm.preset_autoglm'), hint: t('vlm.preset_autoglm_hint')},
+        {id: 'autoglm_ml', model: 'autoglm-phone-9b-multilingual',
+            name: t('vlm.preset_autoglm_ml'), hint: t('vlm.preset_autoglm_ml_hint')},
         {id: 'other', model: null,
             name: t('vlm.preset_other'), hint: t('vlm.preset_other_hint')},
     ];

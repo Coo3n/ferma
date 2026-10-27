@@ -1,9 +1,6 @@
 <component name="ProjectRunConfigurationManager">
-  <!-- Ферма под отладчиком PyCharm (точки останова). Нужен интерпретатор проекта:
-       Settings → Python Interpreter → Add Interpreter → Existing → .venv/bin/python
-       (на Windows .venv\Scripts\python.exe). Старый сервер перед запуском
-       остановите сами — или запускайте обычную «Ферму». -->
   <configuration default="false" name="Ферма (отладка)" type="PythonConfigurationType" factoryName="Python">
+    <module name="android-farm_final" />
     <option name="ENV_FILES" value="" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
@@ -11,10 +8,13 @@
       <env name="PYTHONUNBUFFERED" value="1" />
     </envs>
     <option name="SDK_HOME" value="" />
+    <option name="SDK_NAME" value="~/Desktop/android-farm_final/.venv" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/backend" />
-    <option name="IS_MODULE_SDK" value="true" />
+    <option name="IS_MODULE_SDK" value="false" />
     <option name="ADD_CONTENT_ROOTS" value="true" />
     <option name="ADD_SOURCE_ROOTS" value="true" />
+    <option name="DEBUG_JUST_MY_CODE" value="true" />
+    <option name="RUN_TOOL" value="" />
     <option name="SCRIPT_NAME" value="farm.server" />
     <option name="PARAMETERS" value="" />
     <option name="SHOW_COMMAND_LINE" value="false" />

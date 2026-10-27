@@ -383,4 +383,12 @@ def test_step_для_autoglm_шлёт_свой_промпт_и_переводи�
     out = agent.step("S1", "открой браузер", [])
     assert out["action"] == {"kind": "launch_app", "package": "com.android.chrome"}
     assert 'do(action="Tap"' in sent["prompt"] and "JSON" not in sent["prompt"]
+    assert "Калькулятор" in sent["prompt"] and "Chrome" in sent["prompt"]   # список приложений телефона
     assert sent["max_tokens"] == agent.AUTOGLM_MAX_TOKENS
+
+
+def test_autoglm_строка_приложений_не_роняет_шаг(monkeypatch):
+    def boom(serial):
+        raise RuntimeError("телефон не отвечает")
+    monkeypatch.setattr(agent, "_app_packages", boom)
+    assert agent.autoglm_apps_line("S1") == ""
