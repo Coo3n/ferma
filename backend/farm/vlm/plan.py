@@ -148,6 +148,9 @@ def plan(serial: str, task: str) -> list:
     cfg = settings.get()
     if not (cfg.enabled and cfg.url):
         raise PlanError("нейросеть-помощник выключен — включите его в настройках (значок в шапке)")
+    if loc.is_autoglm(cfg.model):
+        raise PlanError("AutoGLM ведёт телефон по одному шагу и не составляет сценарий целиком "
+                        "по одному экрану — запустите ИИ-агента или выберите в настройках Qwen3-VL")
     if loc.safety.secret_goal(task):
         raise PlanError("в описании пароль или платёжные данные — такое нейросети не отправляем")
     try:

@@ -89,7 +89,7 @@ def test_recipe_for_is_valid_for_recorder():
 
 @pytest.fixture
 def ready(monkeypatch):
-    cfg = SimpleNamespace(enabled=True, url="http://x", max_per_job=5, max_per_day=50)
+    cfg = SimpleNamespace(enabled=True, url="http://x", model="m", max_per_job=5, max_per_day=50)
     monkeypatch.setattr(plan.settings, "get", lambda: cfg)
     monkeypatch.setattr(plan.control, "screenshot", lambda serial, quality=85: b"img")
     monkeypatch.setattr(plan.loc, "screen_gate", lambda c, image: False)
@@ -109,7 +109,7 @@ def test_plan_happy_path(ready):
 
 
 def test_plan_refuses_when_assistant_is_off(ready, monkeypatch):
-    monkeypatch.setattr(plan.settings, "get", lambda: SimpleNamespace(enabled=False, url="", max_per_job=1, max_per_day=1))
+    monkeypatch.setattr(plan.settings, "get", lambda: SimpleNamespace(enabled=False, url="", model="m", max_per_job=1, max_per_day=1))
     with pytest.raises(plan.PlanError) as e:
         plan.plan("S1", "x")
     assert "выключен" in str(e.value)
@@ -234,3 +234,11 @@ def test_plan_wraps_screenshot_and_dump_failures(ready, monkeypatch):
     monkeypatch.setattr(plan.control, "dump_hierarchy", boom)
     with pytest.raises(plan.PlanError):
         plan.plan("S1", "x")
+
+
+def test_autoglm_черновик_целиком_не_составляет(monkeypatch):
+    from types import SimpleNamespace
+    monkeypatch.setattr(plan.settings, "get", lambda: SimpleNamespace(
+        enabled=True, url="http://x", model="AutoGLM-Phone-9B"))
+    with pytest.raises(plan.PlanError, match="по одному шагу"):
+        plan.plan("S1", "открой настройки")

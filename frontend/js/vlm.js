@@ -7,6 +7,32 @@
 
 const VLM = {data: null};
 
+/* Готовые модели: выбор подставляет имя в поле «Модель». Обе отдаёт LM Studio
+   на одном адресе; AutoGLM ферма узнаёт по «autoglm» в имени и говорит с ней на её
+   языке (do(action="Tap", …)). «Другая» — поле правится руками. */
+function vlmPresets() {
+    return [
+        {id: 'qwen', model: 'qwen/qwen3-vl-30b',
+            name: t('vlm.preset_qwen'), hint: t('vlm.preset_qwen_hint')},
+        {id: 'autoglm', model: 'autoglm-phone-9b',
+            name: t('vlm.preset_autoglm'), hint: t('vlm.preset_autoglm_hint')},
+        {id: 'other', model: null,
+            name: t('vlm.preset_other'), hint: t('vlm.preset_other_hint')},
+    ];
+}
+
+function vlmPresetOf(model) {
+    const found = vlmPresets().find(p => p.model === model);
+    return found || vlmPresets().find(p => p.id === 'other');
+}
+
+function vlmPick(id) {
+    const p = vlmPresets().find(x => x.id === id);
+    if (!p) return;
+    if (p.model) $('vlmModel').value = p.model;
+    setText($('vlmPresetHint'), p.hint);
+}
+
 async function vlmChipRefresh() {
     try {
         VLM.data = await api('/api/vlm');
@@ -47,6 +73,13 @@ async function vlmOpen() {
         <div class="vlm-group">
           <h4>${esc(t('vlm.gruppa_kuda'))}</h4>
           <label>${esc(t('vlm.adres'))}<input id="vlmUrl" value="${esc(d.url)}" placeholder="http://127.0.0.1:1234/v1"></label>
+          <label>${esc(t('vlm.preset'))}
+            <select id="vlmPreset" onchange="vlmPick(this.value)">
+              ${vlmPresets().map(p =>
+                `<option value="${p.id}" ${p.id === vlmPresetOf(d.model).id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+            </select>
+          </label>
+          <p class="vlm-calm" id="vlmPresetHint">${esc(vlmPresetOf(d.model).hint)}</p>
           <div class="vlm-two">
             <label>${esc(t('vlm.model'))}<input id="vlmModel" value="${esc(d.model)}" placeholder="qwen/qwen3-vl-30b"></label>
             <label>${esc(t('vlm.klyuch'))}<input id="vlmKey" type="password" value="${esc(d.key)}" autocomplete="off"></label>

@@ -15,7 +15,7 @@ REPLY = '```json\n{"action": {"kind": "tap", "x": 400, "y": 600}, "why": "кно
 
 @pytest.fixture
 def ready(monkeypatch):
-    cfg = SimpleNamespace(enabled=True, url="http://x", max_per_job=5, max_per_day=50)
+    cfg = SimpleNamespace(enabled=True, url="http://x", model="m", max_per_job=5, max_per_day=50)
     monkeypatch.setattr(agent.settings, "get", lambda: cfg)
     monkeypatch.setattr(agent.control, "screenshot", lambda serial, quality=85: b"img")
     monkeypatch.setattr(agent.loc, "screen_gate", lambda c, image: False)
@@ -162,7 +162,7 @@ def test_step_prompt_has_history_without_shell(ready):
 
 
 def test_step_off(ready, monkeypatch):
-    monkeypatch.setattr(agent.settings, "get", lambda: SimpleNamespace(enabled=False, url="", max_per_job=1, max_per_day=1))
+    monkeypatch.setattr(agent.settings, "get", lambda: SimpleNamespace(enabled=False, url="", model="m", max_per_job=1, max_per_day=1))
     with pytest.raises(agent.AgentError) as e:
         agent.step("S1", "x", [])
     assert "выключен" in str(e.value)
@@ -307,3 +307,80 @@ def test_api_step_numbers_and_errors(ready, monkeypatch):
         api.agent_do({"serial": "S1", "action": {"kind": "shell", "cmd": "x"}})
     with pytest.raises(HTTPException):
         api.agent_recipe({"task": "x", "history": []})
+
+
+# ---- AutoGLM: родной формат ответа do(...) → действия фермы
+
+APPS = [{"package": "com.android.chrome", "label": "Chrome"},
+        {"package": "com.miui.calculator", "label": "Калькулятор"},
+        {"package": "com.android.settings", "label": "Настройки"},
+        {"package": "com.miui.gallery", "label": "Галерея"},
+        {"package": "com.google.android.apps.photos", "label": "Фото"}]
+
+
+@pytest.fixture
+def apps(monkeypatch):
+    monkeypatch.setattr(agent, "_app_packages", lambda serial: APPS)
+
+
+@pytest.mark.parametrize("reply,action", [
+    ('<think>вижу кнопку</think>\n<answer>do(action="Tap", element=[500,250])</answer>',
+     {"kind": "tap", "x": 0.5, "y": 0.25}),
+    ('рассуждение... do(action="Swipe", start=[500,800], end=[500,200])',
+     {"kind": "swipe", "x1": 0.5, "y1": 0.8, "x2": 0.5, "y2": 0.2}),
+    ('do(action="Type", text="привет \\"мир\\"")', {"kind": "type", "value": 'привет "мир"'}),
+    ('do(action="Back")', {"kind": "key", "name": "back"}),
+    ('do(action="Home")', {"kind": "key", "name": "home"}),
+    ('do(action="Wait", duration="3 seconds")', {"kind": "wait", "seconds": 3.0}),
+    ('do(action="Launch", app="Chrome")', {"kind": "launch_app", "package": "com.android.chrome"}),
+    ('do(action="Launch", app="калькулятор")', {"kind": "launch_app", "package": "com.miui.calculator"}),
+    ('do(action="Launch", app="Calculator")', {"kind": "launch_app", "package": "com.miui.calculator"}),
+])
+def test_autoglm_действия(apps, reply, action):
+    assert agent.parse_autoglm(reply, "S1")["action"] == action
+
+
+def test_autoglm_последний_вызов_и_почему(apps):
+    r = agent.parse_autoglm('<think>ищу кнопку</think> do(action="Tap", element=[1,1]) '
+                            'передумал <think>нет, вот</think><answer>do(action="Tap", element=[300,400])</answer>', "S1")
+    assert r["action"] == {"kind": "tap", "x": 0.3, "y": 0.4} and "нет, вот" in r["why"]
+
+
+def test_autoglm_finish_и_передача_человеку(apps):
+    assert agent.parse_autoglm('finish(message="готово")', "S1") == {"done": True, "why": "готово"}
+    r = agent.parse_autoglm('do(action="Take_over", message="нужен код из СМС")', "S1")
+    assert r == {"ask": True, "why": "нужен код из СМС"}
+
+
+@pytest.mark.parametrize("reply,exc", [
+    ("Looking at the screen, I can see the button and need to tap it, then", agent.UnreadableReply),
+    ('do(action="Tap", element=[1500,5])', agent.AgentError),          # вне шкалы 0..999
+    ('do(action="Long Press", element=[5,5])', agent.AgentError),      # нет в ферме
+    ('do(action="Launch", app="Шахматы")', agent.AgentError),          # нет такого приложения
+    ('do(action="Launch", app="")', agent.AgentError),                 # имя не указано
+    ('do(action="Type", text="пароль: 123456")', agent.AgentError),    # секрет — как у JSON-пути
+])
+def test_autoglm_отказы(apps, monkeypatch, reply, exc):
+    monkeypatch.setattr(agent.loc.safety, "secret_goal", lambda *t: any("пароль" in x for x in t))
+    with pytest.raises(exc):
+        agent.parse_autoglm(reply, "S1")
+
+
+def test_autoglm_неоднозначное_приложение(apps):
+    with pytest.raises(agent.AgentError, match="несколько"):
+        agent.parse_autoglm('do(action="Launch", app="к")', "S1")     # «Калькулятор» и «Настройки»
+
+
+def test_step_для_autoglm_шлёт_свой_промпт_и_переводит_ответ(ready, apps, monkeypatch):
+    monkeypatch.setattr(agent.settings, "get", lambda: SimpleNamespace(
+        enabled=True, url="http://x", model="AutoGLM-Phone-9B", max_per_job=5, max_per_day=50))
+    sent = {}
+
+    def ask(image, prompt, cfg=None, max_tokens=300):
+        sent.update(prompt=prompt, max_tokens=max_tokens)
+        return '<think>открою</think><answer>do(action="Launch", app="Chrome")</answer>'
+    monkeypatch.setattr(agent.client, "ask", ask)
+    out = agent.step("S1", "открой браузер", [])
+    assert out["action"] == {"kind": "launch_app", "package": "com.android.chrome"}
+    assert 'do(action="Tap"' in sent["prompt"] and "JSON" not in sent["prompt"]
+    assert sent["max_tokens"] == agent.AUTOGLM_MAX_TOKENS

@@ -9,7 +9,7 @@
 .vlm-form p { margin: 0; line-height: var(--lh); }
 .vlm-lead { color: var(--text2); }
 .vlm-form label { display: grid; gap: var(--s1); color: var(--text2); font-size: var(--fs-1); }
-.vlm-form input:not([type="checkbox"]) { width: 100%; }
+.vlm-form input:not([type="checkbox"]), .vlm-form select { width: 100%; }
 
 .vlm-switch { display: flex !important; align-items: flex-start; gap: var(--s3); padding: var(--s3);
               background: var(--well); border-radius: var(--r2); color: var(--text); cursor: pointer; }
