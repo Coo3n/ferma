@@ -128,6 +128,13 @@
    просвечивают в щели над ней при прокрутке. */
 #accList {
     padding: 0 var(--s4) var(--s4);
+    overflow-x: auto;
+    min-width: 0;
+}
+
+#view-accounts .acc-filters .chips {
+    flex-wrap: wrap;
+    min-width: 0;
 }
 
 .acc-table {

@@ -12,8 +12,25 @@
 }
 
 .tool-table td.bad {
-    color: var(--bad, #c0392b);
+    color: var(--bad);
     font-weight: 600;
+}
+
+/* Таблица прокручивается внутри диалога, а не вместе с его содержимым. */
+.tool-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.tool-table-scroll:focus-visible,
+#accList:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.tool-table .health-warning {
+    display: block;
+    font-size: var(--fs-1);
 }
 
 .tool-note {

@@ -21,22 +21,25 @@ function healthRows(devices) {
 
 function healthOpen() {
     const rows = healthRows(S.devices || []);
+    const warnings = {battery: t('health.low_battery'), temp: t('health.hot'),
+        rom: t('health.low_storage'), ram: t('health.low_memory')};
     const cell = (row, key, value, suffix) =>
-        `<td${row.bad.includes(key) ? ' class="bad"' : ''}>${value == null ? '—' : esc(value) + suffix}</td>`;
-    $('mTitle').textContent = 'Здоровье телефонов';
+        `<td${row.bad.includes(key) ? ' class="bad"' : ''}>${value == null ? '—' : esc(value) + suffix}${
+            row.bad.includes(key) ? `<span class="health-warning">${esc(warnings[key])}</span>` : ''}</td>`;
+    $('mTitle').textContent = t('health.title');
     $('mBody').innerHTML = rows.length ? `
-      <p class="tool-note">Красным — то, что пора починить: заряд, перегрев, мало места или памяти.</p>
+      <div class="tool-table-scroll" role="region" tabindex="0" aria-label="${t('health.title')}">
       <table class="tool-table">
-        <thead><tr><th>Телефон</th><th>Заряд</th><th>Температура</th><th>Место занято</th><th>ОЗУ свободно</th><th>Процессор</th></tr></thead>
+        <thead><tr><th>${t('health.phone')}</th><th>${t('health.battery')}</th><th>${t('health.temperature')}</th><th>${t('health.storage')}</th><th>${t('health.memory')}</th><th>${t('health.cpu')}</th></tr></thead>
         <tbody>${rows.map(r => `<tr><td>${esc(r.name)}</td>
           ${cell(r, 'battery', r.battery, '%')}${cell(r, 'temp', r.temp, '°C')}
           ${cell(r, 'rom', r.rom, '%')}${cell(r, 'ram', r.ram, '%')}${cell(r, 'cpu', r.cpu, '%')}</tr>`).join('')}</tbody>
-      </table>`
-        : '<p class="tool-note">Нет телефонов в сети.</p>';
-    $('mActs').innerHTML = `${toolsBackButton()}<span class="sp"></span><button onclick="closeModal()">Закрыть</button>`;
+      </table></div>`
+        : `<p class="tool-note">${t('health.empty')}</p>`;
+    $('mActs').innerHTML = `${toolsBackButton()}<span class="sp"></span><button onclick="closeModal()">${t('health.close')}</button>`;
     modalSheet('wide');
     openModal();
 }
 
-toolsRegister({id: 'health', icon: 'sliders', title: 'Здоровье телефонов',
-               sub: 'заряд, нагрев, память, процессор', open: healthOpen});
+toolsRegister({id: 'health', icon: 'sliders', title: t('health.title'),
+               sub: t('health.subtitle'), open: healthOpen});
