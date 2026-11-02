@@ -64,6 +64,12 @@
     --warn: #e9b44f;
     --bad: #ef6f6a;
     --busy: #57b4ee;
+    /* Platform identity: account icons, never operation/status colors. */
+    --social-vk: #0077ff;
+    --social-inst: #cf397c;
+    --social-inst-gradient: radial-gradient(circle at 30% 105%, #fdf497 0%, #fd5949 40%, #d6249f 65%, #285aeb 100%);
+    --social-tiktok: #27e0dc;
+    --social-tg: #0088cc;
     --off: #6f7573; /* точка — графика, ей хватает 3:1 */
     --bad-dim: color-mix(in srgb, var(--bad) 12%, transparent);
     --bad-line: color-mix(in srgb, var(--bad) 45%, transparent);

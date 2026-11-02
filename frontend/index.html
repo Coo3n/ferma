@@ -32,6 +32,7 @@
     <link rel="stylesheet" href="css/onboarding.css">
     <link rel="stylesheet" href="css/coach.css">
     <link rel="stylesheet" href="css/tooltip.css">
+    <link rel="stylesheet" href="css/accounts.css">
     <!-- Первый кадр не показываем, пока app.js не выберет раздел по адресу:
          в разметке «Ферма» выбрана по умолчанию, и при обновлении на другой
          вкладке подсветка было видно, как она перескакивает. Страховка — если
@@ -989,41 +990,42 @@
 
     <!-- ========================================================= АККАУНТЫ -->
     <section class="view" id="view-accounts" aria-label="Аккаунты" data-t-aria-label="accounts.akkaunty">
-        <div class="bar">
+        <div class="bar acc-toolbar">
             <div class="find">
                 <svg class="ic" aria-hidden="true">
                     <use href="#i-search"/>
                 </svg>
-                <input type="text" id="accSearch" placeholder="логин, прокси, телефон"
+                <input type="search" id="accSearch" name="account-search" autocomplete="off" spellcheck="false" placeholder="Поиск аккаунта…"
                        aria-label="Поиск по аккаунтам" oninput="accFilter()" data-t-placeholder="accounts.login_proksi_telefon" data-t-aria-label="accounts.poisk_po_akkauntam">
             </div>
-            <select id="accPlatform" class="sm" aria-label="Платформа" onchange="accFilter()" data-t-aria-label="accounts.platforma"></select>
-            <span class="sect-n" id="accSummary"></span>
             <span class="sp"></span>
-            <button class="sm" id="btnAccAutobind" onclick="accAutobind()"
-                    title="Каждому телефону без аккаунта — свободный" data-t="accounts.razdat_telefonam" data-t-title="accounts.kazhdomu_telefonu_bez_akkaunta">
-                <svg class="ic" aria-hidden="true">
-                    <use href="#i-phone"/>
-                </svg>
-                Раздать телефонам
-            </button>
-            <button class="sm" onclick="accImport()" data-t="accounts.vstavit_spiskom">
-                <svg class="ic" aria-hidden="true">
-                    <use href="#i-copy"/>
-                </svg>
-                Вставить списком
-            </button>
-            <button class="sm primary" onclick="accAdd()" data-t="accounts.dobavit">
+            <div class="acc-add-control">
+            <button class="sm primary" id="btnAccAdd" onclick="accAddMenuToggle()" aria-expanded="false" aria-controls="accAddMenu" data-t="accounts.dobavit">
                 <svg class="ic" aria-hidden="true">
                     <use href="#i-plus"/>
                 </svg>
                 Добавить
             </button>
+            <div id="accAddMenu" class="acc-add-menu" hidden>
+                <button onclick="accAddMenuToggle(false); $('btnAccAdd').focus(); accAdd()" data-t="accounts.add_one">Один аккаунт</button>
+                <button onclick="accAddMenuToggle(false); $('btnAccAdd').focus(); accImport()" data-t="accounts.import">Импорт списком</button>
+            </div>
+            </div>
         </div>
-        <!-- чипы статуса и панель выбора рисует accounts.js -->
-        <div class="acc-filters" id="accFilters" hidden></div>
         <div class="acc-selbar" id="accSelBar" hidden></div>
-        <div class="scroll grow" id="accList" role="region" tabindex="0" aria-label="Таблица аккаунтов" data-t-aria-label="accounts.table_label"></div>
+        <div class="acc-workspace">
+            <div class="acc-master">
+                <div class="acc-filter-fields">
+                    <label><span data-t="accounts.platforma">Платформа</span><select id="accPlatform" onchange="accFilter()"></select></label>
+                    <label><span data-t="accounts.show">Показать</span><select id="accStatusFilter" onchange="accSetStatus(this.value)"></select></label>
+                </div>
+                <div class="acc-binding-action" id="accBindingAction" hidden><button class="sm" id="btnAccAutobind" onclick="accAutobind()" data-t="accounts.razdat_telefonam" data-t-title="accounts.kazhdomu_telefonu_bez_akkaunta"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg>Раздать телефонам</button></div>
+                <div class="acc-filters" id="accFilters" hidden></div>
+                <div class="scroll grow" id="accList" role="region" tabindex="0" aria-label="Список аккаунтов" data-t-aria-label="accounts.table_label"><p class="acc-list-empty" role="status" data-t="accounts.loading">Загрузка аккаунтов…</p></div>
+                <div class="acc-list-footer"><span id="accSummary" role="status"></span><button class="sm ghost" id="btnAccExport" onclick="accCsv()" data-t="accounts.skachat_csv" data-t-title="accounts.csv_title"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg>Скачать CSV</button></div>
+            </div>
+            <section id="accDetail" class="acc-detail" aria-label="Данные аккаунта" data-t-aria-label="accounts.details"></section>
+        </div>
     </section>
 <script>
     /* Раздел из адреса выбираем сразу, до первой отрисовки: app.js потом

@@ -8,6 +8,8 @@ data/
 devices.json
 network.json
 .superpowers/
+.ux/
+.playwright-mcp/
 .idea/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
