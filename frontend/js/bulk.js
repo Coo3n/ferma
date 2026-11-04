@@ -68,6 +68,7 @@ function bulkTel(n) {
 
 /* Коды причин приходят с фермы (bulk.py: failure) — здесь только слова. */
 const BULK_REASONS = {
+    busy: () => t('run.zanyat'),
     offline: () => t('bulk.prichina_offline'),
     not_found: () => t('bulk.prichina_not_found'),
     unauthorized: () => t('bulk.prichina_unauthorized'),

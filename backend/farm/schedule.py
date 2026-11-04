@@ -18,6 +18,7 @@ import random
 import threading
 import uuid
 from contextlib import contextmanager
+from copy import deepcopy
 from datetime import date as Date, datetime, timedelta
 from pathlib import Path
 from typing import Callable
@@ -37,6 +38,10 @@ MAX_RUNS = 10
 TARGET_KINDS = ("all", "group", "tag", "serials")
 
 WAIT, STARTED, SKIPPED = "wait", "started", "skipped"
+
+
+class SaveError(OSError):
+    """A safe persistence error for the API; no successful edit was published."""
 
 
 # ------------------------------------------------------------- проверка
@@ -183,6 +188,17 @@ class Scheduler:
 
     # ---- хранение
     @contextmanager
+    def _edit(self):
+        with self._lock:
+            before = deepcopy((self._items, self._state, self._since))
+            try:
+                yield
+                self._save()
+            except BaseException:
+                self._items, self._state, self._since = before
+                raise
+
+    @contextmanager
     def restoring(self):
         """Файл и живой снимок меняются вместе, без тика между ними.
 
@@ -214,8 +230,11 @@ class Scheduler:
             tmp.write_text(json.dumps({"schedules": self._items, "state": self._state,
                                        "since": self._since}, ensure_ascii=False, indent=2), "utf-8")
             tmp.replace(self.path)
-        except Exception as e:  # noqa: BLE001
+        except OSError as e:
             log.warning("не удалось сохранить смены: %s", e)
+            raise SaveError("Не удалось сохранить расписание. Проверьте свободное место "
+                            "и права на папку данных. После аварийной остановки смены "
+                            "приостановлены до перезапуска, но пауза могла не сохраниться.") from None
 
     # ---- CRUD
     def all(self) -> list[dict]:
@@ -227,15 +246,14 @@ class Scheduler:
             return next((dict(s) for s in self._items if s["id"] == sid), None)
 
     def create(self, data: dict) -> dict:
-        with self._lock:
+        with self._edit():
             sched = normalize({k: v for k, v in (data or {}).items() if k != "id"})
             self._items.append(sched)
             self._since[sched["id"]] = self.clock().timestamp()
-            self._save()
             return dict(sched)
 
     def update(self, sid: str, data: dict) -> dict:
-        with self._lock:
+        with self._edit():
             for i, s in enumerate(self._items):
                 if s["id"] == sid:
                     new = normalize({k: v for k, v in (data or {}).items() if k != "id"}, s)
@@ -243,30 +261,27 @@ class Scheduler:
                     # Новое окно/число запусков — новый план; прошедшие
                     # моменты не должны выстрелить все разом.
                     self._since[sid] = self.clock().timestamp()
-                    self._save()
                     return dict(new)
-        raise KeyError(sid)
+            raise KeyError(sid)
 
     def delete(self, sid: str) -> None:
-        with self._lock:
+        with self._edit():
             before = len(self._items)
             self._items = [s for s in self._items if s["id"] != sid]
             if len(self._items) == before:
                 raise KeyError(sid)
             self._since.pop(sid, None)
             self._state = {k: v for k, v in self._state.items() if not k.startswith(sid + "|")}
-            self._save()
 
     def toggle(self, sid: str, enabled: bool | None = None) -> dict:
-        with self._lock:
+        with self._edit():
             for s in self._items:
                 if s["id"] == sid:
                     s["enabled"] = (not s["enabled"]) if enabled is None else bool(enabled)
                     if s["enabled"]:
                         self._since[sid] = self.clock().timestamp()
-                    self._save()
                     return dict(s)
-        raise KeyError(sid)
+            raise KeyError(sid)
 
     def pause_all(self) -> int:
         """Аварийная остановка: выключить все включённые смены. Иначе после

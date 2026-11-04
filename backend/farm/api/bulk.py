@@ -49,6 +49,7 @@ def _online(serials: list[str]) -> list[str]:
 # отключился», «мало места»), а сырой текст adb остаётся в подсказке.
 # Порядок важен: «device offline» в тексте таймаута — всё равно «не в сети».
 _REASONS = (
+    ("busy", ("телефон занят",)),
     ("unauthorized", ("unauthorized",)),
     ("offline", ("offline", "не в сети")),
     ("not_found", ("not found", "no devices", "no emulators")),
@@ -99,10 +100,16 @@ def _summary(results: dict) -> dict:
     return {"ok": failed == 0, "done": len(results) - failed, "failed": failed, "results": results}
 
 
-def _each(serials: list[str], fn, asked: list[str] | None = None) -> dict:
+def _run_idle(serial: str, fn):
+    """Own the phone through completion, coordinated with scenario acquire()."""
+    with registry.idle_action(serial):
+        return fn(serial)
+
+
+def _each(serials: list[str], fn, asked: list[str] | None = None, *, idle: bool = False) -> dict:
     def one(serial):
         try:
-            res = fn(serial)
+            res = _run_idle(serial, fn) if idle else fn(serial)
             return serial, {"ok": True, **(res if isinstance(res, dict) else {})}
         except Exception as e:  # noqa: BLE001
             return serial, failure(_message(e))
@@ -131,18 +138,26 @@ _queues_lock = threading.Lock()
 # Действие, которое очередь уже достала и ждёт его срока. Раньше аварийная
 # остановка его не видела: жест, спящий в разбросе, всё равно доходил.
 _sleeping: dict[str, Future] = {}
+# Registered before publication, retained through dequeue and delay. An action
+# must never disappear between the queue and _sleeping during emergency stop.
+_pending: set[Future] = set()
 
 
 def _worker(serial: str, q: queue.Queue) -> None:
     while True:
         due, fn, fut = q.get()
-        _sleeping[serial] = fut
+        with _queues_lock:
+            _sleeping[serial] = fut
         wait = due - time.monotonic()
         if wait > 0:
-            time.sleep(wait)
-        _sleeping.pop(serial, None)
-        if not fut.set_running_or_notify_cancel():
-            continue   # аварийная остановка успела отменить
+            wake = threading.Event()
+            fut.add_done_callback(lambda done: wake.set())
+            wake.wait(wait)  # cancellation wakes the worker without delaying new actions
+        with _queues_lock:
+            _sleeping.pop(serial, None)
+            _pending.discard(fut)
+            if not fut.set_running_or_notify_cancel():
+                continue   # аварийная остановка успела отменить
         try:
             fut.set_result(fn(serial))
         except Exception as e:  # noqa: BLE001
@@ -160,28 +175,28 @@ def _enqueue(serial: str, delay: float, fn) -> Future:
                              name=f"bulk-{serial}").start()
         due = max(now + delay, _last_due.get(serial, 0.0) + MIN_GAP)
         _last_due[serial] = due
-    fut: Future = Future()
-    q.put((due, fn, fut))
+        fut: Future = Future()
+        _pending.add(fut)
+        q.put((due, fn, fut))  # assignment and FIFO publication are one operation
     return fut
 
 
 def drain_queues() -> int:
     """Выбросить отложенные (с разбросом) действия, ещё не дошедшие до
     телефонов, — часть аварийной остановки фермы."""
-    n = 0
     with _queues_lock:
+        pending = set(_pending) | set(_sleeping.values())
         for q in _queues.values():
             while True:
                 try:
                     _due, _fn, fut = q.get_nowait()
                 except queue.Empty:
                     break
-                fut.cancel()   # массовое действие ждёт итог — скажем «остановлено»
-                n += 1
-        for fut in list(_sleeping.values()):
-            if fut.cancel():
-                n += 1
-    return n
+                pending.add(fut)
+        n = sum(1 for fut in pending if not fut.done() and fut.cancel())
+        _pending.difference_update(pending)
+        _last_due.clear()
+        return n
 
 
 # Сколько массовое действие с разбросом ждёт итог сверх самого разброса.
@@ -224,7 +239,8 @@ def bulk_action(serials: list[str] = Body(...), action: dict = Body(...),
     if handler is None:
         raise HTTPException(400, f"неизвестное действие: {action.get('type')}")
     targets = _online(serials)
-    run = lambda s: handler(s, action)  # noqa: E731
+    def run(s):
+        return _run_idle(s, lambda serial: handler(serial, action))
     if lead is None and not jitter:
         return _each(targets, run, serials)
 
@@ -300,7 +316,8 @@ def text_lines(serials: list[str] = Body(...), lines: list[str] = Body(...),
              for s, row in plan.items() if row is not None}
 
     def send(serial):
-        ACTIONS["text"](serial, {"type": "text", "value": texts[serial], "clear": clear})
+        return _run_idle(serial, lambda s: ACTIONS["text"](s, {
+            "type": "text", "value": texts[s], "clear": clear}))
 
     empty = [s for s, t in texts.items() if not t.strip()]
     for s in empty:
@@ -347,7 +364,7 @@ def bulk_packages(serials: str = Query(...)):
 
 @router.post("/reboot")
 def bulk_reboot(serials: list[str] = Body(..., embed=True)):
-    return _each(_online(serials), lambda s: adb.raw(["reboot"], serial=s, timeout=30), serials)
+    return _each(_online(serials), lambda s: adb.raw(["reboot"], serial=s, timeout=30), serials, idle=True)
 
 
 @router.post("/group")
@@ -422,7 +439,7 @@ async def bulk_install(request: Request, serials: str = Query(...), name: str = 
         return {"output": out[-200:]}
 
     try:
-        return _each(targets, install, serials.split(","))
+        return _each(targets, install, serials.split(","), idle=True)
     finally:
         _discard(apk)
 
@@ -440,7 +457,7 @@ async def bulk_push(request: Request, serials: str = Query(...), name: str = Que
                            "-d", f"file://{dest}"])
 
     try:
-        result = _each(targets, push, serials.split(","))
+        result = _each(targets, push, serials.split(","), idle=True)
         result["path"] = dest
         return result
     finally:

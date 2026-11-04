@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 
-import base64
+import copy
 import hashlib
 import json
 import shutil
@@ -45,6 +45,21 @@ HELD = "held"
 CANCELLING = "cancelling"
 ACTIVE = (QUEUED, RUNNING, HELD, CANCELLING)
 DONE = (PASSED, FAILED, CANCELLED)
+
+MAX_REPEAT = 200
+
+
+def normalize_repeat(value) -> int:
+    """A bounded integer, checked before creating even the trial job."""
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise ValueError(f"повторов: целое число от 1 до {MAX_REPEAT}")
+    try:
+        repeat = int(value)
+    except ValueError:
+        raise ValueError(f"повторов: целое число от 1 до {MAX_REPEAT}") from None
+    if not 1 <= repeat <= MAX_REPEAT:
+        raise ValueError(f"повторов: от 1 до {MAX_REPEAT}")
+    return repeat
 
 
 @dataclass
@@ -611,7 +626,10 @@ def _mark_failed_step(job: Job, ctx, art_dir: Path | None = None, sc=None) -> No
             steps = (recorder_save.load_recipe(sc.key) or {}).get("steps", [])
             crop = steps[last["i"]].get("crop") if 0 <= last["i"] < len(steps) else None
             if crop:
-                (art_dir / "99_expected.png").write_bytes(base64.b64decode(crop))
+                if not isinstance(crop, str) or not recorder_save.ASSET_RE.fullmatch(crop):
+                    raise ValueError("недопустимое имя снимка цели")
+                data = (recorder_save.assets_dir(sc.key) / crop).read_bytes()
+                (art_dir / "99_expected.png").write_bytes(data)
                 last["expected"] = "99_expected.png"
     except Exception as e:  # noqa: BLE001 — отчёт важнее слепка
         job.add_line(f"слепок шага не сохранён: {e}")
@@ -729,7 +747,7 @@ def _execute(job: Job) -> None:
         job.status = CANCELLED
         job.error = str(e)
         job.add_line("отменено")
-    except Exception as e:  # noqa: BLE001
+    except (Exception, SystemExit) as e:  # noqa: BLE001 — sys.exit in a script must not kill its worker
         job.status = FAILED
         job.error = f"{type(e).__name__}: {e}"
         job.add_line("ОШИБКА " + job.error)
@@ -814,6 +832,8 @@ class Runner:
                repeat: int = 1, start_step: int = 0, speed: float = 1.0,
                stop_step: int | None = None, batch: str | None = None,
                step_shots: bool = False) -> list[Job]:
+        repeat = normalize_repeat(repeat)
+        serials = list(dict.fromkeys(serials))
         sc = scenarios.get(scenario_key)
         if sc is None:
             raise ValueError(f"сценарий «{scenario_key}» не найден")
@@ -846,7 +866,7 @@ class Runner:
             devices.append((serial, dev))
         created: list[Job] = []
         for serial, dev in devices:
-            for _ in range(max(1, repeat)):
+            for _ in range(repeat):
                 job = Job(
                     id=uuid.uuid4().hex[:12],
                     scenario_key=sc.key,
@@ -881,6 +901,7 @@ class Runner:
         Все телефоны проверяются сразу (как в submit): неизвестный телефон
         должен дать ошибку в ответ на нажатие, а не через минуту пробы.
         """
+        repeat = normalize_repeat(repeat)
         serials = list(dict.fromkeys(serials))
         if len(serials) < 2:
             raise ValueError("для проверки на одном нужно хотя бы два телефона")
@@ -893,7 +914,7 @@ class Runner:
             job = jobs[0]
             trial = Trial(batch=job.batch, job_id=job.id, serial=first, device_name=job.device_name,
                           rest=[s for s in serials if s != first], scenario_key=scenario_key,
-                          params=dict(params or {}), repeat=max(1, int(repeat or 1)))
+                          params=copy.deepcopy(job.params), repeat=repeat)
             self.trials[job.batch] = trial
             # Задача могла кончиться раньше, чем план лёг в словарь.
             done = job.status in DONE

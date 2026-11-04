@@ -38,6 +38,7 @@ def _fresh_queues(monkeypatch):
     monkeypatch.setattr(bulk, "_queues", {})
     monkeypatch.setattr(bulk, "_last_due", {})
     monkeypatch.setattr(bulk, "_sleeping", {})
+    monkeypatch.setattr(bulk, "_pending", set())
 
 
 def test_без_разброса_выпавшие_из_сети_в_итоге(monkeypatch):

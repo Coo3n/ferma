@@ -215,8 +215,6 @@ def preflight(sc, serials: list[str]) -> dict:
         info = {"status": "ready"}
         if dev is None or not dev.online:
             info["status"] = "offline"
-        elif dev.busy_job:
-            info["status"] = "busy"
         else:
             for platform in sc.needs_accounts or []:
                 acc = accounts.for_device(serial, platform)
@@ -228,6 +226,8 @@ def preflight(sc, serials: list[str]) -> dict:
                     info = {"status": "login", "platform": platform}
                 if info["status"] in ("no_account", "banned"):
                     break
+            if info["status"] == "ready" and (dev.busy_job or getattr(dev, "busy_action", False)):
+                info["status"] = "busy"
         devices[serial] = info
         counts[info["status"]] = counts.get(info["status"], 0) + 1
     return {"counts": counts, "devices": devices}

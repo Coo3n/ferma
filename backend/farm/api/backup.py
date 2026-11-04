@@ -26,7 +26,10 @@ async def _read(request: Request) -> bytes:
 def export_backup(payload: dict = Body(default=None)):
     # POST, а не GET: в архиве может лежать приватный ключ adb, а меняющие
     # запросы сервер принимает только со своей страницы (security.py).
-    blob = backup.build(bool((payload or {}).get("adb_key")))
+    try:
+        blob = backup.build(bool((payload or {}).get("adb_key")))
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from None
     name = time.strftime("farm-backup-%Y%m%d-%H%M.zip")
     return Response(blob, media_type="application/zip",
                     headers={"Content-Disposition": f'attachment; filename="{name}"'})

@@ -28,6 +28,7 @@ def run(monkeypatch, tmp_path):
     monkeypatch.setattr(schedule, "scheduler", schedule.Scheduler(tmp_path / "schedules.json"))
     monkeypatch.setattr(bulk, "_queues", {})
     monkeypatch.setattr(bulk, "_sleeping", {})
+    monkeypatch.setattr(bulk, "_pending", set())
     return r, sc
 
 

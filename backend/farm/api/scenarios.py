@@ -108,12 +108,14 @@ def run_scenario(payload: dict = Body(...)):
         raise HTTPException(400, "не указан сценарий")
     if not serials:
         raise HTTPException(400, "не выбрано ни одного устройства")
+    if not isinstance(serials, list) or not all(isinstance(s, str) and s.strip() for s in serials):
+        raise HTTPException(400, "нужен список телефонов")
     batch = _batch_of(payload)
     if (payload.get("trial") or payload.get("trial_serial")) and len(set(serials)) > 1:
         return _run_trial(key, serials, payload, batch)
     try:
         jobs = runner.submit(key, serials, payload.get("params"),
-                             int(payload.get("repeat", 1)),
+                             payload.get("repeat", 1),
                              start_step=int(payload.get("start_step") or 0),
                              stop_step=(int(payload["stop_step"])
                                         if payload.get("stop_step") is not None else None),
@@ -139,7 +141,7 @@ def _run_trial(key: str, serials: list, payload: dict, batch: str | None) -> dic
         raise HTTPException(400, "неверный пробный телефон")
     try:
         jobs, trial = runner.submit_trial(key, serials, payload.get("params"),
-                                          int(payload.get("repeat", 1)),
+                                          payload.get("repeat", 1),
                                           trial_serial=trial_serial, batch=batch)
     except (ValueError, TypeError) as e:
         raise HTTPException(400, str(e))

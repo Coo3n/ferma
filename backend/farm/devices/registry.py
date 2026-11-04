@@ -5,6 +5,7 @@ import json
 import logging
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
@@ -19,6 +20,10 @@ GROUPS_FILE = config.DATA_DIR / "groups.json"
 TAGS_FILE = config.DATA_DIR / "tags.json"
 MAX_TAGS = 10
 MAX_TAG_LEN = 24
+
+
+class DeviceUnavailable(ValueError):
+    """The phone cannot be reserved for a manual/bulk operation."""
 
 
 def clean_tags(tags) -> list[str]:
@@ -53,6 +58,7 @@ class Device:
     cpu: int | None = None         # % загрузки процессора между опросами
     charging: str = ""
     busy_job: str | None = None
+    busy_action: bool = False
     enabled: bool = True  # можно вывести устройство из ротации вручную
     last_seen: float = 0.0
     first_seen: float = field(default_factory=time.time)
@@ -65,7 +71,7 @@ class Device:
 
     @property
     def available(self) -> bool:
-        return self.online and self.enabled and not self.rest and self.busy_job is None
+        return self.online and self.enabled and not self.rest and self.busy_job is None and not self.busy_action
 
     @property
     def name(self) -> str:
@@ -137,6 +143,7 @@ class Device:
 class Registry:
     def __init__(self) -> None:
         self._devices: dict[str, Device] = {}
+        self._actions: set[str] = set()
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -256,10 +263,32 @@ class Registry:
         return True
 
     # ---------- занятость ----------
+    @contextmanager
+    def idle_action(self, serial: str):
+        """Reserve ownership under the same lock as acquire(), not across I/O.
+
+        A scenario cannot start during an install or a delayed gesture. Manual
+        ownership is separate from busy_job, which must always name a real job.
+        """
+        with self._lock:
+            dev = self.get(serial)
+            if dev is None or not dev.online:
+                raise DeviceUnavailable("телефон не в сети")
+            if getattr(dev, "busy_job", None) or serial in self._actions:
+                raise DeviceUnavailable("телефон занят сценарием или другим действием")
+            self._actions.add(serial)
+            dev.busy_action = True
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._actions.discard(serial)
+                dev.busy_action = False
+
     def acquire(self, serial: str, job_id: str) -> bool:
         with self._lock:
             d = self._devices.get(serial)
-            if d is None or not d.online or d.busy_job is not None:
+            if d is None or not d.online or d.busy_job is not None or serial in self._actions:
                 return False
             d.busy_job = job_id
             return True

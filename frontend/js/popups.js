@@ -234,7 +234,7 @@ async function popScenarioLoad(key) {
     try {
         info = await api('/api/detours/scenario/' + encodeURIComponent(key));
     } catch (e) {
-        box.hidden = true;
+        if (POP.scenKey === key) box.hidden = true;
         return;
     }
     if (POP.scenKey !== key) return;

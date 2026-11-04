@@ -21,7 +21,7 @@ import zlib
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
-from . import config
+from . import apklib, config
 
 ADB_DIR = Path.home() / ".android"
 ADB_KEYS = ("adbkey", "adbkey.pub")
@@ -45,6 +45,9 @@ def _target(name: str):
     parts = name.split("/")
     if parts[0] == "data" and len(parts) == 2 and parts[1] in _data_names():
         return Path(config.DATA_DIR) / parts[1]
+    if (len(parts) == 3 and parts[:2] == ["data", "apks"] and parts[2].endswith(".apk")
+            and apklib.PACKAGE_RE.fullmatch(parts[2][:-4])):
+        return Path(config.DATA_DIR) / "apks" / parts[2]
     if parts[0] == "scenarios":
         if len(parts) == 2 and _PY.match(parts[1]) and not parts[1].startswith("_"):
             return Path(config.SCENARIOS_DIR) / parts[1]
@@ -58,24 +61,49 @@ def _target(name: str):
 def build(include_adb_key: bool = False) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        total = 0
+        def add(path: Path, name: str) -> None:
+            nonlocal total
+            if _target(name) is None:
+                return
+            size = path.stat().st_size
+            if total + size > MAX_TOTAL or len(z.infolist()) >= MAX_FILES:
+                raise ValueError("резервная копия превышает предел: "
+                                 f"{MAX_TOTAL // (1024 * 1024)} МБ и {MAX_FILES} файлов")
+            z.write(path, name)
+            total += z.infolist()[-1].file_size
+            if total > MAX_TOTAL:  # file may have grown while being read
+                raise ValueError("резервная копия слишком большая")
+
         for name in _data_names():
+            if name == "apks.json":
+                continue
             path = Path(config.DATA_DIR) / name
             if path.is_file():
-                z.write(path, f"data/{name}")
+                add(path, f"data/{name}")
+        # Library updates atomically replace APK + index under this same lock.
+        # The archive must see one version of that pair, not two moments.
+        with apklib._lock:
+            index = Path(config.DATA_DIR) / "apks.json"
+            if index.is_file():
+                add(index, "data/apks.json")
+            for path in sorted((Path(config.DATA_DIR) / "apks").glob("*.apk")):
+                if path.is_file():
+                    add(path, f"data/apks/{path.name}")
         sc = Path(config.SCENARIOS_DIR)
         for path in sorted(sc.glob("*.py")):
             if not path.name.startswith("_"):
-                z.write(path, f"scenarios/{path.name}")
+                add(path, f"scenarios/{path.name}")
         for folder in sorted(sc.glob("*_assets")):
             if folder.is_dir():
                 for path in sorted(folder.iterdir()):
                     if path.is_file():
-                        z.write(path, f"scenarios/{folder.name}/{path.name}")
+                        add(path, f"scenarios/{folder.name}/{path.name}")
         if include_adb_key:
             for name in ADB_KEYS:
                 path = Path(ADB_DIR) / name
                 if path.is_file():
-                    z.write(path, f"adb/{name}")
+                    add(path, f"adb/{name}")
     return buf.getvalue()
 
 
@@ -141,6 +169,8 @@ def _restore_state(plan):
         has_accounts = "data/accounts.json" in targets
         if has_accounts:
             stack.enter_context(accounts._lock)
+        if any(name == "data/apks.json" or name.startswith("data/apks/") for name in targets):
+            stack.enter_context(apklib._lock)
         try:
             yield
         finally:

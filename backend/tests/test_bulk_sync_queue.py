@@ -8,6 +8,7 @@ from farm.api import bulk
 def _fresh(monkeypatch):
     monkeypatch.setattr(bulk, "_queues", {})
     monkeypatch.setattr(bulk, "_last_due", {})
+    monkeypatch.setattr(bulk, "_pending", set())
     puts = []
 
     class Q:

@@ -298,6 +298,14 @@ function renderParams() {
     const box = $('scParams');
     if (!scenario) {
         box.innerHTML = '';
+        for (const id of ['scSteps', 'scPopups']) {
+            const details = $(id);
+            if (details) {
+                details.hidden = true;
+                details.innerHTML = '';
+            }
+        }
+        if (typeof POP !== 'undefined') POP.scenKey = null;
         return;
     }
 
@@ -377,6 +385,7 @@ async function renderScenarioSteps(scenario) {
     if (!scenario.editable) {
         box.hidden = true;
         if ($('scPopups')) $('scPopups').hidden = true;
+        if (typeof POP !== 'undefined') POP.scenKey = null;
         return;
     }
     if (window.popScenarioLoad) popScenarioLoad(scenario.key);
@@ -387,7 +396,7 @@ async function renderScenarioSteps(scenario) {
             scRecipeCache.set(scenario.key, recipe);
         }
     } catch (e) {
-        box.hidden = true;
+        if (S.scenario === scenario.key) box.hidden = true;
         return;
     }
     if (S.scenario !== scenario.key) return;   // пока грузили, выбрали другой

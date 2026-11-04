@@ -56,8 +56,10 @@ def test_assign_without_rows():
 
 @pytest.fixture
 def sent(monkeypatch):
+    from farm.devices.registry import Device
     got = []
-    monkeypatch.setattr(bulk, "_online", lambda serials: list(serials))
+    phones = {s: Device(serial=s, state="device") for s in ("A", "B", "C")}
+    monkeypatch.setattr(bulk.registry, "get", phones.get)
     monkeypatch.setitem(bulk.ACTIONS, "text",
                         lambda serial, p: got.append((serial, p["value"], p.get("clear"))))
     return got

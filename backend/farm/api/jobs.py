@@ -32,8 +32,11 @@ def cancel_all(serial: Optional[str] = None, everything: bool = False):
     if everything and serial is None:
         from ..schedule import scheduler
         from .bulk import drain_queues
-        out["shifts_paused"] = scheduler.pause_all()
-        out["actions_dropped"] = drain_queues()
+        try:
+            out["shifts_paused"] = scheduler.pause_all()
+        finally:
+            # A disk failure must not prevent the rest of an emergency stop.
+            out["actions_dropped"] = drain_queues()
     return out
 
 

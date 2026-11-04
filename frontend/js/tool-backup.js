@@ -63,8 +63,7 @@ async function backupRestore(ev) {
 function backupOpen() {
     $('mTitle').textContent = 'Резервная копия';
     $('mBody').innerHTML = `
-      <p class="tool-note">Сохраняет аккаунты, группы, теги, расписание, имена телефонов и записанные сценарии.
-        Если ферма переедет на другой компьютер, всё вернётся из этого файла.</p>
+      <p class="tool-note">${esc(t('backup.description'))}</p>
       <label><input type="checkbox" id="backupKey"> положить ключ adb (телефоны не придётся авторизовать заново)</label>
       <p class="tool-warn">Ключ и пароли аккаунтов — секреты. Не отправляйте архив никому и не храните в общей папке.</p>
       <div class="bp-row"><button class="sm primary" onclick="backupDownload()">Скачать копию</button></div>

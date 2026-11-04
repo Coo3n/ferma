@@ -24,7 +24,7 @@ const RD_STATUS = {
 const RD_RUNNABLE = new Set(['ready', 'busy', 'login']);
 
 const RD = window.RD = {mode: 'devices', who: 'phones', picked: new Set(), query: '',
-    group: '', tag: '', check: null, timer: null, seq: 0};
+    group: '', tag: '', check: null, checkKey: null, submitting: false, timer: null, seq: 0};
 
 function rdGroups() {
     return [...new Set(S.devices.map(d => d.group).filter(Boolean))].sort();
@@ -71,6 +71,8 @@ function openRunDialog(opts) {
     RD.group = rdGroups()[0] || '';
     RD.tag = FLEET.tag || rdTags()[0] || '';
     RD.check = null;
+    RD.checkKey = null;
+    RD.submitting = false;
 
     $('mTitle').textContent = 'Запуск сценария';
     $('mBody').innerHTML = `<div class="rd">
@@ -186,23 +188,41 @@ function rdSetWho(who) {
 
 function rdRefresh() {
     clearTimeout(RD.timer);
+    ++RD.seq;  // invalidate in-flight requests now, not after the debounce
+    RD.check = null;
+    RD.checkKey = null;
+    if ($('rdGo')) rdRenderCheck();
     RD.timer = setTimeout(rdPreflight, RD_PREFLIGHT_DEBOUNCE_MS);
 }
 
+function rdSelectionKey() {
+    const sc = rdScenario();
+    return JSON.stringify([sc && sc.key, rdTargets().slice().sort()]);
+}
+
 async function rdPreflight() {
+    const select = $('rdScen');
+    if (!select || !$('modal').classList.contains('on')) return;
     const sc = rdScenario();
     const serials = rdTargets();
     const seq = ++RD.seq;
+    const key = rdSelectionKey();
+    const current = () => seq === RD.seq && $('rdScen') === select
+        && $('modal').classList.contains('on') && key === rdSelectionKey();
     if (!sc || !serials.length) {
         RD.check = {counts: {}, devices: {}};
+        RD.checkKey = key;
         return rdRenderCheck();
     }
     try {
         const check = await post('/api/run/preflight', {scenario: sc.key, serials});
-        if (seq !== RD.seq) return;   // пока ждали, выбор поменялся
+        if (!current()) return;
         RD.check = check;
+        RD.checkKey = key;
     } catch (e) {
+        if (!current()) return;
         RD.check = null;
+        RD.checkKey = null;
         setHTML($('rdCheck'), `<div class="rd-err">${esc(e.message)}</div>`);
         return disableWithReason($('rdGo'), true, e.message);
     }
@@ -210,6 +230,7 @@ async function rdPreflight() {
 }
 
 function rdRunnable() {
+    if (RD.checkKey !== rdSelectionKey()) return [];
     const devs = (RD.check && RD.check.devices) || {};
     return Object.keys(devs).filter(s => RD_RUNNABLE.has(devs[s].status));
 }
@@ -241,7 +262,7 @@ function rdRenderCheck() {
     const k = rdRunnable().length;
     const go = $('rdGo');
     go.textContent = k ? `Запустить на ${k}` : 'Запустить';
-    disableWithReason(go, !k, 'Нет готовых телефонов');
+    disableWithReason(go, !k || RD.submitting, 'Нет готовых телефонов');
     rdRenderTrial(name);
 }
 
@@ -400,7 +421,9 @@ async function rdGo() {
     const serials = rdRunnable();
     if (!sc || !serials.length) return;
     const go = $('rdGo');
-    if (go.disabled) return;
+    if (go.disabled || RD.submitting) return;
+    const select = $('rdScen');
+    RD.submitting = true;
     go.disabled = true;   // двойной клик давал два пакета по 40 задач
     go.textContent = 'Запускаю…';
     const params = rdParams();
@@ -412,6 +435,7 @@ async function rdGo() {
             scenario: sc.key, serials, params, repeat,
             ...(trial ? {trial_serial: trial.first} : {}),
         });
+        if ($('rdScen') !== select || !$('modal').classList.contains('on')) return;
         closeModal();
         if (trial) {
             toast(t('run.proba_poshla', {name: rdName(trial.first), n: trial.rest.length}), 'ok');
@@ -421,7 +445,11 @@ async function rdGo() {
         showRuns(res.batch);
     } catch (e) {
         toast(e.message, 'bad');
-        rdRenderCheck();   // вернёт кнопке текст и состояние
+    } finally {
+        if ($('rdScen') === select) {
+            RD.submitting = false;
+            if ($('modal').classList.contains('on')) rdRenderCheck();
+        }
     }
 }
 

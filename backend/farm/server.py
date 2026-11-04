@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import accounts, api, config, security, tls
 from .devices import net, registry
-from .schedule import scheduler
+from .schedule import SaveError as ScheduleSaveError, scheduler
 from .limits import BodyLimits, TrafficLimits
 
 logging.basicConfig(
@@ -43,7 +43,8 @@ def create_app() -> FastAPI:
     application.include_router(api.router)
 
     @application.exception_handler(accounts.SaveError)
-    async def account_save_failed(request, exc):
+    @application.exception_handler(ScheduleSaveError)
+    async def persistence_save_failed(request, exc):
         return JSONResponse({"detail": str(exc)}, status_code=503)
 
     # Сайт (frontend/) — обычные статические файлы. Монтируем последним и на
