@@ -17,6 +17,7 @@ import logging
 import random
 import threading
 import uuid
+from contextlib import contextmanager
 from datetime import date as Date, datetime, timedelta
 from pathlib import Path
 from typing import Callable
@@ -181,6 +182,22 @@ class Scheduler:
         return self._registry
 
     # ---- хранение
+    @contextmanager
+    def restoring(self):
+        """Файл и живой снимок меняются вместе, без тика между ними.
+
+        Даже если восстановление следующего файла упало, уже записанное
+        расписание нельзя затереть старым снимком из памяти.
+        """
+        with self._lock:
+            try:
+                yield
+            finally:
+                data = self._load()
+                self._items = data.get("schedules", [])
+                self._state = data.get("state", {})
+                self._since = data.get("since", {})
+
     def _load(self) -> dict:
         try:
             data = json.loads(self.path.read_text("utf-8"))

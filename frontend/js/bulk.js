@@ -97,6 +97,10 @@ function bulkFailed(res) {
     return Object.entries((res && res.results) || {}).filter(([, r]) => !r.ok);
 }
 
+function bulkRetryable(res) {
+    return bulkFailed(res).filter(([, r]) => r.retryable !== false);
+}
+
 /* Тост — только короткий итог; подробности в панели. Без панели (один
    телефон, синхронный режим) называем первый сбой. */
 function bulkReport(what, res, withPanel) {
@@ -210,10 +214,11 @@ function bulkPaint() {
         const ok = Object.keys(results).filter(s => results[s].ok).map(deviceLabel)
             .sort((a, b) => a.localeCompare(b, 'ru', {numeric: true}));
         const total = Object.keys(results).length || last.serials.length;
+        const retryCount = bulkRetryable(last.res).length;
         box.dataset.st = failed.length ? 'bad' : 'ok';
         box.innerHTML = `<div class="bulk-res-head"><b>${esc(last.what)}</b>
             <span role="status">${esc(t('bulk.gotovo_iz', {done: total - failed.length, total}))}</span>
-            <span class="sp"></span>${failed.length ? retry(failed.length) : ''}</div>
+            <span class="sp"></span>${retryCount ? retry(retryCount) : ''}</div>
           ${failed.length ? `<ul class="bulk-fails" aria-label="${esc(t('bulk.ne_vyshlo'))}">${failed.map(f => `
             <li title="${esc(f.raw)}"><b>${esc(f.name)}</b><span>${esc(f.why)}</span></li>`).join('')}</ul>` : ''}
           ${ok.length && failed.length ? `<details class="bulk-oks"><summary>${esc(t('bulk.gde_gotovo', {n: ok.length}))}</summary>
@@ -231,7 +236,8 @@ function bulkPaint() {
 function bulkRetry() {
     const last = BULK_RUN.last;
     if (!last || BULK_RUN.busy) return;
-    const failed = last.error ? last.serials : bulkFailed(last.res).map(([s]) => s);
+    const failed = last.error ? last.serials : bulkRetryable(last.res).map(([s]) => s);
+    if (!failed.length) return;
     const serials = failed.filter(s => !(S.devices.find(d => d.serial === s) || {}).busy_job);
     if (!serials.length) return toast(t('bulk.vse_zanyaty'), 'bad');
     bulkRun(last.what, serials, last.call, last.progress);

@@ -27,9 +27,13 @@ from urllib.parse import urlsplit
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse, RedirectResponse, Response
 
+from . import config
+from .limits import RateLimiter, peer_key
+
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 TOKEN_COOKIE = "farm_token"
 TOKEN_HEADER = "x-farm-token"
+LOGIN_LIMITER = RateLimiter(rate=1 / 6, burst=10)
 
 
 def _env_hosts() -> set[str]:
@@ -68,7 +72,7 @@ def host_allowed(host_header: str | None) -> bool:
 
 
 def origin_allowed(method: str, host_header: str | None,
-                   origin: str | None, referer: str | None) -> bool:
+                   origin: str | None, referer: str | None, scheme: str = "http") -> bool:
     """Меняющий запрос — только со своей страницы."""
     if method.upper() in SAFE_METHODS:
         return True
@@ -77,17 +81,39 @@ def origin_allowed(method: str, host_header: str | None,
         return True  # не браузер: curl, скрипты, тесты
     if source.strip().lower() == "null":
         return False  # sandbox-iframe, file://, data: — чужие по определению
-    netloc = urlsplit(source).netloc.lower()
-    return bool(netloc) and netloc == (host_header or "").strip().lower()
+    try:
+        parsed = urlsplit(source)
+        target = urlsplit(f"{scheme}://{host_header or ''}")
+        if parsed.scheme not in ("http", "https") or parsed.username is not None:
+            return False
+        if origin is not None and (parsed.path or parsed.query or parsed.fragment):
+            return False
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        target_port = target.port or (443 if scheme == "https" else 80)
+        return (bool(parsed.hostname) and parsed.scheme == scheme
+                and parsed.hostname == target.hostname and port == target_port)
+    except ValueError:
+        return False
 
 
 def is_loopback(host: str) -> bool:
-    if host in ("localhost", ""):
+    if host == "localhost":
         return True
     try:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
         return False
+
+
+def validate_network(remote: bool | None = None) -> None:
+    """Ошибочная конфигурация не должна открывать управление телефонами."""
+    if remote is None:
+        remote = not is_loopback(config.HOST)
+    if remote:
+        if os.getenv("FARM_HTTPS", "1") != "1":
+            raise ValueError("Доступ по сети требует HTTPS (FARM_HTTPS=1).")
+        if len(token()) < 32:
+            raise ValueError("Доступ по сети требует FARM_TOKEN длиной не менее 32 символов.")
 
 
 def _token_ok(request: Request, secret: str) -> bool:
@@ -99,19 +125,68 @@ def _token_ok(request: Request, secret: str) -> bool:
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
-    "Content-Security-Policy": "frame-ancestors 'none'",
-    "Referrer-Policy": "same-origin",
+    # Старый интерфейс использует inline обработчики; unsafe-inline пока нужен.
+    "Content-Security-Policy": (
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+        "connect-src 'self'; media-src 'self' blob:; object-src 'none'; "
+        "base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+    ),
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 }
 
 
-async def guard(request: Request, call_next) -> Response:  # noqa: ANN001
+def protect_response(request: Request, response: Response) -> Response:
+    for k, v in SECURITY_HEADERS.items():
+        # Встроенная справка FastAPI уже использует эти CDN. Исключение только
+        # для справки; основной интерфейс и API сохраняют same-origin CSP.
+        if (k == "Content-Security-Policy" and request.url.path in ("/docs", "/redoc")
+                and response.status_code == 200):
+            asset = ("https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/"
+                     if request.url.path == "/docs" else "https://cdn.jsdelivr.net/npm/redoc@2/bundles/")
+            v = v.replace("script-src 'self' 'unsafe-inline'", f"script-src 'self' 'unsafe-inline' {asset}")
+            v = v.replace("style-src 'self' 'unsafe-inline'",
+                          f"style-src 'self' 'unsafe-inline' {asset} https://fonts.googleapis.com")
+            v = v.replace("img-src 'self' data: blob:",
+                          "img-src 'self' data: blob: https://fastapi.tiangolo.com/img/")
+            v += "; font-src 'self' https://fonts.gstatic.com"
+            if request.url.path == "/redoc":
+                v = v.replace("https://fastapi.tiangolo.com/img/",
+                              "https://fastapi.tiangolo.com/img/ https://cdn.redoc.ly/redoc/")
+                v += "; worker-src 'self' blob:"
+        response.headers.setdefault(k, v)
+    if request.url.scheme == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=86400")
+    if (request.url.path.startswith("/api/") or response.status_code >= 400
+            or "set-cookie" in response.headers or "token" in request.query_params):
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+async def _guard(request: Request, call_next) -> Response:  # noqa: ANN001
     headers = request.headers
     host = headers.get("host")
+    remote = (not is_loopback(config.HOST)
+              or bool(request.client and not is_loopback(request.client.host)))
+    try:
+        validate_network(remote)
+    except ValueError:
+        return PlainTextResponse("Сетевой доступ не настроен: нужны HTTPS и FARM_TOKEN.", status_code=503)
+    if remote and request.url.scheme != "https":
+        return PlainTextResponse("Доступ по сети возможен только через HTTPS.", status_code=403)
     if not host_allowed(host):
         return PlainTextResponse(
-            "недопустимый Host. Откройте ферму по http://127.0.0.1 или добавьте "
+            "недопустимый Host. Откройте ферму по https://127.0.0.1:8777 или добавьте "
             "имя в FARM_ALLOWED_HOSTS", status_code=403)
-    if not origin_allowed(request.method, host, headers.get("origin"), headers.get("referer")):
+    # Некоторые GET запускают захват/запись экрана. SOP скрывает ответ, но не
+    # предотвращает действие, поэтому для API проверяем источник и у GET.
+    api_request = request.url.path.startswith("/api/")
+    if api_request and headers.get("sec-fetch-site") == "cross-site":
+        return PlainTextResponse("запрос с чужой страницы отклонён", status_code=403)
+    method = "POST" if api_request else request.method
+    if not origin_allowed(method, host, headers.get("origin"), headers.get("referer"),
+                          request.url.scheme):
         return PlainTextResponse("запрос с чужой страницы отклонён", status_code=403)
 
     secret = token()
@@ -119,16 +194,23 @@ async def guard(request: Request, call_next) -> Response:  # noqa: ANN001
         given = request.query_params.get("token")
         if request.method == "GET" and request.url.path == "/" and given is not None:
             if not hmac.compare_digest(given.encode(), secret.encode()):
+                if not LOGIN_LIMITER.allow(peer_key(request.scope)):
+                    return PlainTextResponse("Слишком много попыток входа.", status_code=429,
+                                             headers={"Retry-After": "6"})
                 return PlainTextResponse("неверный токен", status_code=401)
             resp = RedirectResponse("/", status_code=303)
-            resp.set_cookie(TOKEN_COOKIE, secret, httponly=True, samesite="lax",
-                            path="/", max_age=60 * 60 * 24 * 365)
+            resp.set_cookie(TOKEN_COOKIE, secret, httponly=True, samesite="strict",
+                            secure=request.url.scheme == "https", path="/", max_age=60 * 60 * 12)
             return resp
         if not _token_ok(request, secret):
+            if not LOGIN_LIMITER.allow(peer_key(request.scope)):
+                return PlainTextResponse("Слишком много попыток входа.", status_code=429,
+                                         headers={"Retry-After": "6"})
             return PlainTextResponse(
                 "нужен токен фермы: откройте /?token=<FARM_TOKEN>", status_code=401)
 
-    response = await call_next(request)
-    for k, v in SECURITY_HEADERS.items():
-        response.headers.setdefault(k, v)
-    return response
+    return await call_next(request)
+
+
+async def guard(request: Request, call_next) -> Response:  # noqa: ANN001
+    return protect_response(request, await _guard(request, call_next))

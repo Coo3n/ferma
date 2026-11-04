@@ -36,6 +36,7 @@ TEXT = "\n".join([
     "comma,pw",
     "a:p,w",
     "empty:",
+    "spaced:  pw  ",
 ])
 
 
@@ -58,5 +59,7 @@ def test_предпросмотр_совпадает_с_сервером(acc_fil
     ok = [r for r in plan if r["kind"] == "ok"]
     assert [r["login"] for r in ok] == [a["login"] for a in report["created"]]
     assert [r["proxy"] for r in ok] == [a["proxy"] for a in report["created"]]
+    assert [r["password"] for r in ok] == [a["password"] for a in report["created"]]
+    assert next(r for r in ok if r["login"] == "spaced")["password"] == "  pw  "
     assert sum(r["kind"] == "dup" for r in plan) == report["duplicates"]
     assert [r["n"] for r in plan if r["kind"] == "bad"] == report["bad_lines"]

@@ -31,7 +31,10 @@
 (Homebrew на Mac, winget или python.org на Windows), adb и scrcpy (в папку
 `.deps`), зависимости (в `.venv`, заново — только если поменялся
 `backend/requirements.txt`). Уже установленное повторно не качается.
-Ферма откроется на http://127.0.0.1:8777.
+Для HTTPS один раз установите [mkcert](https://github.com/FiloSottile/mkcert)
+(Mac: `brew install mkcert`) и выполните `mkcert -install`.
+Сертификат создаётся при запуске. Ферма откроется на **https://127.0.0.1:8777**.
+Подробно: [HTTPS, вход и защита от атак](docs/security.md).
 
 ### PyCharm
 
@@ -39,7 +42,7 @@
 2. Вверху справа выберите **«Ферма»** и нажмите ▶. Она запускает `run.sh`: сам
    создаст `.venv`, поставит зависимости и **остановит старый сервер**, если он
    ещё работает. Интерпретатор выбирать не нужно. Сайт откроется на
-   http://127.0.0.1:8777. **«Тесты»** прогоняет все тесты.
+   https://127.0.0.1:8777. **«Тесты»** прогоняет все тесты.
 3. Нужны точки останова — конфигурация **«Ферма (отладка)»**. Ей нужен
    интерпретатор: **Settings → Python Interpreter → Add Interpreter → Existing**
    → `.venv/bin/python` (на Windows `.venv\Scripts\python.exe`).
@@ -71,7 +74,7 @@ android-farm/
 ```
 
 ```
- Браузер ──HTTP──▶  frontend/  (статика)
+ Браузер ──HTTPS──▶ frontend/  (статика)
     │
     └──── /api/* ──▶ backend/farm/api      ← тонкий слой: проверить запрос, вызвать сервис
                         │
@@ -98,8 +101,8 @@ android-farm/
 FARM_SERVE_FRONTEND=0 ./run.sh
 
 # сайт отдельно, ходит в API через прокси
+FARM_HTTPS=0 FARM_SERVE_FRONTEND=0 ./run.sh         # локальный dev API по HTTP
 python3 frontend/dev_server.py                   # http://127.0.0.1:5173
-FARM_API=http://10.0.0.2:8777 python3 frontend/dev_server.py
 ```
 
 ## Разработка

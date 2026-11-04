@@ -200,7 +200,14 @@ def _wait_queued(futures: dict[str, Future], hi: float) -> dict:
         except CancelledError:
             results[s] = {**failure("остановлено"), "reason": "stopped"}
         except FutureTimeout:
-            results[s] = failure("таймаут: телефон не ответил")
+            if fut.cancel():
+                results[s] = {"ok": False, "reason": "timeout_cancelled", "retryable": True,
+                              "error": "Время ожидания истекло: действие отменено до выполнения."}
+            else:
+                # Уже выполняется: Future.cancel не может прервать adb.
+                # Повтор после такого ответа мог бы выполнить команду дважды.
+                results[s] = {"ok": False, "reason": "outcome_unknown", "retryable": False,
+                              "error": "Действие уже началось, результат пока неизвестен. Проверьте телефон перед повтором."}
         except Exception as e:  # noqa: BLE001
             results[s] = failure(_message(e))
     return results

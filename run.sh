@@ -45,12 +45,12 @@ fi
 if [ ! -x "$VENV/bin/python" ]; then
   say "Создаю виртуальное окружение…"
   "$PY" -m venv "$VENV"
-  "$VENV/bin/pip" install --disable-pip-version-check --upgrade pip
+  "$VENV/bin/python" -m pip install --disable-pip-version-check --upgrade pip
 fi
 # Зависимости — заново, только если список изменился с прошлой установки.
 if ! cmp -s backend/requirements.txt "$VENV/.requirements.installed" 2>/dev/null; then
   say "Ставлю зависимости (видно ход установки, обычно меньше минуты)…"
-  "$VENV/bin/pip" install --disable-pip-version-check -r backend/requirements.txt
+  "$VENV/bin/python" -m pip install --disable-pip-version-check -r backend/requirements.txt
   cp backend/requirements.txt "$VENV/.requirements.installed"
 fi
 
@@ -96,7 +96,9 @@ fi
 # ---------------------------------------------------------------- запуск
 HOST="${FARM_HOST:-127.0.0.1}"
 PORT="${FARM_PORT:-8777}"
-URL="http://${HOST}:${PORT}"
+# Проверяем TLS до остановки работающего сервера. Ошибка не откатывает нас на HTTP.
+"$VENV/bin/python" backend/tools/setup_https.py
+URL="$(PYTHONPATH="$PWD/backend" "$VENV/bin/python" -m farm.tls)"
 
 # Старый сервер этой же папки останавливаем сами: иначе новый не займёт порт, а
 # если порт свободен — два сервера делили бы телефоны и мешали друг другу.

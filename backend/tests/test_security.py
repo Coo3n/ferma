@@ -54,10 +54,10 @@ def test_origin_allowed(method, origin, referer, ok):
     assert security.origin_allowed(method, "127.0.0.1:8777", origin, referer) is ok
 
 
-def _request(method="GET", path="/api/status", headers=None, query=b""):
+def _request(method="GET", path="/api/status", headers=None, query=b"", scheme="http"):
     raw = [(k.lower().encode(), v.encode()) for k, v in (headers or {}).items()]
     return Request({"type": "http", "method": method, "path": path, "headers": raw,
-                    "query_string": query, "scheme": "http", "server": ("127.0.0.1", 8777)})
+                    "query_string": query, "scheme": scheme, "server": ("127.0.0.1", 8777)})
 
 
 def _guard(req):
@@ -103,6 +103,105 @@ def test_app_has_guard():
     assert security.guard in names
 
 
+@pytest.mark.parametrize("origin", [
+    "http://127.0.0.1:8777", "https://[broken", "https://127.0.0.1:bad",
+    "https://user@127.0.0.1:8777", "https://127.0.0.1:8777/path",
+])
+def test_https_rejects_downgraded_or_malformed_origin(monkeypatch, origin):
+    monkeypatch.delenv("FARM_TOKEN", raising=False)
+    response = _guard(_request("POST", headers={
+        "host": "127.0.0.1:8777", "origin": origin,
+    }, scheme="https"))
+    assert response.status_code == 403
+
+
+def test_https_accepts_same_origin_default_port(monkeypatch):
+    monkeypatch.delenv("FARM_TOKEN", raising=False)
+    response = _guard(_request("POST", headers={
+        "host": "localhost:443", "origin": "https://localhost",
+    }, scheme="https"))
+    assert response.status_code == 200
+
+
+def test_https_login_cookie_and_auth_responses_are_private(monkeypatch):
+    monkeypatch.setenv("FARM_TOKEN", "s3cret")
+    response = _guard(_request(path="/", headers={"host": "localhost:8777"},
+                              query=b"token=s3cret", scheme="https"))
+    assert response.status_code == 303
+    cookie = response.headers["set-cookie"].lower()
+    assert "secure" in cookie and "httponly" in cookie and "samesite=strict" in cookie
+    assert "max-age=43200" in cookie
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["x-frame-options"] == "DENY"
+
+
+@pytest.mark.parametrize("secret,scheme,expected", [
+    ("", "https", 503), ("short", "https", 503),
+    ("a" * 32, "http", 403), ("a" * 32, "https", 200),
+])
+def test_remote_access_fails_closed(monkeypatch, secret, scheme, expected):
+    from farm import config
+    monkeypatch.setattr(config, "HOST", "0.0.0.0")
+    monkeypatch.setenv("FARM_TOKEN", secret)
+    monkeypatch.setenv("FARM_HTTPS", "1")
+    response = _guard(_request(headers={"host": "192.168.1.2:8777",
+                                        "x-farm-token": secret,
+                                        "x-forwarded-proto": "https"}, scheme=scheme))
+    assert response.status_code == expected
+
+
+@pytest.mark.parametrize("host,secret,query", [
+    ("evil.com", "", b""), ("localhost", "secret", b""),
+    ("localhost", "secret", b"token=wrong"), ("localhost", "", b""),
+])
+def test_security_headers_cover_denials_and_api(monkeypatch, host, secret, query):
+    monkeypatch.setenv("FARM_TOKEN", secret)
+    response = _guard(_request(headers={"host": host}, query=query, scheme="https"))
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert "object-src 'none'" in response.headers["content-security-policy"]
+    assert "max-age=" in response.headers["strict-transport-security"]
+
+
+def test_security_preserves_artifact_sandbox(monkeypatch):
+    monkeypatch.delenv("FARM_TOKEN", raising=False)
+    async def handler(_):
+        return PlainTextResponse("artifact", headers={"Content-Security-Policy": "sandbox"})
+    response = asyncio.run(security.guard(_request(headers={"host": "localhost"}), handler))
+    assert response.headers["content-security-policy"] == "sandbox"
+
+
+def test_unhandled_error_does_not_disclose_exception():
+    from farm import server
+    handler = server.create_app().exception_handlers[Exception]
+    response = asyncio.run(handler(_request(), RuntimeError("secret/path/password")))
+    assert response.status_code == 500
+    assert b"secret/path/password" not in response.body
+    assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize("headers", [
+    {"sec-fetch-site": "cross-site"}, {"origin": "https://evil.test"},
+    {"referer": "https://evil.test/page"},
+])
+def test_cross_site_get_cannot_trigger_device_recording(monkeypatch, headers):
+    monkeypatch.delenv("FARM_TOKEN", raising=False)
+    response = _guard(_request(path="/api/devices/TEST/record",
+                              headers={"host": "localhost", **headers}, scheme="https"))
+    assert response.status_code == 403
+
+
+@pytest.mark.parametrize("path,cdn", [("/", False), ("/api/status", False),
+                                      ("/docs", True), ("/redoc", True)])
+def test_docs_assets_allowed_without_relaxing_application_csp(path, cdn):
+    from starlette.responses import HTMLResponse
+    response = security.protect_response(_request(path=path), HTMLResponse("docs"))
+    policy = response.headers["content-security-policy"]
+    assert ("https://cdn.jsdelivr.net" in policy) is cdn
+    assert "object-src 'none'" in policy and "frame-ancestors 'none'" in policy
+
+
 # ------------------------------------------------------------ аккаунты
 
 @pytest.fixture
@@ -140,7 +239,8 @@ def test_accounts_save_error_does_not_log_contents(acc_file, monkeypatch, caplog
         raise OSError("disk full TOPSECRET")
     monkeypatch.setattr(accounts.os, "replace", boom)
     with caplog.at_level(logging.WARNING, logger="farm.accounts"):
-        accounts.update(accounts.all_accounts()[0]["id"], {"note": "x"})
+        with pytest.raises(accounts.SaveError):
+            accounts.update(accounts.all_accounts()[0]["id"], {"note": "x"})
     assert "TOPSECRET" not in caplog.text
     assert not list(acc_file.parent.glob("*.tmp"))
 

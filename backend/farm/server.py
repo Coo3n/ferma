@@ -8,9 +8,10 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import api, config, security
+from . import accounts, api, config, security, tls
 from .devices import net, registry
 from .schedule import scheduler
+from .limits import BodyLimits, TrafficLimits
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,18 +23,15 @@ log = logging.getLogger("farm.server")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    security.validate_network()
     registry.start()
     net.start()
     scheduler.start()
     log.info("ADB: %s", registry.adb_version)
-    log.info("API: http://%s:%s/api", config.HOST, config.PORT)
+    log.info("API: %s/api", tls.browser_url())
     if config.SERVE_FRONTEND:
-        log.info("Сайт: http://%s:%s", config.HOST, config.PORT)
+        log.info("Сайт: %s", tls.browser_url())
     log.info("Данные: %s", config.DATA_DIR)
-    if not security.is_loopback(config.HOST) and not security.token():
-        log.warning("Ферма открыта в сеть (FARM_HOST=%s) без FARM_TOKEN: любой в "
-                    "этой сети управляет телефонами и видит пароли аккаунтов. "
-                    "Задайте FARM_TOKEN или верните FARM_HOST=127.0.0.1.", config.HOST)
     yield
     scheduler.stop()
     net.stop()
@@ -44,11 +42,19 @@ def create_app() -> FastAPI:
     application = FastAPI(title="Android Farm", version="0.1.0", lifespan=lifespan)
     application.include_router(api.router)
 
+    @application.exception_handler(accounts.SaveError)
+    async def account_save_failed(request, exc):
+        return JSONResponse({"detail": str(exc)}, status_code=503)
+
     # Сайт (frontend/) — обычные статические файлы. Монтируем последним и на
     # корень: всё, что не /api, — это сайт. Без него сервер — чистый API.
     if config.SERVE_FRONTEND and config.FRONTEND_DIR.is_dir():
         application.mount("/", StaticFiles(directory=str(config.FRONTEND_DIR), html=True),
                           name="frontend")
+
+    # Ближе всего к обработчикам: HTTPException из receive() должна попадать
+    # прямо в ExceptionMiddleware, а не в task group BaseHTTPMiddleware.
+    application.add_middleware(BodyLimits)
 
     # Без этого браузер держал старые JS/CSS из кэша и после обновления
     # фермы показывал прежний интерфейс. no-cache = «спроси сервер»: файл
@@ -60,14 +66,16 @@ def create_app() -> FastAPI:
             response.headers["Cache-Control"] = "no-cache"
         return response
 
-    # Последним, чтобы оборачивать всё остальное: Host/Origin/токен
+    # Host/Origin/токен проверяются до чтения тела запроса.
     # проверяются до любого обработчика, включая статику.
     application.middleware("http")(security.guard)
+    application.add_middleware(TrafficLimits)
 
     @application.exception_handler(Exception)
     async def unhandled(request, exc):  # noqa: ANN001
         log.exception("необработанная ошибка на %s", request.url.path)
-        return JSONResponse({"detail": str(exc)}, status_code=500)
+        return security.protect_response(request, JSONResponse(
+            {"detail": "Внутренняя ошибка сервера. Подробности в журнале фермы."}, status_code=500))
 
     return application
 
@@ -78,7 +86,11 @@ app = create_app()
 def main() -> None:
     import uvicorn
 
-    uvicorn.run(app, host=config.HOST, port=config.PORT, log_level="warning")
+    try:
+        options = tls.uvicorn_options()
+    except ValueError as exc:
+        raise SystemExit(str(exc))
+    uvicorn.run(app, **options)
 
 
 if __name__ == "__main__":

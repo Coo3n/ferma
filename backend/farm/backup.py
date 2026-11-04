@@ -18,6 +18,7 @@ import re
 import time
 import zipfile
 import zlib
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 from . import config
@@ -126,6 +127,27 @@ def _is_secret(name: str) -> bool:
     return name == "data/accounts.json" or (name.startswith("adb/") and name.endswith("adbkey"))
 
 
+@contextmanager
+def _restore_state(plan):
+    """Не даём фоновым писателям вернуть старые данные поверх архива."""
+    from . import accounts
+    from .schedule import scheduler
+
+    targets = {name: target for name, target, _data in plan}
+    with ExitStack() as stack:
+        target = targets.get("data/schedules.json")
+        if target is not None and target.resolve() == scheduler.path.resolve():
+            stack.enter_context(scheduler.restoring())
+        has_accounts = "data/accounts.json" in targets
+        if has_accounts:
+            stack.enter_context(accounts._lock)
+        try:
+            yield
+        finally:
+            if has_accounts:
+                _drop_accounts_cache()
+
+
 def restore(blob: bytes, adb_key: bool = False, scenarios: bool = False) -> dict:
     z = _open(blob)
     restored, skipped, plan = [], [], []
@@ -152,23 +174,22 @@ def restore(blob: bytes, adb_key: bool = False, scenarios: bool = False) -> dict
         plan.append((name, target, data))
     saved_root = Path(config.DATA_DIR) / ".restore-backup" / time.strftime("%Y%m%d-%H%M%S")
     saved_any = False
-    for name, target, data in plan:
-        if target.exists():
-            keep = saved_root / name
-            _mkdir_private(keep.parent)
-            _write_private(keep, target.read_bytes())
-            saved_any = True
-        target.parent.mkdir(parents=True, exist_ok=True)
-        tmp = target.with_name(target.name + ".tmp")
-        if _is_secret(name):
-            _write_private(tmp, data)     # приватный ключ и пароли не должны читаться чужими
-        else:
-            tmp.write_bytes(data)
-        os.replace(tmp, target)
-        restored.append(name)
+    with _restore_state(plan):
+        for name, target, data in plan:
+            if target.exists():
+                keep = saved_root / name
+                _mkdir_private(keep.parent)
+                _write_private(keep, target.read_bytes())
+                saved_any = True
+            target.parent.mkdir(parents=True, exist_ok=True)
+            tmp = target.with_name(target.name + ".tmp")
+            if _is_secret(name):
+                _write_private(tmp, data)     # приватный ключ и пароли не должны читаться чужими
+            else:
+                tmp.write_bytes(data)
+            os.replace(tmp, target)
+            restored.append(name)
     data_restored = any(n.startswith("data/") for n in restored)
-    if "data/accounts.json" in restored:
-        _drop_accounts_cache()
     return {"restored": restored, "skipped": skipped,
             "saved_previous_to": str(saved_root) if saved_any else None,
             "restart_needed": data_restored}

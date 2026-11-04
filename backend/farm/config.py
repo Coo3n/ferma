@@ -8,7 +8,10 @@ from pathlib import Path
 #   data/      — рабочие данные фермы (аккаунты, телефоны, артефакты), не в git
 ROOT = Path(__file__).resolve().parent.parent          # backend/
 PROJECT_DIR = ROOT.parent
-DATA_DIR = Path(os.getenv("FARM_DATA_DIR", PROJECT_DIR / "data"))
+DATA_DIR = Path(os.getenv("FARM_DATA_DIR", PROJECT_DIR / "data")).expanduser()
+if not DATA_DIR.is_absolute():
+    DATA_DIR = PROJECT_DIR / DATA_DIR
+DATA_DIR = DATA_DIR.resolve()
 
 # Каталоги
 SCENARIOS_DIR = Path(os.getenv("FARM_SCENARIOS_DIR", ROOT / "scenarios"))

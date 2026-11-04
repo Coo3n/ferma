@@ -648,7 +648,7 @@ const ACC_SEPARATORS = ['\t', ';', ':', ','];
 
 function accParseLine(line) {
     const sep = ACC_SEPARATORS.find(s => line.includes(s));
-    const parts = sep ? line.split(sep).map(p => p.trim()) : [line];
+    const parts = sep ? line.split(sep).map((p, i) => i === 1 ? p : p.trim()) : [line.trim()];
     return {
         login: parts[0],
         password: parts.length > 1 ? parts[1] : '',
@@ -665,7 +665,7 @@ function accImportPlan(text, platform) {
     (text || '').split(/\r?\n/).forEach((raw, i) => {
         const line = raw.trim();
         if (!line || line.startsWith('#')) return;
-        const row = accParseLine(line);
+        const row = accParseLine(raw);
         row.n = i + 1;
         const key = row.login.toLowerCase();
         if (!row.password) row.kind = 'bad';

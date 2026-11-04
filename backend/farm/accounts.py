@@ -12,6 +12,7 @@ import os
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 from . import config
@@ -28,6 +29,24 @@ FIELDS = ("platform", "login", "password", "phone", "proxy", "note", "serial", "
 
 _lock = threading.RLock()
 _items: list[dict] | None = None
+
+
+class SaveError(OSError):
+    """Сохранение не состоялось; текст безопасен для ответа API."""
+
+
+@contextmanager
+def _edit():
+    """Изменяем копию под замком; при ошибке возвращаем прежний снимок."""
+    global _items
+    with _lock:
+        before = _load()
+        _items = [dict(a) for a in before]
+        try:
+            yield _items
+        except BaseException:
+            _items = before
+            raise
 
 
 # Пароли: файл читает только владелец. Права выставляются и при чтении —
@@ -74,7 +93,10 @@ def _save() -> None:
         data = json.dumps(_items, ensure_ascii=False, indent=2).encode("utf-8")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, FILE_MODE)
         with os.fdopen(fd, "wb") as fh:
-            os.fchmod(fh.fileno(), FILE_MODE)
+            if hasattr(os, "fchmod"):
+                os.fchmod(fh.fileno(), FILE_MODE)
+            else:  # Windows: fchmod отсутствует, chmod поддерживает writable.
+                os.chmod(tmp, FILE_MODE)
             fh.write(data)
             fh.flush()
             os.fsync(fh.fileno())
@@ -86,10 +108,12 @@ def _save() -> None:
             tmp.unlink(missing_ok=True)
         except OSError:
             pass
+        raise SaveError("Не удалось сохранить аккаунты. Проверьте свободное место и права на папку данных.") from None
 
 
 def _clean(data: dict) -> dict:
-    out = {k: str(data.get(k) or "").strip() for k in FIELDS if k in data}
+    out = {k: str(data.get(k) or "") for k in FIELDS if k in data}
+    out = {k: v if k == "password" else v.strip() for k, v in out.items()}
     if "platform" in out:
         out["platform"] = out["platform"].lower()
         if out["platform"] not in PLATFORMS:
@@ -109,21 +133,26 @@ def get(account_id: str) -> dict | None:
         return next((dict(a) for a in _load() if a["id"] == account_id), None)
 
 
-def create(data: dict) -> dict:
+def _new_item(data: dict) -> dict:
     item = {k: "" for k in FIELDS}
     item.update(_clean(data))
     item["status"] = item["status"] or "new"
     item["id"] = uuid.uuid4().hex[:10]
     item["updated"] = time.time()
-    with _lock:
-        _load().append(item)
+    return item
+
+
+def create(data: dict) -> dict:
+    item = _new_item(data)
+    with _edit() as items:
+        items.append(item)
         _save()
     return dict(item)
 
 
 def update(account_id: str, data: dict) -> dict | None:
-    with _lock:
-        for a in _load():
+    with _edit() as items:
+        for a in items:
             if a["id"] == account_id:
                 a.update(_clean(data))
                 a["updated"] = time.time()
@@ -133,8 +162,7 @@ def update(account_id: str, data: dict) -> dict | None:
 
 
 def delete(account_id: str) -> bool:
-    with _lock:
-        items = _load()
+    with _edit() as items:
         before = len(items)
         items[:] = [a for a in items if a["id"] != account_id]
         if len(items) != before:
@@ -147,8 +175,7 @@ def delete_many(ids: list[str]) -> int:
     """Удалить пачку одним сохранением: 500 отдельных запросов DELETE
     переписывали бы файл 500 раз и шли бы минуту."""
     wanted = {str(i) for i in ids or ()}
-    with _lock:
-        items = _load()
+    with _edit() as items:
         before = len(items)
         items[:] = [a for a in items if a["id"] not in wanted]
         removed = before - len(items)
@@ -160,9 +187,9 @@ def delete_many(ids: list[str]) -> int:
 def unbind_many(ids: list[str]) -> int:
     """Отвязать пачку от телефонов. Считаем только тех, кто был привязан."""
     wanted = {str(i) for i in ids or ()}
-    with _lock:
+    with _edit() as items:
         count = 0
-        for a in _load():
+        for a in items:
             if a["id"] in wanted and a.get("serial"):
                 a["serial"] = ""
                 a["updated"] = time.time()
@@ -182,15 +209,14 @@ def parse_lines(text: str, platform: str) -> list[dict]:
     """Строки «логин:пароль[:прокси]» или через ; / таб / запятую — как их отдают продавцы."""
     rows = []
     for line in (text or "").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
+        if not line.strip() or line.lstrip().startswith("#"):
             continue
         for sep in SEPARATORS:
             if sep in line:
-                parts = [p.strip() for p in line.split(sep)]
+                parts = [p if i == 1 else p.strip() for i, p in enumerate(line.split(sep))]
                 break
         else:
-            parts = [line]
+            parts = [line.strip()]
         row = {"platform": platform, "login": parts[0]}
         if len(parts) > 1:
             row["password"] = parts[1]
@@ -211,13 +237,10 @@ def import_report(text: str, platform: str) -> dict:
     списка или двойной клик давали двойников — два телефона в одном аккаунте
     = бан). Строка без пароля не импортируется, а называется номером: иначе
     в базе оставался аккаунт, которым не войти."""
-    platform_key = platform.lower()
-    with _lock:
-        known = {a["login"].lower() for a in _load() if a["platform"] == platform_key}
+    platform_key = platform.strip().lower()
     created, duplicates, bad = [], 0, []
-    lineno = 0
-    for raw in (text or "").splitlines():
-        lineno += 1
+    pending = []
+    for lineno, raw in enumerate((text or "").splitlines(), 1):
         if not raw.strip() or raw.strip().startswith("#"):
             continue
         rows = parse_lines(raw, platform)
@@ -227,20 +250,28 @@ def import_report(text: str, platform: str) -> dict:
         if not row.get("password"):
             bad.append(lineno)
             continue
-        key = row["login"].lower()
-        if key in known:
-            duplicates += 1
-            continue
-        known.add(key)
-        created.append(create(row))
+        pending.append(_new_item(row))
+    # Проверка дублей и публикация всего импорта — одна транзакция.
+    # Парсинг вне замка: он не читает хранилище и не блокирует другие запросы.
+    with _edit() as items:
+        known = {a["login"].lower() for a in items if a["platform"] == platform_key}
+        for item in pending:
+            key = item["login"].lower()
+            if key in known:
+                duplicates += 1
+                continue
+            known.add(key)
+            items.append(item)
+            created.append(dict(item))
+        if created:
+            _save()
     return {"created": created, "duplicates": duplicates, "bad_lines": bad}
 
 
 def auto_bind(platform: str, serials: list[str]) -> int:
     """Раздать свободные аккаунты платформы телефонам, у которых такого ещё нет."""
     platform = platform.lower()
-    with _lock:
-        items = _load()
+    with _edit() as items:
         taken = {a["serial"] for a in items if a["platform"] == platform and a["serial"]}
         free = [a for a in items if a["platform"] == platform and not a["serial"]
                 and a["status"] != "banned"]
@@ -250,6 +281,7 @@ def auto_bind(platform: str, serials: list[str]) -> int:
                 continue
             acc = free.pop(0)
             acc["serial"] = serial
+            taken.add(serial)
             acc["updated"] = time.time()
             bound += 1
         if bound:

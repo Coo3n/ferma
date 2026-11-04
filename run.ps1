@@ -209,7 +209,13 @@ if ($adbCmd) { $env:ADB = $adbCmd.Source; $env:ADB_PATH = $adbCmd.Source }
 # ------------------------------------------------------------------ запуск
 $hostName = if ($env:FARM_HOST) { $env:FARM_HOST } else { '127.0.0.1' }
 $port = if ($env:FARM_PORT) { $env:FARM_PORT } else { '8777' }
-$url = "http://${hostName}:${port}"
+# Ошибка сертификата не должна останавливать старый сервер или включать HTTP.
+& $vpy (Join-Path $PSScriptRoot 'backend/tools/setup_https.py')
+if ($LASTEXITCODE -ne 0) { Fail 'HTTPS не настроен — исправьте ошибку выше.' }
+Push-Location (Join-Path $PSScriptRoot 'backend')
+try { $url = & $vpy -m farm.tls; $tlsExit = $LASTEXITCODE }
+finally { Pop-Location }
+if ($tlsExit -ne 0) { Fail 'Проверка HTTPS не прошла.' }
 # Старый сервер этой папки останавливаем сами (иначе новый не займёт порт или
 # два сервера делили бы телефоны). Чужие программы не трогаем: только процессы
 # `farm.server` из нашего .venv.

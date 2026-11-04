@@ -1,5 +1,9 @@
 fastapi>=0.111
-uvicorn[standard]>=0.30
+# http_protocol.py расширяет H11Protocol; новую minor-версию проверять тестами.
+uvicorn[standard]>=0.54.0,<0.55
 uiautomator2>=3.2
 Pillow>=10.0
 pytest>=8.0
+# Исправления известных уязвимостей транзитивных зависимостей (аудит 2026-11-05).
+certifi>=2026.10.19
+setuptools>=84.1.0

@@ -94,6 +94,7 @@ class Job:
     time_by_reason: dict = field(default_factory=dict)
     _cancel: threading.Event = field(default_factory=threading.Event, repr=False)
     _decided: threading.Event = field(default_factory=threading.Event, repr=False)
+    _state_lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
 
     @property
     def duration(self) -> float:
@@ -716,8 +717,13 @@ def _execute(job: Job) -> None:
                 module.run(ctx)
         except Finished as e:
             job.add_line(f"сценарий закончен досрочно: {e}")
-        job.status = PASSED
-        job.add_line(f"готово за {job.duration:.1f} с")
+        # Финальный adb-вызов мог вернуться уже после принятой отмены.
+        # Проверка и публикация успеха атомарны относительно Runner.cancel.
+        with job._state_lock:
+            if job._cancel.is_set():
+                raise Cancelled("отменено")
+            job.status = PASSED
+            job.add_line(f"готово за {job.duration:.1f} с")
 
     except Cancelled as e:
         job.status = CANCELLED
@@ -773,6 +779,8 @@ class Trial:
     started: int = 0    # сколько телефонов получили задачи после пробы
     skipped: int = 0    # сколько пропущено: к моменту запуска не в сети
     error: str = ""
+    _launch_pending: bool = field(default=True, repr=False)
+    _cancelled_serials: set[str] = field(default_factory=set, repr=False)
 
     def to_dict(self, job: Job | None) -> dict:
         return {
@@ -880,12 +888,12 @@ class Runner:
         for serial in serials:
             if registry.get(serial) is None:
                 raise ValueError(f"устройство {serial} не подключено")
-        jobs = self.submit(scenario_key, [first], params, 1, batch=batch)
-        job = jobs[0]
-        trial = Trial(batch=job.batch, job_id=job.id, serial=first, device_name=job.device_name,
-                      rest=[s for s in serials if s != first], scenario_key=scenario_key,
-                      params=dict(params or {}), repeat=max(1, int(repeat or 1)))
         with self._lock:
+            jobs = self.submit(scenario_key, [first], params, 1, batch=batch)
+            job = jobs[0]
+            trial = Trial(batch=job.batch, job_id=job.id, serial=first, device_name=job.device_name,
+                          rest=[s for s in serials if s != first], scenario_key=scenario_key,
+                          params=dict(params or {}), repeat=max(1, int(repeat or 1)))
             self.trials[job.batch] = trial
             # Задача могла кончиться раньше, чем план лёг в словарь.
             done = job.status in DONE
@@ -913,22 +921,28 @@ class Runner:
     def _trial_launch(self, trial: Trial) -> None:
         """Остальные — в тот же batch: в «Запусках» это один запуск.
         Пробному телефону досылаются недостающие повторы."""
-        online = [s for s in trial.rest
-                  if (d := registry.get(s)) is not None and d.online]
-        trial.skipped = len(trial.rest) - len(online)
-        try:
-            if online:
-                self.submit(trial.scenario_key, online, trial.params, trial.repeat,
-                            batch=trial.batch)
-            if trial.repeat > 1:
-                self.submit(trial.scenario_key, [trial.serial], trial.params,
-                            trial.repeat - 1, batch=trial.batch)
-            trial.started = len(online)
-        except (ValueError, TypeError) as e:
-            # Повторно не пробуем: часть задач уже могла встать, а двойной
-            # запуск хуже недозапуска. Причина видна в полосе запуска.
-            trial.error = str(e)
-            log.warning("проба %s: остальные не запущены: %s", trial.batch, e)
+        # Остановка либо аннулирует план до постановки, либо увидит ВСЕ
+        # поставленные задачи. Между проверкой и submit замок не отпускаем.
+        with self._lock:
+            if (self.trials.get(trial.batch) is not trial or not trial._launch_pending
+                    or trial.state == TRIAL_DROPPED):
+                return
+            trial._launch_pending = False
+            online = [s for s in trial.rest if s not in trial._cancelled_serials
+                      and (d := registry.get(s)) is not None and d.online]
+            trial.skipped = len(trial.rest) - len(online)
+            try:
+                if online:
+                    self.submit(trial.scenario_key, online, trial.params, trial.repeat,
+                                batch=trial.batch)
+                if trial.repeat > 1:
+                    self.submit(trial.scenario_key, [trial.serial], trial.params,
+                                trial.repeat - 1, batch=trial.batch)
+                trial.started = len(online)
+            except (ValueError, TypeError) as e:
+                # Часть задач могла встать; повторная постановка их удвоит.
+                trial.error = str(e)
+                log.warning("проба %s: остальные не запущены: %s", trial.batch, e)
 
     def trial_release(self, batch: str) -> Trial | None:
         """«Всё равно запустить на остальных» — после непрошедшей пробы."""
@@ -950,27 +964,29 @@ class Runner:
             return trial
 
     def cancel(self, job_id: str) -> bool:
-        job = self.jobs.get(job_id)
-        if job is None or job.status in DONE or job._cancel.is_set():
-            return False
-        job._cancel.set()
-        # Остановленная задача спит на событии решения, а не на check_cancel:
-        # без побудки она проспала бы отмену до самого HOLD_TIMEOUT.
-        job._decided.set()
-        if job.status == QUEUED:
-            job.status = CANCELLED
-            job.finished_at = time.time()
-            job.add_line("отменено до старта")
-            # Воркер такую задачу пропустит, итог пробы подводим здесь.
-            self._trial_settle(job)
-        else:
-            # Прервать чужой поток посреди шага нельзя, а показать, что отмена
-            # принята, надо сразу: статус меняется здесь, до выхода сценария.
-            job.status = CANCELLING
-            job.held_reason = ""
-            job.held_at = None
-            job.add_line("отмена принята — прерываю на ближайшем шаге")
-        return True
+        with self._lock:
+            job = self.jobs.get(job_id)
+            if job is None:
+                return False
+            with job._state_lock:
+                if job.status in DONE or job._cancel.is_set():
+                    return False
+                job._cancel.set()
+                # Будим и остановленную на решении человека задачу.
+                job._decided.set()
+                queued = job.status == QUEUED
+                if queued:
+                    job.status = CANCELLED
+                    job.finished_at = time.time()
+                    job.add_line("отменено до старта")
+                else:
+                    job.status = CANCELLING
+                    job.held_reason = ""
+                    job.held_at = None
+                    job.add_line("отмена принята — прерываю на ближайшем шаге")
+            if queued:
+                self._trial_settle(job)
+            return True
 
     def decide(self, job_id: str, decision: str,
                target: dict | None = None) -> bool:
@@ -1014,12 +1030,20 @@ class Runner:
         return n
 
     def cancel_all(self, serial: str | None = None) -> int:
-        n = 0
-        for job in list(self.jobs.values()):
-            if job.status in ACTIVE and (serial is None or job.serial == serial):
-                if self.cancel(job.id):
-                    n += 1
-        return n
+        with self._lock:
+            for trial in self.trials.values():
+                if not trial._launch_pending:
+                    continue
+                if serial is None or serial == trial.serial:
+                    trial.state = TRIAL_DROPPED
+                elif serial in trial.rest:
+                    trial._cancelled_serials.add(serial)
+            n = 0
+            for job in list(self.jobs.values()):
+                if job.status in ACTIVE and (serial is None or job.serial == serial):
+                    if self.cancel(job.id):
+                        n += 1
+            return n
 
     def delete(self, job_id: str) -> bool:
         """Убрать завершённую задачу из журнала. Работающую сначала отменяют."""
