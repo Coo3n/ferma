@@ -75,26 +75,24 @@ function galleryCard(item, state) {
     const tab = st.focus ? 0 : -1;
     const steps = item.steps_text || [];
     const params = item.params || [];
-    const badges = [
-        item.editable
-            ? `<span class="gal-badge ok" title="${esc(t('gallery.pravitsya_d'))}">${esc(t('gallery.pravitsya'))}</span>`
-            : `<span class="gal-badge" title="${esc(t('gallery.tolko_parametry_d'))}">${esc(t('gallery.tolko_parametry'))}</span>`,
-        item.verified ? '' :
-            `<span class="gal-badge warn" title="${esc(t('gallery.ne_proveren_d'))}">${esc(t('gallery.ne_proveren'))}</span>`,
-    ].join('');
+    /* Один ярлык максимум: «Правится». «Не проверено» и «только параметры» —
+       в подсказке, а не жёлтой плашкой на каждой карточке. */
+    const badge = item.editable
+        ? `<span class="gal-badge ok" title="${esc(t('gallery.pravitsya_d'))}">${esc(t('gallery.pravitsya'))}</span>` : '';
+    const tip = [item.verified ? '' : t('gallery.ne_proveren') + '. ' + t('gallery.ne_proveren_d'),
+        item.editable ? '' : t('gallery.tolko_parametry') + '. ' + t('gallery.tolko_parametry_d'),
+        params.length ? t('gallery.polya_d') + ': ' + params.map(p => p.label || p.name).join(', ') : '']
+        .filter(Boolean).join('\n');
     const what = steps.length ? `
         <button type="button" class="gal-what" tabindex="${tab}" aria-expanded="${st.open ? 'true' : 'false'}"
                 aria-controls="galSteps_${key}" onclick="galleryToggle('${key}')">
           <svg class="ic chev" aria-hidden="true"><use href="#i-down"/></svg>
           <span>${esc(t('gallery.chto_delaet'))}</span><b>${steps.length}</b>
-        </button>
+        </button>` : '<span></span>';
+    const list = steps.length ? `
         <div class="gal-steps" id="galSteps_${key}" role="region" aria-label="${esc(t('gallery.chto_delaet'))}">
           <div><ol>${galleryStepsHtml(steps)}</ol></div>
         </div>` : '';
-    const chips = params.length
-        ? `<div class="gal-params" title="${esc(t('gallery.polya_d'))}">${params.map(p =>
-            `<span class="gal-chip">${esc(p.label || p.name)}</span>`).join('')}</div>`
-        : '';
     const action = item.added
         ? `<button type="button" class="sm gal-open" tabindex="${tab}" onclick="galleryOpenMine('${key}')">
              <svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>${esc(t('gallery.uzhe_otkryt'))}</button>`
@@ -102,20 +100,17 @@ function galleryCard(item, state) {
              onclick="galleryAdd('${key}')">${esc(t('gallery.dobavit'))}</button>`;
     const letter = esc(String(item.platform || item.name || '?').trim().charAt(0).toUpperCase());
     return `<article class="gal-card" data-key="${key}" data-open="${st.open ? '1' : '0'}" tabindex="${tab}"
-             aria-label="${esc(item.name)}">
+             aria-label="${esc(item.name)}"${tip ? ` title="${esc(tip)}"` : ''}>
         <header>
           <span class="gal-tile" data-tone="${galleryTone(item.platform)}" aria-hidden="true">${letter}</span>
           <div class="gal-head"><b title="${esc(item.name)}">${esc(item.name)}</b>
-            <span class="gal-plat">${esc(item.platform)}</span></div>
+            <span class="gal-sub"><span class="gal-plat">${esc(item.platform)}</span>${badge}</span></div>
         </header>
-        <p title="${esc(item.description)}">${esc(item.description)}</p>
-        <div class="gal-badges">${badges}</div>
-        ${what}
-        ${chips}
-        <footer>${action}</footer>
+        <p>${esc(item.description)}</p>
+        ${list}
+        <footer>${what}${action}</footer>
       </article>`;
 }
-
 /* ---------------------------------------------------------------- отрисовка */
 
 async function galleryShow() {

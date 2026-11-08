@@ -1,0 +1,135 @@
+/* ИИ-мастер сюжетов (js/ai-wizard.js). Всё под #aiWiz / .ai-*, глобальные классы не трогаем. */
+#view-scen.ai-on > .split { display: none; }
+#aiWiz { flex: 1; min-height: 0; overflow: auto; padding: var(--s4); display: grid; gap: var(--s4);
+         align-content: start; container-type: inline-size; color: var(--text); font-size: var(--fs-3); }
+#aiWiz[hidden] { display: none; }
+/* До 1280px по центру; на широком экране две колонки (этап слева, сводка справа). Сброс отступов списков — только по вертикали, иначе margin-inline:auto теряется. */
+#aiWiz > * { max-width: min(1560px, 100%); width: 100%; margin-inline: auto; }
+#aiWiz h2 { margin: 0; font-size: var(--fs-5); font-weight: 600; overflow-wrap: anywhere; }
+#aiWiz h3 { margin: 0; font-size: var(--fs-4); font-weight: 600; }
+#aiWiz h4 { margin: var(--s2) 0 0; font-size: var(--fs-3); font-weight: 600; }
+#aiWiz p { margin: 0; line-height: var(--lh); }
+#aiWiz ul, #aiWiz ol { margin-block: 0; padding: 0; list-style: none; }
+
+.ai-head { display: grid; gap: var(--s2); }
+.ai-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin-inline: calc(var(--s2) * -1); }
+.ai-meta { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.ai-spacer { flex: 1 1 0; }
+.ai-dim { color: var(--text2); font-size: var(--fs-1); }
+.ai-chip { display: inline-flex; align-items: center; padding: 2px var(--s3); border-radius: var(--pill);
+           background: var(--panel2); color: var(--text2); font-size: var(--fs-1); line-height: 1.6; }
+.ai-chip[data-kind="ok"] { background: var(--accent-dim); color: var(--accent); }
+.ai-chip[data-kind="warn"], .ai-chip[data-kind="need"] { background: var(--warn-dim); color: var(--warn); }
+.ai-chip[data-kind="bad"] { background: var(--bad-dim); color: var(--bad); }
+
+/* Степпер — вкладки с линией снизу: тише плашек, но этап виден сразу. */
+.ai-stepper { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--panel3); }
+.ai-stepper button { width: 100%; justify-content: flex-start; gap: var(--s2); text-align: left; white-space: normal;
+                     background: transparent; color: var(--text2); border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.ai-stepper button:disabled { opacity: .45; }
+.ai-stepper b { display: inline-grid; place-items: center; width: 20px; height: 20px; flex: none;
+                border-radius: var(--pill); background: var(--panel3); font-size: var(--fs-1); font-weight: 600; }
+.ai-stepper button[aria-current="step"] { color: var(--text); border-bottom-color: var(--accent); }
+.ai-stepper button[aria-current="step"] b { background: var(--accent-fill); color: var(--accent-ink); }
+@container (max-width: 560px) {
+    .ai-stepper { grid-template-columns: repeat(4, auto); overflow-x: auto; }
+    .ai-stepper span { display: none; }
+    .ai-stepper button[aria-current="step"] span { display: inline; }
+}
+
+/* Две колонки: этап слева, сводка справа (шаги / замечания / ход). Уже 900px — одна. */
+.ai-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 400px); gap: var(--s4); align-items: start; }
+.ai-grid.ai-solo { grid-template-columns: minmax(0, 1fr); }
+.ai-side { display: grid; gap: var(--s3); align-content: start; }
+.ai-side:empty { display: none; }
+.ai-mini { display: grid; gap: 2px; }
+.ai-mini li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: var(--s2); align-items: center; padding: var(--s1) var(--s2);
+              border-radius: var(--r1); color: var(--text2); font-size: var(--fs-2); }
+.ai-mini li > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-mini li[data-st="passed"], .ai-mini li[data-st="ok"] { box-shadow: inset 3px 0 0 var(--accent); color: var(--text); }
+.ai-mini li[data-st="failed"], .ai-mini li[data-st="error"] { box-shadow: inset 3px 0 0 var(--bad); color: var(--text); }
+.ai-mini li[data-st="running"] { box-shadow: inset 3px 0 0 var(--busy); color: var(--text); }
+@container (max-width: 900px) {
+    .ai-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.ai-body { display: grid; gap: var(--s3); min-width: 0; }
+.ai-card { background: var(--panel); border-radius: var(--r3); padding: var(--s4); display: grid; gap: var(--s3); align-content: start; }
+.ai-card > .ai-row:last-child { margin-top: var(--s1); }
+.ai-card label { display: grid; gap: var(--s1); color: var(--text2); font-size: var(--fs-2); }
+.ai-card input:not([type="radio"]):not([type="checkbox"]), .ai-card select, .ai-card textarea { width: 100%; }
+.ai-card textarea { resize: vertical; min-height: 5.5em; }
+.ai-row { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; }
+.ai-row select { flex: 1 1 200px; width: auto; min-width: 0; }
+.ai-note { color: var(--text2); font-size: var(--fs-2); }
+.ai-msg { padding: var(--s2) var(--s3); border-radius: var(--r2); background: var(--well); font-size: var(--fs-2); }
+.ai-msg[data-kind="bad"] { background: var(--bad-dim); color: var(--bad); }
+.ai-msg[data-kind="warn"] { background: var(--warn-dim); color: var(--warn); }
+.ai-msg[data-kind="ok"] { background: var(--accent-dim); color: var(--accent); }
+.ai-notes { display: grid; gap: var(--s1); color: var(--text2); font-size: var(--fs-2); padding-left: var(--s4) !important; list-style: disc !important; }
+.ai-link { color: var(--accent); }
+.ai-sr, #aiWiz .ai-sr, #aiLive.ai-sr { position: absolute; left: 0; width: 1px; max-width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.ai-steps, .ai-tl { display: grid; gap: var(--s1); }
+.ai-st, .ai-tl li { display: grid; grid-template-columns: 28px 1fr auto; gap: var(--s2); align-items: center;
+                    padding: var(--s2); background: var(--well); border-radius: var(--r2); }
+.ai-tl li { grid-template-columns: 28px 1fr auto; }
+.ai-tl li[data-st="passed"], .ai-tl li[data-st="ok"] { box-shadow: inset 3px 0 0 var(--accent); }
+.ai-tl li[data-st="failed"], .ai-tl li[data-st="error"] { box-shadow: inset 3px 0 0 var(--bad); }
+.ai-tl li[data-st="running"] { box-shadow: inset 3px 0 0 var(--busy); }
+.ai-tl img { width: 56px; height: 100px; object-fit: cover; border-radius: var(--r1); display: block; }
+.ai-n { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: var(--pill);
+        background: var(--panel3); color: var(--text2); font-size: var(--fs-1); }
+.ai-lab { min-width: 0; overflow-wrap: anywhere; }
+.ai-lab small { display: block; color: var(--text2); font-size: var(--fs-1); }
+.ai-lab input { width: 100%; }
+.ai-acts { display: flex; gap: var(--s1); }
+.ai-acts button { min-width: 32px; }
+
+.ai-finds { display: grid; gap: var(--s3); }
+.ai-find { background: var(--well); border-radius: var(--r2); padding: var(--s3); display: grid; gap: var(--s2); }
+.ai-find[data-st="accepted"] { box-shadow: inset 3px 0 0 var(--accent); }
+.ai-find[data-st="rejected"], .ai-find[data-st="stale"], .ai-find[data-st="failed"] { opacity: .7; }
+.ai-fh { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+.ai-diff { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); font-size: var(--fs-2); }
+.ai-diff > div { padding: var(--s2); border-radius: var(--r1); overflow-wrap: anywhere; }
+.ai-diff small { display: block; color: var(--text2); font-size: var(--fs-1); }
+.ai-diff .was { background: var(--bad-dim); }
+.ai-diff .now { background: var(--accent-dim); }
+@container (max-width: 480px) { .ai-diff { grid-template-columns: 1fr; } }
+
+.ai-phones { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s2); }
+.ai-ph { display: flex !important; grid-template-columns: none; flex-direction: row; align-items: center; gap: var(--s3);
+         padding: var(--s3); background: var(--well); border-radius: var(--r2); cursor: pointer; color: var(--text) !important; }
+.ai-ph[data-off="1"] { opacity: .6; cursor: not-allowed; }
+.ai-ph:has(input:checked) { background: var(--accent-dim); }
+.ai-ph small { display: block; color: var(--text2); font-size: var(--fs-1); }
+.ai-risky { background: var(--warn-dim); }
+.ai-risky ul { display: grid; gap: var(--s1); }
+.ai-hist li button { width: 100%; display: flex; flex-wrap: wrap; gap: var(--s3); justify-content: flex-start; text-align: left; }
+.ai-obs { display: grid; gap: var(--s1); }
+.ai-obs[data-k="confirmed"] h4 { color: var(--accent); }
+.ai-obs[data-k="probable"] h4 { color: var(--warn); }
+.ai-obs[data-k="unverified"] h4 { color: var(--text2); }
+.ai-obs ul { display: grid; gap: var(--s1); padding-left: var(--s4) !important; list-style: disc !important; }
+
+/* Окно настроек живёт вне #aiWiz, поэтому сбрасываем браузерные отступы списков и заголовков здесь. */
+.ai-set ul, .ai-set ol { margin: 0; padding: 0; list-style: none; }
+.ai-set h3, .ai-set h4, .ai-set p { margin: 0; }
+.ai-set h4 { margin-top: var(--s2); font-size: var(--fs-3); font-weight: 600; }
+.ai-set .ai-card > .ai-chip, .ai-card > .ai-chip { justify-self: start; }
+.ai-set { display: grid; gap: var(--s3); }
+.ai-two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); align-items: start; }
+@media (max-width: 720px) { .ai-two { grid-template-columns: 1fr; } }
+.ai-set .ai-card { background: var(--panel2); }
+.ai-recs { display: grid; gap: var(--s2); }
+.ai-recs li { display: grid; gap: var(--s2); padding: var(--s3); background: var(--well); border-radius: var(--r2); }
+.ai-rec[data-fits="0"] { opacity: .85; }
+.ai-prog progress { width: 100%; height: 10px; accent-color: var(--accent); }
+
+#aiWiz :focus-visible, .ai-set :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 480px) {
+    #aiWiz { padding: var(--s3); }
+    .ai-st, .ai-tl li { grid-template-columns: 24px 1fr; }
+    .ai-acts { grid-column: 2; }
+}
+@media (prefers-reduced-motion: reduce) { #aiWiz * { transition: none !important; animation: none !important; } }

@@ -34,12 +34,13 @@ FIELDS = {
     "max_per_day": ("FARM_VLM_MAX_PER_DAY", int),
     "max_width": ("FARM_VLM_MAX_WIDTH", int),
     "min_confidence": ("FARM_VLM_MIN_CONFIDENCE", float),
+    "vision": ("FARM_VLM_VISION", str),     # yes|no|unknown — результат пробы картинки
 }
 DEFAULTS = {
     "enabled": False, "url": "", "model": "", "key": "",
     "timeout": config.VLM_TIMEOUT, "max_per_job": config.VLM_MAX_PER_JOB,
     "max_per_day": config.VLM_MAX_PER_DAY, "max_width": config.VLM_MAX_WIDTH,
-    "min_confidence": 0.6,
+    "min_confidence": 0.6, "vision": "unknown",
 }
 MASK = "••••••••"
 
@@ -55,6 +56,7 @@ class Settings:
     max_per_day: int = 200
     max_width: int = 720
     min_confidence: float = 0.6
+    vision: str = "unknown"
 
 
 def _file() -> dict:
@@ -111,6 +113,8 @@ def get() -> Settings:
     merged["max_per_day"] = max(0, int(merged["max_per_day"]))
     merged["max_width"] = max(160, int(merged["max_width"]))
     merged["min_confidence"] = min(1.0, max(0.0, float(merged["min_confidence"])))
+    if merged["vision"] not in ("yes", "no", "unknown"):
+        merged["vision"] = "unknown"
     return Settings(**merged)
 
 
@@ -123,6 +127,11 @@ def save(patch: dict) -> None:
     """Дописать поля в data/vlm.json. Неизвестные ключи игнорируются."""
     with _lock:
         data = _file()
+        # Другая модель/адрес — прежний результат пробы картинки недействителен.
+        if "vision" not in patch and any(
+                n in patch and str(patch[n] or "") != str(data.get(n, DEFAULTS[n]) or "")
+                for n in ("url", "model")):
+            data["vision"] = "unknown"
         for name, value in patch.items():
             if name in FIELDS:
                 data[name] = value

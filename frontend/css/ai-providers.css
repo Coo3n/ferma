@@ -1,0 +1,34 @@
+/* Окно «Подключить нейросеть» (ai-providers.js). Только токены; всё внутри .ap. */
+.ap { display: grid; gap: var(--s3); min-width: 0; }
+.ap h3, .ap p { margin: 0; }
+.ap-now { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); background: var(--panel2); border-radius: var(--r3); }
+.ap-dot { width: 10px; height: 10px; flex: none; border-radius: var(--pill); background: var(--text3); }
+.ap-dot[data-kind="ok"] { background: var(--accent); }
+.ap-dot[data-kind="warn"] { background: var(--warn); }
+.ap-nowtxt { flex: 1; min-width: 0; display: grid; font-size: var(--fs-3); overflow-wrap: anywhere; }
+.ap-nowtxt small { color: var(--text2); font-size: var(--fs-2); }
+
+.ap-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); }
+.ap-tile { display: grid; grid-template-rows: auto auto 1fr; justify-items: center; align-content: start; gap: 2px;
+    height: 100px; padding: var(--s3) var(--s2); text-align: center; background: var(--panel2); border-radius: var(--r3);
+    border: 1px solid var(--line); font-size: var(--fs-2); line-height: 1.25; min-width: 0; }
+.ap-tile:hover { background: var(--panel3); border-color: var(--line-hover); }
+.ap-tile[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-dim); }
+.ap-tile b { font-weight: 600; font-size: var(--fs-2); overflow-wrap: anywhere; }
+.ap-tile small { color: var(--text2); font-size: var(--fs-1); overflow-wrap: anywhere; }
+.ap-ico { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: var(--s1); border-radius: var(--pill);
+    background: var(--panel3); color: var(--text2); font-style: normal; font-weight: 700; font-size: var(--fs-1); }
+.ap-tile[aria-pressed="true"] .ap-ico { background: var(--accent); color: var(--accent-ink); }
+
+.ap-panel, .ap-local { display: grid; gap: var(--s3); align-content: start; background: var(--panel2); border: 1px solid var(--line); border-radius: var(--r3); padding: var(--s4); min-width: 0; }
+.ap-panel label, .ap-field { display: grid; gap: var(--s1); color: var(--text2); font-size: var(--fs-2); }
+.ap-panel input:not([type="radio"]), .ap-panel select { width: 100%; }
+.ap-lbl { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s3); flex-wrap: wrap; }
+.ap-hints { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.ap-panel > .primary { justify-self: start; }
+.ap-panel .ai-note[data-kind="warn"] { color: var(--warn); }
+.ap :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 520px) {
+    .ap-tiles { grid-template-columns: repeat(2, 1fr); }
+    .ap-panel > .primary { justify-self: stretch; }
+}

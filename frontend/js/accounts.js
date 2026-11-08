@@ -1,4 +1,4 @@
-/* Аккаунты: список + постоянный редактор. Черновики живут в памяти до
+﻿/* Аккаунты: список + постоянный редактор. Черновики живут в памяти до
    явного сохранения. Массовый выбор независим от открытого аккаунта. */
 
 const ACC = window.ACC = {items: [], platform: '', query: '', status: '', sel: new Set(),
@@ -27,6 +27,26 @@ const ACC_FILTERS = [
     {key: 'login', label: t('accounts.f_nuzhen_vhod'), test: a => a.status === 'login'},
 ];
 
+/* Прокси с логином/паролем — секрет: в списке показываем только адрес,
+   в редакторе поле скрыто, пока человек не нажмёт «показать». */
+function accProxySecret(p) {
+    p = String(p || '');
+    return p.includes('@') || p.split(':').length >= 4;
+}
+
+function accProxyHost(p) {
+    p = String(p || '').replace(/^[a-z0-9+.-]+:\/\//i, '');
+    if (p.includes('@')) return p.slice(p.lastIndexOf('@') + 1);
+    const parts = p.split(':');
+    return parts.length >= 4 ? parts.slice(0, 2).join(':') : p;
+}
+
+/* На узком экране список и данные аккаунта — два экрана по очереди. */
+function accSyncPane() {
+    const view = $('view-accounts');
+    if (view && view.classList) view.classList.toggle('acc-detail-on', !!ACC.opened && !!ACC.active);
+}
+
 async function loadAccounts() {
     const seq = ++ACC.loadSeq, revision = ACC.revision;
     let items;
@@ -34,7 +54,7 @@ async function loadAccounts() {
         items = await api('/api/accounts');
     } catch (e) {
         if (!ACC.loaded) {
-            setHTML($('accList'), `<div class="acc-list-empty" role="alert"><p>${esc(e.message)}</p><button onclick="loadAccounts()">${t('accounts.retry')}</button></div>`);
+            setHTML($('accList'), `<div class="acc-list-empty acc-list-error" role="alert"><h2>${t('accounts.error_title')}</h2><p>${esc(e.message)}</p><button class="sm primary" onclick="loadAccounts()">${t('accounts.retry')}</button></div>`);
             renderAccDetail();
         }
         return toast(e.message, 'bad');
@@ -116,9 +136,13 @@ function renderAccounts() {
         return;
     }
 
-    if (!rows.some(a => a.id === ACC.active)) ACC.active = rows[0]?.id || '';
+    if (!rows.some(a => a.id === ACC.active)) {
+        ACC.active = rows[0]?.id || '';
+        ACC.opened = false;
+    }
+    accSyncPane();
     setHTML(box, rows.length ? `<ul class="acc-items">${rows.map(accRowHtml).join('')}</ul>`
-        : `<div class="acc-list-empty"><p>${t('accounts.nichego')}</p><button class="sm" onclick="accResetFilters()">${t('accounts.sbrosit_filtry')}</button></div>`);
+        : `<div class="acc-list-empty"><h2>${t('accounts.nichego_title')}</h2><p>${t('accounts.nichego')}</p><button class="sm" onclick="accResetFilters()">${t('accounts.sbrosit_filtry')}</button></div>`);
     renderAccSelBar();
     renderAccDetail();
     if (focusedId) {
@@ -134,16 +158,17 @@ function accSocialIcon(platform) {
 }
 
 function accRowHtml(a, index) {
-    const phone = a.serial ? accDeviceName(a.serial) : t('accounts.ne_privyazan');
+    const phone = a.serial ? accDeviceName(a.serial) : '';
     const reachable = a.id === ACC.active || (!ACC.active && index === 0);
     return `<li data-id="${a.id}" class="acc-item${ACC.sel.has(a.id) ? ' sel' : ''}">
       <label class="acc-check"><input type="checkbox" data-sel="${a.id}" tabindex="${reachable ? 0 : -1}" aria-label="${t('accounts.vybrat')} ${esc(a.login)}"
         ${ACC.sel.has(a.id) ? 'checked' : ''}></label>
-      <button class="acc-item-open" data-open="${a.id}" tabindex="${reachable ? 0 : -1}" aria-current="${a.id === ACC.active}" onclick="accOpen('${a.id}')">
+      <button class="acc-item-open" data-open="${a.id}" tabindex="${reachable ? 0 : -1}" aria-current="${a.id === ACC.active}" onclick="accOpen('${a.id}', true)">
         ${accSocialIcon(a.platform)}
-        <span class="acc-identity"><strong>${esc(a.login)}</strong><span>${esc(PLATFORM_NAMES[a.platform] || a.platform)} <span class="acc-draft-mark" data-draft="${a.id}">${accDraftLabel(a.id)}</span></span></span>
+        <span class="acc-identity"><strong>${esc(a.login)}</strong><span class="acc-row-meta">${esc(PLATFORM_NAMES[a.platform] || a.platform)}${a.proxy ? ' <i class="acc-dot" aria-hidden="true"></i>' : ''}${a.proxy ? `<span class="acc-row-proxy" title="${esc(t('accounts.proxy_row', {p: accProxyHost(a.proxy)}))}">${esc(accProxyHost(a.proxy))}</span>` : ''} <span class="acc-draft-mark" data-draft="${a.id}">${accDraftLabel(a.id)}</span></span>
+</span>
         <span class="acc-row-facts"><span class="acc-status acc-status--${a.status}">${esc(ACC_STATUS[a.status] || a.status)}</span>
-        <span class="acc-row-phone" title="${esc(phone)}">${esc(phone)}</span></span>
+        ${a.serial ? `<span class="acc-row-phone" title="${esc(phone)}"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg>${esc(phone)}</span>` : ''}</span>
       </button></li>`;
 }
 
@@ -159,8 +184,10 @@ function accRefreshDraftMarks() {
     });
 }
 
-function accOpen(id) {
+function accOpen(id, user) {
     ACC.active = id;
+    if (user) ACC.opened = true;
+    if (!id) ACC.opened = false;
     document.querySelectorAll('#accList [data-open]').forEach((btn, i) => {
         const active = btn.dataset.open === id;
         btn.setAttribute('aria-current', String(active));
@@ -168,7 +195,11 @@ function accOpen(id) {
         btn.closest('.acc-item').querySelector('input').tabIndex = btn.tabIndex;
     });
     $('accDetail').dataset.account = '';
+    accSyncPane();
     renderAccDetail();
+    if (user && window.matchMedia && matchMedia('(max-width: 640px)').matches) {
+        $('accDetail').querySelector('.acc-close')?.focus();
+    }
 }
 
 function accCloseDetail() {
@@ -228,16 +259,18 @@ function renderAccDetail(force = false) {
     box.dataset.account = item.id;
     box.dataset.signature = signature;
     const a = {...item, ...ACC.drafts.get(item.id)};
+    const secretProxy = accProxySecret(a.proxy);
     const input = (key, type = 'text') => `<input id="accEdit-${key}" name="${key}" data-edit="${key}" type="${type}"
-        value="${esc(a[key] || '')}" autocomplete="${key === 'password' ? 'new-password' : 'off'}" spellcheck="false"
+        value="${esc(a[key] || '')}" autocomplete="${type === 'password' ? 'new-password' : 'off'}" spellcheck="false"
         ${key === 'login' ? 'required aria-describedby="accEditError"' : key === 'password' ? 'aria-describedby="accPasswordHint"' : ''}>`;
     box.innerHTML = `<form class="acc-editor" onsubmit="event.preventDefault();accSaveDetail()" novalidate>
       <header class="acc-detail-head">${accSocialIcon(item.platform)}<div class="acc-detail-identity"><h2>${esc(item.login)}</h2><span>${esc(PLATFORM_NAMES[item.platform] || item.platform)}</span></div>
-      <button type="button" class="ghost acc-close" onclick="accCloseDetail()" aria-label="${t('accounts.close_detail')}"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button></header>
+      <button type="button" class="ghost acc-close" onclick="accCloseDetail()" aria-label="${t('accounts.close_detail')}"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg><span class="acc-close-label">${t('accounts.back')}</span></button></header>
       <fieldset id="accEditFields">
         <div class="acc-binding"><div><span class="acc-field-label">${t('accounts.telefon')}</span>
           <button type="button" class="acc-binding-button" onclick="accPickPhone('${item.id}')"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg>
           <span id="accBoundName">${esc(accDeviceName(item.serial) || t('accounts.ne_privyazan'))}</span><span class="acc-binding-change">${t('accounts.change')}</span></button>
+          ${item.serial && accDevice(item.serial) ? `<button type="button" class="sm ghost acc-open-phone" onclick="openDevice('${esc(item.serial)}')"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg>${t('accounts.open_phone')}</button>` : ''}
           <small>${t('accounts.binding_saved')}</small></div></div>
         <div class="acc-form-grid">
           <label>${t('accounts.platforma')}<select name="platform" data-edit="platform">${accPlatformOptions().replace(`value="${a.platform}"`, `value="${a.platform}" selected`)}</select></label>
@@ -246,8 +279,10 @@ function renderAccDetail(force = false) {
           <div class="acc-password-field"><label for="accEdit-password">${t('accounts.parol')}</label><div class="acc-password-input">
             ${input('password', 'password')}<button type="button" class="ghost" aria-label="${t('accounts.pokazat_parol')}" onclick="accShowPw('${item.id}', this)"><svg class="ic" aria-hidden="true"><use href="#i-eye-off"/></svg></button></div>
             <small id="accPasswordHint">${item.has_password ? t('accounts.password_keep') : t('accounts.ne_zadan')}</small></div>
-          <label>${t('accounts.proksi')}${input('proxy')}</label>
-          <label>${t('accounts.zametka')}<textarea name="note" data-edit="note" rows="2">${esc(a.note || '')}</textarea></label>
+          <label>${t('accounts.phone_number')}${input('phone')}</label>
+          <div class="acc-password-field"><label for="accEdit-proxy">${t('accounts.proksi')}</label><div class="acc-password-input">
+            ${secretProxy ? input('proxy', 'password') : input('proxy')}${secretProxy ? `<button type="button" class="ghost" aria-pressed="false" aria-label="${t('accounts.show_proxy')}" onclick="accShowProxy(this)"><svg class="ic" aria-hidden="true"><use href="#i-eye-off"/></svg></button>` : ''}</div></div>
+          <label class="acc-full">${t('accounts.zametka')}<textarea name="note" data-edit="note" rows="2">${esc(a.note || '')}</textarea></label>
         </div>
       </fieldset>
       <p id="accEditError" class="acc-edit-error" role="alert" hidden></p>
@@ -271,6 +306,16 @@ function accResetDetail() {
     accRefreshDraftMarks();
     renderAccDetail(true);
     $('accEdit-login').focus();
+    toast(t('accounts.discarded'));
+}
+
+/* Прокси уже в браузере (список его отдаёт), поэтому показ — локальный. */
+function accShowProxy(btn) {
+    const input = $('accEdit-proxy');
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    btn.setAttribute('aria-pressed', String(show));
+    btn.setAttribute('aria-label', (show ? t('accounts.hide_proxy') : t('accounts.show_proxy')));
 }
 
 async function accSaveDetail() {
@@ -520,6 +565,7 @@ async function accShowPw(id, btn) {
     } catch (e) {
         ACC.errors.set(id, e.message);
         if (ACC.active === id) accEditorFeedback();
+        toast(e.message, 'bad');
     } finally {
         btn.disabled = false;
     }
@@ -627,6 +673,7 @@ async function accDelete(id, btn) {
     try {
         await api(`/api/accounts/${id}`, {method: 'DELETE'});
         ACC.items = ACC.items.filter(a => a.id !== id);
+        ACC.opened = false;
         ACC.sel.delete(id);
         ACC.drafts.delete(id);
         ACC.errors.delete(id);

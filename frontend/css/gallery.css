@@ -1,6 +1,7 @@
 /* Галерея готовых сюжетов (gallery.js).
    Шапка вне прокрутки: поиск и чипы всегда на виду. Только токены; тихие
-   заливки, один основной ярлык на карточку. */
+   заливки. Все плитки одного размера: колонки равны, высота строки фиксирована
+   (--gal-h), заголовок и описание обрезаются, кнопка прижата к низу. */
 
 .gal-bar {
     display: flex;
@@ -75,8 +76,7 @@
     white-space: nowrap;
 }
 
-/* Подсказка клавиш — отдельной строкой на всю ширину: на 1280 в одну линию с
-   поиском и чипами не помещается. */
+/* Подсказка клавиш — отдельной строкой на всю ширину. */
 .gal-hint {
     flex: 1 0 100%;
     font-size: var(--fs-1);
@@ -86,18 +86,22 @@
 /* ------------------------------------------------------------------- сетка */
 
 .gal-grid {
+    --gal-h: 176px;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-auto-rows: var(--gal-h);
     gap: var(--s3);
-    align-items: start;
     padding: var(--s4);
 }
 
 .gal-card {
-    display: flex;
-    flex-direction: column;
+    position: relative;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
     gap: var(--s2);
     min-width: 0;
+    min-height: 0;
+    height: var(--gal-h);
     padding: var(--s3) var(--s4);
     border: 1px solid var(--line-soft);
     border-radius: var(--r3);
@@ -143,6 +147,7 @@
 .gal-head {
     display: flex;
     flex-direction: column;
+    flex: 1;
     min-width: 0;
 }
 
@@ -154,30 +159,42 @@
     font-weight: 600;
 }
 
+.gal-sub {
+    height: 22px;
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    min-width: 0;
+}
+
 .gal-plat {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--dim);
     font-size: var(--fs-2);
 }
 
 .gal-card p {
     margin: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    align-self: start;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     color: var(--text2);
     font-size: var(--fs-3);
+    line-height: var(--lh);
 }
 
-/* --------------------------------------------------------------- бейджи */
-
-.gal-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--s1) var(--s2);
-}
+/* --------------------------------------------------------------- ярлык */
 
 .gal-badge {
-    padding: 2px var(--s2);
+    flex: none;
+    padding: 0 var(--s2);
+    line-height: 20px;
     border-radius: var(--pill);
     background: var(--panel2);
     color: var(--text2);
@@ -191,18 +208,12 @@
     color: var(--accent);
 }
 
-.gal-badge.warn {
-    background: var(--warn-dim);
-    color: var(--warn);
-}
-
 /* ---------------------------------------------------------- «Что делает» */
 
 .gal-what {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: var(--s2);
-    width: 100%;
     padding: var(--s1) 0;
     border: 0;
     background: transparent;
@@ -236,39 +247,39 @@
     transform: none;
 }
 
-/* Высота раскрывается через grid-template-rows 0fr → 1fr: без измерений в JS
-   и без «прыжка» на авто-высоту. Закрытый список скрыт и от Tab. */
+/* Шаги — всплывающий список внутри карточки: размер плитки не меняется.
+   Закрытый список скрыт и от Tab. */
 .gal-steps {
-    display: grid;
-    grid-template-rows: 0fr;
+    position: absolute;
+    inset: calc(var(--s3) + 48px) var(--s2) calc(var(--s3) + 38px);
+    z-index: 2;
+    overflow-y: auto;
+    padding: 0 var(--s3);
+    border-radius: var(--r2);
+    background: var(--panel3);
+    opacity: 0;
     visibility: hidden;
-    transition: grid-template-rows var(--mid) var(--ease-out), visibility 0s var(--mid);
+    transition: opacity var(--mid) var(--ease-out), visibility 0s var(--mid);
 }
 
 .gal-card[data-open="1"] .gal-steps {
-    grid-template-rows: 1fr;
+    opacity: 1;
     visibility: visible;
-    transition: grid-template-rows var(--mid) var(--ease-out), visibility 0s;
-}
-
-.gal-steps > div {
-    min-height: 0;
-    overflow: hidden;
+    transition: opacity var(--mid) var(--ease-out), visibility 0s;
 }
 
 .gal-steps ol {
     list-style: none;
     counter-reset: gal-step;
     margin: 0;
-    padding: var(--s1) 0 var(--s2);
-    border-top: 1px solid var(--line-soft);
+    padding: var(--s1) 0;
 }
 
 .gal-steps li {
     counter-increment: gal-step;
     display: flex;
     gap: var(--s2);
-    padding: 3px 0 3px calc(var(--d, 0) * var(--s4));
+    padding: 2px 0 2px calc(var(--d, 0) * var(--s4));
     color: var(--text2);
     font-size: var(--fs-2);
     line-height: var(--lh);
@@ -288,27 +299,13 @@
     overflow-wrap: anywhere;
 }
 
-/* ----------------------------------------------------- поля формы, подвал */
-
-.gal-params {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--s1) var(--s2);
-}
-
-.gal-chip {
-    padding: 1px var(--s2);
-    border-radius: var(--r1);
-    background: var(--well);
-    color: var(--dim);
-    font-size: var(--fs-1);
-}
+/* ----------------------------------------------------------------- подвал */
 
 .gal-card footer {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: var(--s2);
-    margin-top: var(--s1);
 }
 
 .gal-open {
@@ -322,7 +319,6 @@
 /* ---------------------------------------------------------------- скелетон */
 
 .gal-skel {
-    min-height: 168px;
     pointer-events: none;
 }
 

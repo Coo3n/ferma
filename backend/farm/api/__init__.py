@@ -30,5 +30,7 @@ router.include_router(gallery.router)
 router.include_router(backup.router)
 router.include_router(notifications.router)
 router.include_router(phrases.router)
+from . import ai_local; router.include_router(ai_local.router)  # noqa: E402
+from . import ai as ai_api; router.include_router(ai_api.router)  # noqa: E402
 
 __all__ = ["router"]

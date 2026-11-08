@@ -154,6 +154,13 @@ def plan(serial: str, task: str) -> list:
     if loc.safety.secret_goal(task):
         raise PlanError("в описании пароль или платёжные данные — такое нейросети не отправляем")
     try:
+        # Спящий экран даёт чёрный кадр, который выглядит как «защищённый». Будим телефон заранее.
+        from ..control import input as cinput
+        cinput.wake(serial)
+        time.sleep(1.2)
+    except Exception:  # noqa: BLE001 — не вышло разбудить: снимем как есть
+        pass
+    try:
         image = control.screenshot(serial, quality=85)
     except Exception as e:  # noqa: BLE001 — офлайн или неизвестный телефон
         raise PlanError(f"не удалось снять экран телефона: {e}")

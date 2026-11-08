@@ -18,6 +18,7 @@ from . import settings
 
 class VlmError(RuntimeError):
     """Нейросеть не ответила. Текст — для человека, без секретов."""
+    status = None      # HTTP-код ответа сервера, если он был (chat/list_models)
 
 
 def _human(reason) -> str:
@@ -97,3 +98,75 @@ def ask(image_bytes: bytes, prompt: str, cfg: "settings.Settings | None" = None,
         raise VlmError(f"нейросеть недоступна: {_human(getattr(e, 'reason', e))}") from None
     except ValueError:
         raise VlmError("нейросеть прислала не JSON") from None
+
+
+# ---- ниже: общий чат (текст и/или картинки) и список моделей; ask() выше не менялся ----
+
+def _call(req, timeout):
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8", "replace"))
+    except urllib.error.HTTPError as e:
+        err = VlmError(f"нейросеть ответила ошибкой {e.code}")
+        err.status = e.code
+        raise err from None
+    except (urllib.error.URLError, OSError) as e:
+        raise VlmError(f"нейросеть недоступна: {_human(getattr(e, 'reason', e))}") from None
+    except ValueError:
+        raise VlmError("нейросеть прислала не JSON") from None
+
+
+def _headers(cfg) -> dict:
+    h = {"Content-Type": "application/json"}
+    if cfg.key:
+        h["Authorization"] = "Bearer " + cfg.key
+        if urlsplit(cfg.url or "").hostname == "api.anthropic.com":
+            h["x-api-key"] = cfg.key              # родной заголовок Anthropic, Bearer они не везде берут
+            h["anthropic-version"] = "2023-06-01"
+    return h
+
+
+def _openai_variant(body: dict) -> dict:
+    """Новые модели OpenAI (gpt-5, o-серия) не принимают max_tokens и temperature=0."""
+    v = {k: x for k, x in body.items() if k not in ("temperature", "max_tokens")}
+    v["max_completion_tokens"] = max(int(body.get("max_tokens", 0)), 1500)   # рассуждения съедают лимит
+    return v
+
+
+def chat(messages: list, cfg: "settings.Settings | None" = None, images: list | None = None,
+         max_tokens: int = 1500) -> str:
+    """Общий вызов chat/completions. messages — [{role, content: str}];
+    images (bytes) прикрепляются к последнему сообщению пользователя."""
+    cfg = cfg or settings.get()
+    url = endpoint(cfg.url)
+    msgs = [dict(m) for m in messages]
+    if images:
+        parts = [{"type": "image_url", "image_url": {
+            "url": "data:image/jpeg;base64," + base64.b64encode(shrink(i, cfg.max_width)).decode("ascii")}}
+            for i in images]
+        for m in reversed(msgs):
+            if m.get("role") == "user":
+                m["content"] = parts + [{"type": "text", "text": str(m.get("content", ""))}]
+                break
+    body = {"model": cfg.model, "temperature": 0, "max_tokens": int(max_tokens), "messages": msgs}
+    req = urllib.request.Request(url, json.dumps(body).encode("utf-8"), _headers(cfg), method="POST")
+    try:
+        return _text_of(_call(req, cfg.timeout))
+    except VlmError as e:
+        if e.status != 400 or urlsplit(url).hostname != "api.openai.com":
+            raise
+    req = urllib.request.Request(url, json.dumps(_openai_variant(body)).encode("utf-8"),
+                                 _headers(cfg), method="POST")
+    return _text_of(_call(req, cfg.timeout))
+
+
+def list_models(cfg: "settings.Settings | None" = None) -> list:
+    """GET {base}/models → [{id}]."""
+    cfg = cfg or settings.get()
+    base = endpoint(cfg.url)[:-len("/chat/completions")]
+    req = urllib.request.Request(base + "/models", headers=_headers(cfg), method="GET")
+    data = _call(req, cfg.timeout)
+    items = data.get("data") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        raise VlmError("сервер прислал список моделей в неожиданном формате")
+    return [{"id": str(m["id"])} for m in items if isinstance(m, dict) and m.get("id")]
